@@ -1,0 +1,1 @@
+ALTER TABLE "payments" ADD COLUMN "refunded_amount_clp" integer DEFAULT 0 NOT NULL;

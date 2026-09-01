@@ -1,0 +1,46 @@
+{
+  "rooms": [
+    {
+      "slug": "habitacion-individual-valle",
+      "name": "Habitación Individual",
+      "description": "Habitación Individual con cama de dos plazas y baño privado.",
+      "capacity": 2,
+      "bedCount": 1,
+      "bedConfiguration": "1 cama matrimonial",
+      "bathroomDescription": "Baño privado",
+      "nightlyPriceClp": 39000,
+      "amenities": ["Wi‑Fi", "Calefacción", "SmartTV", "Toallas", "Escritorio", "Té y Café", "utensilios para desayuno"],
+      "images": [
+        { "file": "../../public/rooms/room-1.jpeg", "alt": "Imagen de la habitación Individual" }
+      ]
+    },
+    {
+      "slug": "habitacion-matrimonial-valle",
+      "name": "Habitación Matrimonial",
+      "description": "Habitación Matrimonial con cama de dos plazas y baño privado.",
+      "capacity": 2,
+      "bedCount": 1,
+      "bedConfiguration": "1 cama matrimonial",
+      "bathroomDescription": "Baño privado",
+      "nightlyPriceClp": 42000,
+      "amenities": ["Wi‑Fi", "Calefacción", "SmartTV", "Toallas", "Ropero", "Té y Café", "utensilios para desayuno"],
+      "images": [
+        { "file": "../../public/rooms/room-2.jpeg", "alt": "Imagen de la habitación Matrimonial" }
+      ]
+    },
+    {
+      "slug": "habitacion-doble-valle",
+      "name": "Habitación Doble",
+      "description": "Habitación doble con 2 camas de plaza y media y baño privado.",
+      "capacity": 2,
+      "bedCount": 2,
+      "bedConfiguration": "2 camas de plaza y media",
+      "bathroomDescription": "Baño privado",
+      "nightlyPriceClp": 48000,
+      "amenities": ["Wi‑Fi", "Calefacción", "SmartTV", "Toallas", "Ropero", "Mini refrigerador", "Té y Café", "utensilios para desayuno"],
+      "images": [
+        { "file": "../../public/rooms/room-3.jpeg", "alt": "Imagen de la habitación Doble" }
+      ]
+    }
+  ]
+}

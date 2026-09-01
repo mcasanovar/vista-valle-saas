@@ -1,0 +1,28 @@
+# dependencies
+/node_modules
+
+# Next.js
+/.next
+/out
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# local environment files
+.env*
+!.env.example
+!.env.test.example
+
+# test artifacts
+/playwright-report/
+/test-results/
+/blob-report/
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# macOS
+.DS_Store

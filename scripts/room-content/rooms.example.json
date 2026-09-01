@@ -1,0 +1,20 @@
+{
+  "rooms": [
+    {
+      "slug": "habitacion-individual",
+      "name": "Habitación Individual",
+      "description": "Descripción real de la habitación, sin datos ficticios.",
+      "capacity": 1,
+      "bedCount": 1,
+      "bedConfiguration": "1 cama matrimonial",
+      "bathroomDescription": "Baño privado con ducha.",
+      "nightlyPriceClp": 55000,
+      "amenities": ["Wi-Fi", "Calefacción", "Desayuno"],
+      "images": [
+        { "file": "photos/habitacion-individual/1.jpg", "alt": "Vista general de la habitación individual" },
+        { "file": "photos/habitacion-individual/2.jpg", "alt": "Baño privado de la habitación individual" },
+        { "file": "photos/habitacion-individual/3.jpg", "alt": "Detalle de la cama de la habitación individual" }
+      ]
+    }
+  ]
+}

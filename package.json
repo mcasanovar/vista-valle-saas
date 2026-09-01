@@ -1,0 +1,70 @@
+{
+  "name": "vista-valle-web",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.20.0 <23",
+    "npm": ">=10.8.2"
+  },
+  "packageManager": "npm@10.8.2",
+  "scripts": {
+    "dev": "next dev",
+    "dev:test": "node scripts/with-test-env.mjs next dev",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "build:test": "node scripts/with-test-env.mjs next build --webpack",
+    "test:quality": "node scripts/run-production-quality.mjs",
+    "test": "npm run test:unit",
+    "test:unit": "node scripts/with-test-env.mjs vitest run",
+    "test:integration:postgres": "node scripts/run-postgres-integration.mjs",
+    "test:unit:watch": "node scripts/with-test-env.mjs vitest",
+    "test:e2e": "node scripts/with-test-env.mjs playwright test",
+    "db:generate": "drizzle-kit generate --config=drizzle.config.ts",
+    "db:check": "drizzle-kit check --config=drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config=drizzle.config.ts"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.10.0",
+    "@supabase/supabase-js": "2.100.1",
+    "drizzle-orm": "0.45.2",
+    "framer-motion": "^13.1.0",
+    "lucide-react": "^1.32.0",
+    "next": "16.3.1",
+    "postgres": "3.4.9",
+    "react": "19.2.4",
+    "react-day-picker": "^10.0.1",
+    "react-dom": "19.2.4",
+    "server-only": "0.0.1",
+    "yet-another-react-lightbox": "^3.32.2",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.11.0",
+    "@playwright/test": "1.58.2",
+    "@tailwindcss/postcss": "4.1.18",
+    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/react": "16.3.2",
+    "@testing-library/user-event": "14.6.1",
+    "@types/node": "24.12.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.2",
+    "drizzle-kit": "0.31.10",
+    "eslint": "9.39.4",
+    "eslint-config-next": "16.3.1",
+    "jsdom": "27.4.0",
+    "prettier": "3.8.3",
+    "tailwindcss": "4.1.18",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.25.12"
+    }
+  }
+}

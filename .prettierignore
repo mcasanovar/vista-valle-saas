@@ -1,0 +1,15 @@
+node_modules
+.next
+out
+package-lock.json
+*.tsbuildinfo
+.agent
+.agents
+.codex
+.claude
+.devin
+.impeccable
+design-system
+openspec
+AGENTS.md
+mvp-initial.md

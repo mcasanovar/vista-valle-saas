@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Exec(openspec list)",
+      "Exec(printf)",
+      "Exec(openspec validate)",
+      "Exec(npm run)",
+      "Exec(find src)",
+      "Exec(find)",
+      "Exec(cat)",
+      "Exec(ls)",
+      "Exec(xargs grep)",
+      "Exec(git status)",
+      "Exec(mv)",
+      "Exec(cp)",
+      "Exec(npx eslint)",
+      "Exec(rm)",
+      "Exec(md5)",
+      "Exec(git diff)",
+      "Exec(node)",
+      "Exec(npm view)",
+      "Exec(npm install)",
+      "Exec(grep)",
+      "Exec(npx vitest)",
+      "Exec(openspec status)"
+    ]
+  }
+}
