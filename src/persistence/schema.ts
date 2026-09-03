@@ -75,6 +75,10 @@ export const assistantInteractionStatusEnum = pgEnum(
   "assistant_interaction_status",
   ["proposed", "confirmed", "cancelled", "failed", "expired"]
 );
+/** Only `channel_sync_conflict` is written today; new values are additive as future alert-events (e.g. an OTA feed going stale) get built. */
+export const operationalAlertKindEnum = pgEnum("operational_alert_kind", [
+  "channel_sync_conflict",
+]);
 
 export const rooms = pgTable(
   "rooms",
@@ -633,5 +637,24 @@ export const assistantInteractions = pgTable(
       table.status,
       table.expiresAt
     ),
+  ]
+);
+
+export const operationalAlerts = pgTable(
+  "operational_alerts",
+  {
+    id: id(),
+    kind: operationalAlertKindEnum("kind").notNull(),
+    roomId: uuid("room_id").references(() => rooms.id, {
+      onDelete: "restrict",
+    }),
+    reservationId: uuid("reservation_id").references(() => reservations.id, {
+      onDelete: "restrict",
+    }),
+    message: text("message").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("operational_alerts_created_at_idx").on(table.createdAt),
   ]
 );

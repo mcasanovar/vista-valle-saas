@@ -145,12 +145,14 @@ describe("ingestChannelConnection", () => {
       "2040-06-03"
     );
 
-    const alertsBefore = listChannelSyncConflictAlerts().length;
+    const alertsBefore = (await listChannelSyncConflictAlerts()).length;
     const result = await ingestChannelConnection(connection, document);
 
     expect(result.created).toHaveLength(0);
     expect(result.conflicts).toBe(1);
-    expect(listChannelSyncConflictAlerts().length).toBe(alertsBefore + 1);
+    expect((await listChannelSyncConflictAlerts()).length).toBe(
+      alertsBefore + 1
+    );
 
     const untouched = await mockReservationRepository.getReservationById(
       website.reservation.id

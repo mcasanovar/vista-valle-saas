@@ -111,6 +111,12 @@ export async function approveMockPayAtPropertyPaymentByReservationId(
   return mockReservationRepository.approvePayAtPropertyPayment(id);
 }
 
+/** Guest lookup is best-effort: a guest deleted after the reservation was created should not hide the reservation itself from the admin view. */
+async function mockGuestNameFor(guestId: string) {
+  const guest = await mockGuestRepository.getGuestById(guestId);
+  return guest ? `${guest.firstName} ${guest.lastName}` : undefined;
+}
+
 export async function getMockReservationPaymentAdminView(id: string) {
   const reservation = await mockReservationRepository.getReservationById(id);
   if (!reservation) return null;
@@ -128,6 +134,22 @@ export async function getMockReservationPaymentAdminView(id: string) {
     status: reservation.status,
     totalClp: reservation.totalClp,
     paymentStatus: pending ? "pending" : "approved",
+    guestName: await mockGuestNameFor(reservation.guestId),
+  });
+}
+
+/**
+ * Guest name/total/origin for a reservation referenced by a channel-sync
+ * conflict alert (see `operational-alerts.ts`), so the admin doesn't have
+ * to open the reservation to know who/how much/which channel it's about.
+ */
+export async function getMockReservationSummaryById(id: string) {
+  const reservation = await mockReservationRepository.getReservationById(id);
+  if (!reservation) return null;
+  return Object.freeze({
+    guestName: await mockGuestNameFor(reservation.guestId),
+    origin: reservation.origin,
+    totalClp: reservation.totalClp,
   });
 }
 

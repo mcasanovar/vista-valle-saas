@@ -84,7 +84,7 @@ describe("hold-expiry race with a channel-sync arrival", () => {
     expect(syncResult.created).toHaveLength(1);
     expect(syncResult.conflicts).toBe(0);
 
-    const alertsBefore = listChannelSyncConflictAlerts().length;
+    const alertsBefore = (await listChannelSyncConflictAlerts()).length;
 
     // The late Fintoc approval for the now-expired hold arrives.
     await expect(
@@ -102,7 +102,7 @@ describe("hold-expiry race with a channel-sync arrival", () => {
     // Exactly what app/api/webhooks/fintoc/route.ts does on that error.
     await raiseConflictAlertForExpiredHold(hold.id, holdRepository);
 
-    const alerts = listChannelSyncConflictAlerts();
+    const alerts = await listChannelSyncConflictAlerts();
     expect(alerts.length).toBe(alertsBefore + 1);
     expect(alerts[alerts.length - 1]!.roomId).toBe(room.id);
 

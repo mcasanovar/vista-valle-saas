@@ -21,7 +21,7 @@ describe("initial PostgreSQL migration", () => {
       )
     ).join("\n");
 
-    expect(migration.match(/CREATE TABLE/g) ?? []).toHaveLength(18);
+    expect(migration.match(/CREATE TABLE/g) ?? []).toHaveLength(19);
     expect(migration).toContain(
       'FOREIGN KEY ("assistant_interaction_id") REFERENCES "public"."assistant_interactions"("id")'
     );
@@ -40,6 +40,7 @@ describe("initial PostgreSQL migration", () => {
       'CONSTRAINT "channel_connections_poll_result_consistent"'
     );
     expect(migration).toContain('"reservations_external_platform_ref_unique"');
+    expect(migration).toContain('CREATE TABLE "operational_alerts"');
     expect(migration).not.toMatch(/^\s*(INSERT|UPDATE|DELETE|COPY)\s/im);
     expect(migration).not.toMatch(
       /SUPABASE|DATABASE_URL|MERCADO|RESEND|API_KEY/

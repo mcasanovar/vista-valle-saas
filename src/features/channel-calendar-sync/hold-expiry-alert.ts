@@ -25,5 +25,5 @@ export async function raiseConflictAlertForExpiredHold(
   holdRepository: HoldLookup
 ): Promise<void> {
   const hold = await holdRepository.getHoldById(holdId);
-  if (hold) recordChannelSyncConflictAlert({ roomId: hold.roomId });
+  if (hold) await recordChannelSyncConflictAlert({ roomId: hold.roomId });
 }

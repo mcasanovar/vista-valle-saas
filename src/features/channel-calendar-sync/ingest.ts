@@ -65,7 +65,7 @@ async function createReservationFromEvent(
       // so it cannot be rejected the way a web request can — it is simply
       // not inserted, leaving the existing reservation/hold untouched, and
       // an admin alert is raised instead.
-      recordChannelSyncConflictAlert({ roomId: connection.roomId });
+      await recordChannelSyncConflictAlert({ roomId: connection.roomId });
       return { conflict: true };
     }
     throw error;

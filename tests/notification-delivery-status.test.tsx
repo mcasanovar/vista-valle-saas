@@ -67,7 +67,8 @@ describe("admin notification delivery status", () => {
     expect(
       screen.getByRole("heading", { name: "Entregas de notificaciones" })
     ).toBeVisible();
-    expect(screen.getByText(/Entrega fallida: intento 3/)).toBeVisible();
+    expect(screen.getByText("Entrega fallida")).toBeVisible();
+    expect(screen.getByText(/Intento 3/)).toBeVisible();
     expect(screen.getByText(/código delivery_permanent/)).toBeVisible();
     expect(
       screen.queryByText(

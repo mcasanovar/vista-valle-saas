@@ -41,9 +41,9 @@ describe("raiseConflictAlertForExpiredHold", () => {
         })
     );
 
-    const before = listChannelSyncConflictAlerts().length;
+    const before = (await listChannelSyncConflictAlerts()).length;
     await raiseConflictAlertForExpiredHold(hold.id, holdRepository);
-    const alerts = listChannelSyncConflictAlerts();
+    const alerts = await listChannelSyncConflictAlerts();
 
     expect(alerts.length).toBe(before + 1);
     expect(alerts[alerts.length - 1]!.roomId).toBe("room-hold-expiry-alert");
@@ -51,9 +51,9 @@ describe("raiseConflictAlertForExpiredHold", () => {
 
   it("does nothing when the hold no longer exists", async () => {
     const holdRepository = createMockHoldRepository();
-    const before = listChannelSyncConflictAlerts().length;
+    const before = (await listChannelSyncConflictAlerts()).length;
     await raiseConflictAlertForExpiredHold("does-not-exist", holdRepository);
-    expect(listChannelSyncConflictAlerts().length).toBe(before);
+    expect((await listChannelSyncConflictAlerts()).length).toBe(before);
   });
 });
 
