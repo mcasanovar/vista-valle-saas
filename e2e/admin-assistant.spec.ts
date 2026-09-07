@@ -12,7 +12,9 @@ async function prepareAndConfirmAssistantProposal(
   await page.getByRole("button", { name: "Confirmar propuesta" }).click();
 }
 
-test("administrator confirms assistant preview, rejects conflict, and uses manual fallback", async ({
+// Módulo del asistente temporalmente cerrado (2026-09-07): /admin/asistente
+// redirige a /admin, por lo que este flujo queda deshabilitado hasta reabrirlo.
+test.skip("administrator confirms assistant preview, rejects conflict, and uses manual fallback", async ({
   page,
 }) => {
   const providerRequests: string[] = [];

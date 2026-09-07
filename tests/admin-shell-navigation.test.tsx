@@ -20,10 +20,10 @@ describe("AdminShell navigation", () => {
       "Bloqueos",
       "Sincronizaciones",
       "Alertas",
-      "Asistente",
     ]) {
       expect(within(sidebar).getByText(label)).toBeVisible();
     }
+    expect(within(sidebar).queryByText("Asistente")).not.toBeInTheDocument();
   });
 
   it("wraps the shell in the isolated admin theme scope", () => {
@@ -51,14 +51,10 @@ describe("AdminShell navigation", () => {
 
     // The overflow panel lives inside a closed <details>, so its links exist
     // in the DOM but are not visible until the disclosure is opened.
-    for (const label of [
-      "Nueva reserva",
-      "Bloqueos",
-      "Sincronizaciones",
-      "Asistente",
-    ]) {
+    for (const label of ["Nueva reserva", "Bloqueos", "Sincronizaciones"]) {
       expect(within(overflow).getByText(label)).toBeInTheDocument();
     }
+    expect(within(overflow).queryByText("Asistente")).not.toBeInTheDocument();
   });
 
   it("shows all sections as icon-only links in the tablet rail", () => {
@@ -72,9 +68,9 @@ describe("AdminShell navigation", () => {
       "Bloqueos",
       "Sincronizaciones",
       "Alertas",
-      "Asistente",
     ]) {
       expect(within(rail).getByLabelText(label)).toBeVisible();
     }
+    expect(within(rail).queryByLabelText("Asistente")).not.toBeInTheDocument();
   });
 });

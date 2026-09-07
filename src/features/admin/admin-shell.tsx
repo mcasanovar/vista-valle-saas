@@ -5,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { ToastProvider } from "@/presentation/organisms";
 import {
-  BotMessageSquare,
   CalendarDays,
   CircleAlert,
   Ellipsis,
@@ -52,7 +51,6 @@ const navigationGroups: ReadonlyArray<
         icon: RefreshCw,
       },
       { href: "/admin/alertas", label: "Alertas", icon: CircleAlert },
-      { href: "/admin/asistente", label: "Asistente", icon: BotMessageSquare },
       { href: "/admin/configuracion", label: "Configuración", icon: Settings },
     ],
   },
