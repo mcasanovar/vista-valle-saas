@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+/* Hallmark · macrostructure: Editorial Split · tone: quiet lodge · anchor hue: terracotta */
+
 /* Manual dark mode: the theme toggle sets/removes .dark on <html>. */
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -33,6 +35,7 @@
 
   --font-sans: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
   --font-heading: var(--font-dm-serif-display), Georgia, serif;
+  --font-public-display: Georgia, "Times New Roman", serif;
 
   --text-body: 1rem;
   --text-body--line-height: 1.5;
@@ -48,11 +51,12 @@
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-xl: 1rem;
+  --radius-public-button: 0.2rem;
   --shadow-sm: 0 1px 2px rgb(12 10 9 / 0.05);
   --shadow-md: 0 4px 6px rgb(12 10 9 / 0.1);
   --shadow-lg: 0 10px 15px rgb(12 10 9 / 0.1);
   --shadow-xl: 0 20px 25px rgb(12 10 9 / 0.15);
-  --container-content: 72rem;
+  --container-content: 82.5rem;
 
   --breakpoint-phone: 23.4375rem;
   --breakpoint-tablet: 48rem;
@@ -272,6 +276,435 @@
     linear-gradient(150deg, #a9c5d1 0%, #dfcbb4 45%, #6b614f 100%);
 }
 
+.vv-header {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.vv-header nav {
+  max-width: none;
+  padding-left: max(1rem, calc((100vw - var(--container-content)) / 2));
+  padding-right: max(1rem, calc((100vw - var(--container-content)) / 2));
+}
+
+.vv-header nav > a:first-of-type img {
+  width: 7.5rem;
+}
+
+:root:not(.dark) .vv-theme-toggle {
+  background-color: var(--color-background) !important;
+  border-color: var(--color-border) !important;
+}
+
+.vv-header a.bg-primary,
+.vv-hero a.inline-flex,
+.vv-room-card a.inline-flex,
+.vv-company a.inline-flex,
+.vv-location a.inline-flex,
+.vv-booking > button {
+  border-radius: var(--radius-public-button);
+}
+
+.vv-hero a.inline-flex.border {
+  border-width: 1px;
+}
+
+.vv-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  min-height: 34rem;
+  max-width: 82.5rem;
+  margin-inline: auto;
+  gap: 2rem;
+  padding: 2.25rem 3.5rem 3.5rem;
+}
+
+.vv-hero-copy {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 2rem 1rem;
+}
+
+.vv-hero-media {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 33.75rem;
+  background: var(--color-muted);
+}
+
+.vv-hero-title {
+  max-width: 38rem;
+  color: var(--color-foreground);
+  font-family: var(--font-public-display);
+  font-size: clamp(3rem, 6vw, 5.15rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+
+#consulta-disponibilidad {
+  max-width: 82.5rem;
+}
+
+.vv-hero-caption {
+  position: absolute;
+  bottom: 1.25rem;
+  left: 1.25rem;
+  background: color-mix(in srgb, var(--color-background) 94%, transparent);
+  color: var(--color-foreground);
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  padding: 0.8rem 1rem;
+}
+
+.vv-booking {
+  border-radius: 0;
+  box-shadow: var(--shadow-lg);
+  padding: 0.6rem;
+}
+
+.vv-booking .vv-booking-icon {
+  display: none;
+}
+
+.vv-booking > div {
+  min-width: 0;
+  flex: 1 1 0;
+  border-right: 1px solid var(--color-border);
+  padding: 0.5rem 1.25rem;
+}
+
+.vv-booking > div:last-of-type {
+  border-right: 0;
+}
+
+.vv-booking label,
+.vv-booking legend {
+  color: var(--color-muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.vv-booking input[type="date"] {
+  min-height: 2.25rem;
+  border: 0;
+  background: transparent;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+.vv-booking fieldset {
+  padding-top: 0.5rem;
+}
+
+.vv-booking > button {
+  min-height: 3.5rem;
+  min-width: 13.5rem;
+  border-radius: 0.2rem;
+}
+
+.vv-section {
+  padding-top: 6.5rem;
+  padding-bottom: 6.5rem;
+}
+
+.vv-section-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.vv-section-head > p {
+  margin: 0;
+}
+
+.vv-room-section-head {
+  display: block;
+  margin-bottom: 2.75rem;
+  text-align: center;
+}
+
+.vv-room-section-head > p {
+  margin: 0.75rem auto 0;
+}
+
+.vv-section-head h2,
+.vv-room-card h2,
+.vv-room-card h3,
+.vv-reason-grid li > p:first-of-type,
+.vv-panorama-overlay h2 {
+  font-family: var(--font-public-display);
+}
+
+.vv-room-page h1,
+.vv-room-page h2,
+.vv-room-page h3 {
+  font-family: var(--font-public-display);
+}
+
+.vv-availability-page h1,
+.vv-availability-page h2,
+.vv-availability-page h3 {
+  font-family: var(--font-public-display);
+}
+
+.vv-quotation-page h1,
+.vv-quotation-page h2,
+.vv-quotation-page h3,
+.vv-quotation-page h4 {
+  font-family: var(--font-public-display);
+}
+
+.vv-quotation-hero {
+  background: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.vv-quotation-hero-inner {
+  padding-top: 5.5rem;
+  padding-bottom: 5rem;
+}
+
+.vv-quotation-hero h1 {
+  max-width: 48rem;
+  font-size: clamp(2.75rem, 6vw, 5.25rem);
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+
+.vv-quotation-content {
+  padding-top: 4rem;
+  padding-bottom: 6.5rem;
+}
+
+.vv-quotation-notice {
+  border-left: 3px solid var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  padding: 1rem 1.25rem;
+}
+
+.vv-quotation-panel {
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
+  padding: 2rem;
+  box-shadow: none;
+}
+
+.vv-quotation-panel h2 {
+  font-size: clamp(1.75rem, 3vw, 2.5rem);
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.vv-quotation-room-option,
+.vv-quotation-room-type {
+  border-radius: 0.2rem;
+  background: var(--color-background);
+}
+
+.vv-quotation-room-option {
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.vv-quotation-room-option:hover {
+  border-color: var(--color-accent);
+}
+
+.vv-quotation-capacity,
+.vv-quotation-inline-panel {
+  border-radius: 0.2rem;
+}
+
+.vv-quotation-page input,
+.vv-quotation-page textarea,
+.vv-quotation-page select {
+  border-radius: 0.2rem;
+}
+
+@media (max-width: 47.99rem) {
+  .vv-quotation-hero-inner {
+    padding-top: 4rem;
+    padding-bottom: 3.5rem;
+  }
+
+  .vv-quotation-content {
+    padding-top: 2.75rem;
+    padding-bottom: 4.5rem;
+  }
+
+  .vv-quotation-panel {
+    padding: 1.25rem;
+  }
+}
+
+.vv-room-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+}
+
+.vv-reasons {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  padding-top: 7rem;
+  padding-bottom: 7rem;
+}
+
+.vv-reasons-inner {
+  max-width: 82.5rem;
+  margin-inline: auto;
+  padding-inline: 3.5rem;
+}
+
+.vv-reasons .vv-section-head h2,
+.vv-reasons .vv-reason-grid p,
+.vv-reasons .vv-reason-grid h3 {
+  color: var(--color-on-primary);
+}
+
+.vv-reasons .vv-section-head > p,
+.vv-reasons .vv-reason-grid li > p {
+  color: color-mix(in srgb, var(--color-on-primary) 70%, transparent);
+}
+
+.vv-reason-grid {
+  border-top: 1px solid color-mix(in srgb, var(--color-on-primary) 30%, transparent);
+}
+
+.vv-reason-grid li {
+  min-height: 10rem;
+  border-left: 1px solid color-mix(in srgb, var(--color-on-primary) 30%, transparent);
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.vv-reason-grid li:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.vv-reason-grid li:last-child {
+  padding-right: 0;
+}
+
+.vv-company {
+  background: var(--color-background);
+}
+
+.vv-company h2 {
+  max-width: 38rem;
+  color: var(--color-foreground);
+  font-family: var(--font-public-display);
+  font-size: clamp(2.6rem, 4.8vw, 3.75rem);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.vv-company-image {
+  min-height: 20rem;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 5%, transparent), color-mix(in srgb, var(--color-primary) 35%, transparent)),
+    url("/brand/panoramic-bg.png") center / cover;
+  filter: saturate(0.72);
+}
+
+.vv-location {
+  background: var(--color-background);
+}
+
+.vv-panorama-overlay {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-primary) 58%, transparent),
+    color-mix(in srgb, var(--color-primary) 12%, transparent)
+  );
+}
+
+.vv-panorama-overlay h2 {
+  max-width: 42rem;
+  margin-inline: auto;
+}
+
+@media (max-width: 63.99rem) {
+  .vv-hero {
+    grid-template-columns: 1fr;
+    gap: 1.75rem;
+    padding: 1.75rem 1.5rem 3rem;
+  }
+
+  .vv-hero-copy,
+  .vv-hero-media {
+    grid-column: 1;
+    grid-row: auto;
+  }
+
+  .vv-hero-copy {
+    padding: 1rem 0 0;
+  }
+
+  .vv-hero-media {
+    min-height: 21rem;
+  }
+}
+
+@media (max-width: 47.99rem) {
+  .vv-section {
+    padding-top: 4.5rem;
+    padding-bottom: 4.5rem;
+  }
+
+  .vv-reasons {
+    padding-top: 5.5rem;
+    padding-bottom: 5.5rem;
+  }
+
+  .vv-reasons-inner {
+    padding-inline: 1.5rem;
+  }
+
+  .vv-section-head {
+    display: block;
+  }
+
+  .vv-section-head h2 {
+    margin-bottom: 1rem;
+  }
+
+  .vv-room-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vv-room-section-head {
+    margin-bottom: 2rem;
+  }
+
+  .vv-booking {
+    padding: 0.75rem;
+  }
+
+  .vv-booking > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .vv-booking > button {
+    min-width: 0;
+  }
+
+  .vv-reason-grid li {
+    min-height: 0;
+    border-left: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-on-primary) 30%, transparent);
+    padding: 1.25rem 0 1.5rem;
+  }
+
+  .vv-reason-grid li:last-child {
+    border-bottom: 0;
+  }
+}
+
 .vv-image-frame {
   background:
     linear-gradient(135deg, rgb(255 255 255 / 0.62), rgb(255 255 255 / 0.08)),
@@ -302,6 +735,10 @@ body {
   font-size: 1rem;
   line-height: 1.5;
   text-rendering: optimizeLegibility;
+}
+
+body:has(.vv-public-footer) {
+  background: var(--color-primary);
 }
 
 :focus-visible {

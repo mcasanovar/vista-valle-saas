@@ -46,7 +46,7 @@ export function createLodgingStructuredData(
       "Servicio de alojamiento para turistas y empresas en la ciudad de Illapel",
     url: normalizedSiteUrl,
     telephone: "+56945981722",
-    image: `${normalizedSiteUrl}/brand/bg-hero.jpg`,
+    image: `${normalizedSiteUrl}/brand/bg-hero.png`,
     address: {
       "@type": "PostalAddress",
       streetAddress: "Flor de Mayo #55",

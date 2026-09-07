@@ -34,6 +34,7 @@ export function RoomCard({
   headingLevel = 3,
   numberLabel,
   selectable = false,
+  featured = false,
 }: {
   image?: { src: string; alt: string };
   images?: readonly { src: string; alt: string }[];
@@ -50,6 +51,7 @@ export function RoomCard({
   headingLevel?: 2 | 3;
   numberLabel?: string;
   selectable?: boolean;
+  featured?: boolean;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -135,7 +137,7 @@ export function RoomCard({
       whileHover={animated ? { y: -4 } : undefined}
       whileTap={animated ? { scale: 0.99 } : undefined}
       transition={{ duration: 0.24, ease: [0.2, 0, 0, 1] }}
-      className="flex flex-col overflow-hidden rounded-lg bg-card shadow-md"
+      className={`vv-room-card flex flex-col overflow-hidden rounded-none border border-border bg-card shadow-none ${featured ? "vv-room-card-featured" : ""}`}
     >
       {travel ? (
         <motion.span

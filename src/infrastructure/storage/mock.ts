@@ -2,7 +2,7 @@ import {
   assertRoomImagePath,
   assertRoomImageRoomId,
   assertRoomImageUpload,
-  roomImagesBucket,
+  roomImagesFolder,
   toRoomImageObject,
   type RoomImageObject,
   type RoomImageStorage,
@@ -15,7 +15,7 @@ export function createMockRoomImageStorage(): RoomImageStorage {
     context: "mock" as const,
     getPublicUrl: (path) => {
       assertRoomImagePath(path);
-      return `/mock-storage/${roomImagesBucket}/${path}`;
+      return `/mock-storage/${roomImagesFolder}/${path}`;
     },
     list: async (roomId) => {
       assertRoomImageRoomId(roomId);

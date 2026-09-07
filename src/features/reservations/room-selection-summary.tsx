@@ -104,7 +104,7 @@ export function RoomSelectionSummary({
       ref={cartRef}
       aria-label="Carro de reserva"
       aria-live="polite"
-      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 mx-auto max-w-[56rem] rounded-[2rem] border border-border/80 bg-warm p-3 shadow-xl tablet:bottom-5 tablet:px-5"
+      className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 mx-auto max-w-[56rem] rounded-[2rem] border border-border/80 bg-background p-3 shadow-xl tablet:bottom-5 tablet:px-5"
       initial={reducedMotion ? false : { opacity: 0, y: 8, scale: 0.98 }}
       animate={
         reducedMotion

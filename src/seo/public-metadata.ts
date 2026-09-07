@@ -28,7 +28,7 @@ export function createPublicMetadata(siteUrl: string): Metadata {
       description: siteDescription,
       images: [
         {
-          url: "/brand/bg-hero.jpg",
+          url: "/brand/bg-hero.png",
           alt: "Fachada de Vista Valle con montañas nevadas al fondo",
         },
       ],
@@ -37,7 +37,7 @@ export function createPublicMetadata(siteUrl: string): Metadata {
       card: "summary_large_image",
       title: "Vista Valle | Alojamiento en Illapel",
       description: siteDescription,
-      images: ["/brand/bg-hero.jpg"],
+      images: ["/brand/bg-hero.png"],
     },
     robots: {
       index: true,

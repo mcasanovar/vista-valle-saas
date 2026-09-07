@@ -1,12 +1,11 @@
 "use client";
 
 import { MotionConfig } from "framer-motion";
-import { Icon, type IconName } from "@/presentation/atoms";
 import Image from "next/image";
+import { ActionLink } from "@/presentation/atoms";
 import {
   CompanyCta,
   Hero,
-  LocationSection,
   PublicFooter,
   PublicHeader,
   Reveal,
@@ -69,7 +68,7 @@ export function PublicHomeTemplate({
           <section
             id="consulta-disponibilidad"
             aria-label={content.booking.formLabel}
-            className="relative z-10 mx-auto -mt-12 max-w-content px-4 pb-10 phone:px-6 tablet:-mt-14 tablet:px-8 tablet:pb-14"
+            className="relative z-10 mx-auto mt-0 max-w-content px-4 pb-10 phone:px-6 tablet:mt-0 tablet:px-8 tablet:pb-14"
           >
             {bookingSearch}
           </section>
@@ -77,22 +76,18 @@ export function PublicHomeTemplate({
         <Reveal delay={0.06}>
           <section
             id="habitaciones"
-            className="mx-auto max-w-content space-y-7 px-4 py-10 phone:px-6 tablet:px-8 tablet:py-14"
+            className="vv-section mx-auto max-w-content space-y-7 px-4 phone:px-6 tablet:px-8"
           >
-            <div className="mx-auto max-w-prose text-center">
-              <p className="text-label font-semibold uppercase tracking-[0.18em] text-accent">
-                Catálogo
-              </p>
-              <h2 className="mt-2 font-heading text-title font-normal text-foreground">
+            <div className="vv-section-head vv-room-section-head">
+              <h2 className="font-heading text-display font-normal text-foreground">
                 {content.rooms.title}
               </h2>
-              <span
-                aria-hidden="true"
-                className="mx-auto mt-3 block h-px w-8 bg-accent"
-              />
+              <p className="max-w-prose text-sm text-muted-foreground">
+                {content.rooms.copy}
+              </p>
             </div>
             <RoomPhotoGalleryProvider>
-              <div className="grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3">
+              <div className="vv-room-grid grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3">
                 {rooms.map((room, index) => (
                   <RoomCard
                     key={room.id}
@@ -118,48 +113,47 @@ export function PublicHomeTemplate({
         <Reveal delay={0.08}>
           <section
             id="nosotros"
-            className="mx-auto max-w-content px-4 py-10 phone:px-6 tablet:px-8 tablet:py-14"
+            className="vv-reasons"
           >
-            <div className="mx-auto max-w-prose text-center pb-6">
-              <h2 className="font-heading text-title font-semibold text-foreground">
-                {content.reasons.title}
-              </h2>
+            <div className="vv-reasons-inner">
+              <div className="vv-section-head vv-section-head-dark">
+                <h2 className="font-heading text-display font-normal text-foreground">
+                  {content.reasons.title}
+                </h2>
+                <p className="max-w-prose text-sm text-muted-foreground">
+                  {content.reasons.copy}
+                </p>
+              </div>
+              <ul className="vv-reason-grid grid gap-8 tablet:grid-cols-2 laptop:grid-cols-4">
+                {content.reasons.items.map((item, index) => (
+                  <li
+                    key={item.id}
+                    className="text-left"
+                  >
+                    <div className="flex items-baseline gap-3">
+                      <span
+                        aria-hidden="true"
+                        className="font-heading text-2xl leading-none text-gold"
+                      >
+                        {String(index + 1).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <p className="mt-8 font-heading text-xl text-foreground">
+                      {item.label}
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {item.description}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <ul className="mt-8 grid gap-8 tablet:grid-cols-2 laptop:grid-cols-4">
-              {content.reasons.items.map((item, index) => (
-                <li
-                  key={item.id}
-                  className="border-t border-border pt-6 text-left first:border-t-0 first:pt-0 tablet:border-t-0 tablet:border-l tablet:px-6 tablet:pt-0 tablet:first:border-l-0 tablet:first:px-0"
-                >
-                  <div className="flex items-baseline gap-3">
-                    <span
-                      aria-hidden="true"
-                      className="font-heading text-4xl leading-none text-accent/70"
-                    >
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <Icon
-                      decorative
-                      name={item.icon as IconName}
-                      className="text-accent"
-                    />
-                  </div>
-                  <p className="mt-4 font-heading text-xl text-foreground">
-                    {item.label}
-                  </p>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {item.description}
-                  </p>
-                </li>
-              ))}
-            </ul>
           </section>
         </Reveal>
         <Reveal delay={0.14}>
           <CompanyCta
             id="empresas"
             {...content.company}
-            image={rooms[0] ? { src: rooms[0].images[0].src } : undefined}
             href={
               companyEnquiry.kind === "contact"
                 ? companyEnquiry.contact.href
@@ -183,7 +177,10 @@ export function PublicHomeTemplate({
           />
         </Reveal>
         <Reveal delay={0.12}>
-          <section className="relative aspect-[60/13]">
+          <section
+            id="ubicacion"
+            className="vv-panorama relative min-h-[22rem] overflow-hidden"
+          >
             <Image
               src="/brand/panoramic-bg.png"
               alt="Vista Valle Lodging House"
@@ -191,10 +188,21 @@ export function PublicHomeTemplate({
               sizes="100vw"
               className="object-cover"
             />
+            <div className="vv-panorama-overlay absolute inset-0 flex items-center justify-center px-4 text-center">
+              <div className="space-y-5">
+                <h2 className="font-heading text-display font-normal text-on-primary">
+                  {content.location.title}
+                </h2>
+                <ActionLink
+                  href="#consulta-disponibilidad"
+                  variant="action"
+                  className="!rounded-[0.2rem] !bg-primary !font-heading !font-semibold !text-on-primary hover:!bg-primary active:!bg-primary"
+                >
+                  Reservar ahora
+                </ActionLink>
+              </div>
+            </div>
           </section>
-        </Reveal>
-        <Reveal delay={0.16}>
-          <LocationSection id="ubicacion" title={content.location.title} />
         </Reveal>
       </main>
       <PublicFooter

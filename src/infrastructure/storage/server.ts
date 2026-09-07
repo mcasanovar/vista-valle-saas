@@ -1,94 +1,122 @@
 import "server-only";
 
-import { createClient } from "@supabase/supabase-js";
+import { v2 as cloudinary, type ResourceApiResponse } from "cloudinary";
 
-import { getPublicEnvironment } from "@/config/public";
 import { getServerEnvironment } from "@/config/server";
 import {
   assertRoomImagePath,
   assertRoomImageRoomId,
   assertRoomImageUpload,
-  roomImagesBucket,
+  roomImagesFolder,
   toRoomImageObject,
   type RoomImageObject,
   type RoomImageStorage,
 } from "@/infrastructure/storage/contracts";
 import { createMockRoomImageStorage } from "@/infrastructure/storage/mock";
 
+const contentTypeByFormat: Record<string, string> = {
+  avif: "image/avif",
+  jpeg: "image/jpeg",
+  jpg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
 function storageFailure() {
   return new Error("Unable to complete the room image storage operation");
 }
 
-export function createRoomImageStorage(): RoomImageStorage {
-  const server = getServerEnvironment();
-  const publicEnvironment = getPublicEnvironment();
+/** Cloudinary's own extension suffix is derived from the uploaded content, so the DB-facing `path` (which already carries an extension) maps to a public ID without one. */
+function toPublicId(path: string) {
+  return `${roomImagesFolder}/${path.replace(/\.[^./]+$/, "")}`;
+}
 
-  if (
-    publicEnvironment.NEXT_PUBLIC_VISTA_VALLE_CONFIG_CONTEXT !==
-    server.VISTA_VALLE_CONFIG_CONTEXT
-  ) {
-    throw new Error(
-      "Invalid environment configuration: public and server configuration contexts must match"
-    );
-  }
+export type CloudinaryCredentials = Readonly<{
+  apiKey: string;
+  apiSecret: string;
+  cloudName: string;
+}>;
 
-  if (server.VISTA_VALLE_CONFIG_CONTEXT === "mock") {
-    return createMockRoomImageStorage();
-  }
-
-  const client = createClient(
-    publicEnvironment.NEXT_PUBLIC_SUPABASE_URL,
-    server.SUPABASE_SERVICE_ROLE_KEY,
-    { auth: { persistSession: false } }
-  );
+/** Isolated from `getServerEnvironment()` so the Cloudinary-backed adapter can be exercised in tests without flipping `VISTA_VALLE_CONFIG_CONTEXT`; `createRoomImageStorage()` is the env-driven entry point every caller outside tests should use. */
+export function createCloudinaryRoomImageStorage(
+  credentials: CloudinaryCredentials
+): RoomImageStorage {
+  cloudinary.config({
+    api_key: credentials.apiKey,
+    api_secret: credentials.apiSecret,
+    cloud_name: credentials.cloudName,
+    secure: true,
+  });
 
   return Object.freeze({
     context: "production" as const,
     getPublicUrl: (path) => {
       assertRoomImagePath(path);
-      return client.storage.from(roomImagesBucket).getPublicUrl(path).data
-        .publicUrl;
+      return cloudinary.url(toPublicId(path), { secure: true });
     },
     list: async (roomId) => {
       assertRoomImageRoomId(roomId);
-      const { data, error } = await client.storage
-        .from(roomImagesBucket)
-        .list(`rooms/${roomId}`);
+      const prefix = `${roomImagesFolder}/rooms/${roomId}/`;
 
-      if (error) {
+      try {
+        const { resources } = (await cloudinary.api.resources({
+          max_results: 500,
+          prefix,
+          type: "upload",
+        })) as ResourceApiResponse;
+
+        return resources.map<RoomImageObject>((resource) => ({
+          contentType:
+            contentTypeByFormat[resource.format] ?? "application/octet-stream",
+          path: `rooms/${roomId}/${resource.public_id.slice(prefix.length)}.${resource.format}`,
+          size: resource.bytes,
+        }));
+      } catch {
         throw storageFailure();
       }
-
-      return data.map<RoomImageObject>((object) => ({
-        contentType: object.metadata?.mimetype ?? "application/octet-stream",
-        path: `rooms/${roomId}/${object.name}`,
-        size: Number(object.metadata?.size ?? 0),
-      }));
     },
     remove: async (path) => {
       assertRoomImagePath(path);
-      const { error } = await client.storage
-        .from(roomImagesBucket)
-        .remove([path]);
 
-      if (error) {
+      try {
+        await cloudinary.uploader.destroy(toPublicId(path), {
+          resource_type: "image",
+        });
+      } catch {
         throw storageFailure();
       }
     },
     upload: async (upload) => {
       assertRoomImageUpload(upload);
-      const { error } = await client.storage
-        .from(roomImagesBucket)
-        .upload(upload.path, upload.bytes, {
-          contentType: upload.contentType,
-          upsert: true,
-        });
 
-      if (error) {
+      try {
+        await cloudinary.uploader.upload(
+          `data:${upload.contentType};base64,${Buffer.from(upload.bytes).toString("base64")}`,
+          {
+            overwrite: true,
+            public_id: toPublicId(upload.path),
+            resource_type: "image",
+          }
+        );
+      } catch {
         throw storageFailure();
       }
 
       return toRoomImageObject(upload);
     },
+  });
+}
+
+export function createRoomImageStorage(): RoomImageStorage {
+  const server = getServerEnvironment();
+
+  if (server.VISTA_VALLE_CONFIG_CONTEXT === "mock") {
+    return createMockRoomImageStorage();
+  }
+
+  return createCloudinaryRoomImageStorage({
+    apiKey: server.CLOUDINARY_API_KEY,
+    apiSecret: server.CLOUDINARY_API_SECRET,
+    cloudName: server.CLOUDINARY_CLOUD_NAME,
   });
 }

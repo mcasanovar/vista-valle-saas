@@ -4,15 +4,12 @@ import {
   PublicFooter,
   PublicHeader,
 } from "@/presentation/organisms";
-import { publicSiteContent } from "@/config/public-site-content";
+import {
+  publicNavigationForRoute,
+  publicSiteContent,
+} from "@/config/public-site-content";
 
-const navigation = [
-  { href: "/", label: "Inicio" },
-  { href: "/habitaciones", label: "Habitaciones" },
-  { href: "/#nosotros", label: "Nosotros" },
-  { href: "/#empresas", label: "Empresas" },
-  { href: "/#ubicacion", label: "Ubicación" },
-] as const;
+const navigation = publicNavigationForRoute(false);
 
 export function CompanyQuotationTemplate() {
   return (
@@ -24,9 +21,9 @@ export function CompanyQuotationTemplate() {
         bookingHref="/disponibilidad"
         bookingLabel="Reserva"
       />
-      <main id="main-content" className="bg-warm">
-        <header className="border-b border-border bg-card">
-          <div className="mx-auto max-w-content space-y-4 px-4 py-12 phone:px-6 tablet:px-8 tablet:py-16">
+      <main id="main-content" className="vv-quotation-page bg-background">
+        <header className="vv-quotation-hero">
+          <div className="vv-quotation-hero-inner mx-auto max-w-content space-y-4 px-4 phone:px-6 tablet:px-8">
             <p className="text-label font-semibold uppercase tracking-[0.18em] text-accent">
               Empresas
             </p>
@@ -38,8 +35,8 @@ export function CompanyQuotationTemplate() {
             </Text>
           </div>
         </header>
-        <article className="mx-auto max-w-content space-y-8 px-4 py-10 phone:px-6 tablet:px-8 tablet:py-14">
-          <div className="rounded-lg border border-accent/40 bg-accent/10 p-4">
+        <article className="vv-quotation-content mx-auto max-w-content space-y-8 px-4 phone:px-6 tablet:px-8">
+          <div className="vv-quotation-notice">
             <p className="text-sm text-foreground">
               <strong>Importante:</strong> las capacidades y precios actuales
               son datos de demostración para validar esta experiencia.

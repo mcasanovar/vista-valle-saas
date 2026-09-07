@@ -185,7 +185,7 @@ export function CompanyQuotationForm({
       >
         <section
           aria-labelledby="quotation-stay-heading"
-          className="space-y-5 rounded-xl border bg-card p-5 shadow-sm tablet:p-7"
+          className="vv-quotation-panel space-y-5"
         >
           <div>
             <h2
@@ -218,7 +218,7 @@ export function CompanyQuotationForm({
                 return (
                   <div
                     key={room.slug}
-                    className="space-y-3 rounded-lg border border-border p-4"
+                    className="vv-quotation-room-option space-y-3 rounded-lg border border-border p-4"
                   >
                     <div>
                       <h4 className="font-heading text-lg text-foreground">
@@ -247,7 +247,7 @@ export function CompanyQuotationForm({
             </div>
             <div
               aria-live="polite"
-              className={`rounded-md border p-4 ${capacityShortfall ? "border-destructive bg-destructive/10" : "border-border bg-muted"}`}
+                className={`vv-quotation-capacity rounded-md border p-4 ${capacityShortfall ? "border-destructive bg-destructive/10" : "border-border bg-muted"}`}
             >
               <p className="font-semibold">
                 Capacidad seleccionada: {formatCapacity(capacity)}
@@ -287,7 +287,7 @@ export function CompanyQuotationForm({
         {selectedRooms.length ? (
           <section
             aria-labelledby="quotation-contact-heading"
-            className="space-y-5 rounded-xl border bg-card p-5 shadow-sm tablet:p-7"
+            className="vv-quotation-panel space-y-5"
           >
             <div>
               <h2
@@ -425,7 +425,7 @@ export function CompanyQuotationForm({
                 </Button>
               </div>
               {values.breakfastRequested && breakfast ? (
-                <div className="space-y-3 rounded-md border border-border bg-muted p-4">
+                <div className="vv-quotation-inline-panel space-y-3 rounded-md border border-border bg-muted p-4">
                   <Text className="text-foreground">
                     {breakfast.description}
                   </Text>

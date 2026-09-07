@@ -220,7 +220,7 @@ export function CompanyQuotationController() {
     <div className="space-y-8">
       <section
         aria-labelledby="quotation-search-heading"
-        className="space-y-5 rounded-xl border bg-card p-5 shadow-sm tablet:p-7"
+        className="vv-quotation-panel space-y-5"
       >
         <div>
           <h2
@@ -238,7 +238,7 @@ export function CompanyQuotationController() {
           aria-label="Consulta de disponibilidad para cotización"
           noValidate
           onSubmit={submit}
-          className="grid gap-5 tablet:grid-cols-4 tablet:items-end"
+          className="vv-quotation-search-form grid gap-5 tablet:grid-cols-4 tablet:items-end"
         >
           <DateField
             id="quotation-search-check-in"
@@ -294,7 +294,7 @@ export function CompanyQuotationController() {
       {availability ? (
         <section aria-live="polite" className="space-y-6">
           <div
-            className={`rounded-lg border p-4 ${
+            className={`vv-quotation-status rounded-lg border p-4 ${
               availability.rooms.length === 0
                 ? "border-destructive bg-destructive/10"
                 : "border-accent/40 bg-accent/10"
@@ -340,7 +340,7 @@ export function CompanyQuotationController() {
                 return (
                   <li
                     key={type.slug}
-                    className={`space-y-1 rounded-md border p-3 text-sm ${
+                    className={`vv-quotation-room-type space-y-1 rounded-md border p-3 text-sm ${
                       isAvailable
                         ? "border-border bg-card"
                         : "border-destructive/40 bg-destructive/5"

@@ -1,4 +1,3 @@
-import Image from "next/image";
 import {
   ActionLink,
   Heading,
@@ -35,67 +34,40 @@ export function CompanyCta({
   label,
   ctaHref,
   ctaLabel,
-  image,
 }: {
   href?: ContactHref;
   label?: string;
   ctaHref?: string;
   ctaLabel?: string;
-  image?: { src: string };
 } & SectionProps) {
   return (
-    <section id={id} className="relative isolate overflow-hidden bg-primary">
-      {image ? (
-        <>
-          <Image
-            src={image.src}
-            alt=""
-            aria-hidden="true"
-            fill
-            sizes="100vw"
-            className="object-cover"
-          />
-          <div
-            aria-hidden="true"
-            className="absolute inset-0"
-            style={{
-              background:
-                "linear-gradient(0deg, rgb(11 10 16 / 0.9), rgb(11 10 16 / 0.55) 55%, rgb(11 10 16 / 0.25))",
-            }}
-          />
-        </>
-      ) : null}
-      <div className="relative mx-auto flex max-w-content flex-col items-start gap-6 px-4 py-10 phone:px-6 tablet:flex-row tablet:items-center tablet:justify-between tablet:gap-8 tablet:px-8 tablet:py-14">
-        <div className="flex min-w-0 flex-col gap-4 tablet:flex-row tablet:items-center tablet:gap-6">
-          <Icon
-            decorative
-            name="Briefcase"
-            className="size-24 shrink-0 rounded-full border-2 border-on-primary/60 p-6 text-on-primary"
-          />
-          <div className="space-y-2">
-            <Heading level={2} className="!text-on-primary">
+    <section id={id} className="vv-company relative isolate overflow-hidden">
+      <div className="relative mx-auto grid max-w-content items-center gap-8 px-4 py-14 phone:px-6 tablet:grid-cols-2 tablet:px-8 tablet:py-20 laptop:px-12">
+        <div className="space-y-4">
+          <Text className="!text-label font-semibold uppercase tracking-[0.18em] !text-accent">
+            Para empresas y equipos
+          </Text>
+          <div className="space-y-3">
+            <Heading level={2} className="!text-foreground">
               {title}
             </Heading>
-            <Text className="max-w-prose !text-on-primary/85">{copy}</Text>
+            <Text className="max-w-prose !text-muted-foreground">{copy}</Text>
           </div>
+          {href && label ? <ContactLink href={href}>{label}</ContactLink> : null}
+          {ctaHref && ctaLabel ? (
+            <InteractiveSurface>
+              <ActionLink href={ctaHref} variant="action">
+                {ctaLabel}
+              </ActionLink>
+            </InteractiveSurface>
+          ) : null}
+          {!href && !ctaHref ? (
+            <Text className="!text-muted-foreground">
+              Canal de contacto pendiente de configuración.
+            </Text>
+          ) : null}
         </div>
-        {href && label ? <ContactLink href={href}>{label}</ContactLink> : null}
-        {ctaHref && ctaLabel ? (
-          <InteractiveSurface>
-            <ActionLink
-              href={ctaHref}
-              variant="action"
-              className="!bg-gold !text-on-gold hover:!bg-gold active:!bg-gold"
-            >
-              {ctaLabel}
-            </ActionLink>
-          </InteractiveSurface>
-        ) : null}
-        {!href && !ctaHref ? (
-          <Text className="!text-on-primary/70">
-            Canal de contacto pendiente de configuración.
-          </Text>
-        ) : null}
+        <div className="vv-company-image" aria-hidden="true" />
       </div>
     </section>
   );
@@ -105,7 +77,7 @@ export function LocationSection({ id, title }: { title: string; id?: string }) {
   return (
     <section
       id={id}
-      className="mx-auto max-w-content space-y-4 px-4 py-10 text-center phone:px-6 tablet:px-8 tablet:py-14"
+      className="vv-location mx-auto max-w-content space-y-4 px-4 py-16 text-center phone:px-6 tablet:px-8 tablet:py-24"
     >
       <VistaValleBrandWithoutText className="mx-auto !h-auto !w-16" />
       <Heading level={2}>{title}</Heading>
@@ -113,7 +85,7 @@ export function LocationSection({ id, title }: { title: string; id?: string }) {
         <ActionLink
           href="#consulta-disponibilidad"
           variant="action"
-          className="!bg-gold !text-on-gold hover:!bg-gold active:!bg-gold"
+          className="!bg-primary !font-heading !font-semibold !text-on-primary hover:!bg-primary active:!bg-primary"
         >
           Reservar ahora
         </ActionLink>
@@ -185,7 +157,7 @@ export function PublicFooter({
   copyright: string;
 }) {
   return (
-    <footer className="border-t border-primary bg-primary text-on-primary">
+    <footer className="vv-public-footer bg-primary text-on-primary">
       <div className="mx-auto grid max-w-content gap-8 px-4 py-10 phone:px-6 tablet:grid-cols-4 tablet:px-8 relative">
         <div className="space-y-4">
           <VistaValleBrandWhite />
@@ -234,7 +206,7 @@ export function PublicFooter({
         </div>
 
         <div className="absolute top-0 left-3/4 h-full w-px bg-on-primary/20" />
-        <div className="pl-6">
+        <div id="contacto" className="pl-6 scroll-mt-24">
           <p className="font-heading text-lg font-normal leading-snug text-primary font-semibold text-xs text-white/75">
             WhatsApp
           </p>
