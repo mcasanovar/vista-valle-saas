@@ -7,7 +7,10 @@ import {
   Text,
   type IconName,
 } from "@/presentation/atoms";
-import { publicSiteContent } from "@/config/public-site-content";
+import {
+  publicNavigationForRoute,
+  publicSiteContent,
+} from "@/config/public-site-content";
 import { Amenities, Price } from "@/presentation/molecules";
 import {
   PublicFooter,
@@ -18,15 +21,7 @@ import {
 import { RoomDetailSelectionButton } from "@/features/reservations/room-detail-selection-button";
 import { RoomSelectionSummary } from "@/features/reservations/room-selection-summary";
 
-const navigation = [
-  { href: "/", label: "Inicio" },
-  { href: "/habitaciones", label: "Habitaciones" },
-  { href: "/#servicios", label: "Servicios" },
-  { href: "/#nosotros", label: "Nosotros" },
-  { href: "/#empresas", label: "Empresas" },
-  { href: "/#ubicacion", label: "Ubicación" },
-  { href: "/#contacto", label: "Contacto" },
-] as const;
+const navigation = publicNavigationForRoute(false);
 
 type RoomPresentationModel = Readonly<{
   amenities: readonly string[];
@@ -66,7 +61,7 @@ export function RoomDetailTemplate({
         }
         bookingLabel="Reservar"
       />
-      <main id="main-content" className="bg-warm">
+      <main id="main-content" className="vv-room-page bg-background">
         <article className="mx-auto max-w-content space-y-8 px-4 py-10 pb-32 phone:px-6 tablet:px-8 tablet:py-14 tablet:pb-32">
           {room.isDemonstration ? (
             <Feedback variant="info" title="Contenido de demostración">

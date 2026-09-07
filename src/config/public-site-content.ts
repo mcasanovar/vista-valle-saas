@@ -5,28 +5,27 @@ import type { PublicNavigationItem } from "@/presentation/organisms";
  * owner supplies and approves them for the production content configuration.
  */
 export const publicSiteContent = {
+  // Kept in sync app-wide: publicNavigationForRoute() is the only place that
+  // reads this list, so every public page shares the same nav automatically.
   brandLabel: "Vista Valle",
   navigation: [
     { href: "#inicio", label: "Inicio" },
     { href: "/habitaciones", label: "Habitaciones" },
-    { href: "#servicios", label: "Servicios" },
-    { href: "#nosotros", label: "Nosotros" },
-    { href: "#empresas", label: "Empresas" },
+    { href: "#nosotros", label: "Experiencia" },
     { href: "#ubicacion", label: "Ubicación" },
     { href: "#contacto", label: "Contacto" },
-    { href: "#consulta-disponibilidad", label: "Reserva" },
   ] satisfies readonly PublicNavigationItem[],
   hero: {
     eyebrow: "Illapel · Valle del Choapa",
-    title: "Descansa con una experiencia para recordar",
-    copy: "La información definitiva de Vista Valle se encuentra en preparación.",
+    title: "Un lugar para bajar el ritmo.",
+    copy: "Comodidad, tranquilidad y una vista privilegiada para descansar después del camino.",
     primaryCta: {
       href: "#consulta-disponibilidad",
       label: "Reservar ahora",
     },
     secondaryCta: { href: "/habitaciones", label: "Ver habitaciones" },
     image: {
-      src: "/brand/bg-hero.jpg",
+      src: "/brand/bg-hero.png",
       alt: "Fachada de Vista Valle con montañas nevadas al fondo",
     },
   },
@@ -39,34 +38,35 @@ export const publicSiteContent = {
   },
   rooms: {
     title: "Nuestras habitaciones",
+    copy: "Tres espacios preparados para estadías de trabajo, descanso y viaje.",
   },
   reasons: {
-    title: "Por qué elegir Vista Valle",
-    copy: "Las ventajas del alojamiento se publicarán cuando su información esté aprobada.",
+    title: "Lo esencial, bien cuidado.",
+    copy: "Una experiencia simple y cercana, pensada para que llegues, descanses y te sientas en casa.",
     items: [
       {
         id: "view",
         label: "Vista privilegiada",
         icon: "Mountain",
-        description: "Disfruta de la mejor vista de Illapel y el valle.",
+        description: "El valle y la montaña como parte de tu estadía.",
       },
       {
         id: "comfort",
         label: "Estacionamiento privado",
         icon: "Car",
-        description: "Comodidad y seguridad para ti y tu vehículo.",
+        description: "Comodidad y seguridad para tu vehículo.",
       },
       {
         id: "rest",
         label: "Ambiente tranquilo",
         icon: "TreePine",
-        description: "Espacios diseñados para tu descanso y bienestar.",
+        description: "Espacios preparados para el descanso.",
       },
       {
         id: "care",
-        label: "Atención personalizada",
+        label: "Atención cercana",
         icon: "User",
-        description: "Te acompañamos en cada detalle de tu estadía.",
+        description: "Acompañamiento cuando lo necesites.",
       },
     ],
   },
@@ -81,8 +81,8 @@ export const publicSiteContent = {
     copy: "La información sobre la experiencia y sus imágenes se publicará cuando esté aprobada.",
   },
   company: {
-    title: "Alojamiento para empresas",
-    copy: "Soluciones de hospedaje cómodas y convenientes para empresas y trabajadores. Habitaciones equipadas para garantizar buen descanso, cercanas a los principales puntos de la zona",
+    title: "Tu equipo también necesita descansar.",
+    copy: "Soluciones de hospedaje cómodas y convenientes para empresas y trabajadores.",
     contact: undefined,
     quotation: {
       enabled: true,
@@ -91,7 +91,7 @@ export const publicSiteContent = {
     },
   },
   location: {
-    title: "Tu próxima estadía en Illapel comienza aquí",
+    title: "Tu próxima estadía comienza aquí.",
   },
   contact: {
     title: "Contacto",
@@ -104,8 +104,7 @@ export const publicSiteContent = {
     label: "Consultar disponibilidad",
   },
   footer: {
-    brandDescription:
-      "Comodidad, tranquilidad y una vista privilegiada para que te sientas como en casa en Illapel.",
+    brandDescription: "Comodidad, tranquilidad y una vista privilegiada en Illapel.",
     socials: [],
     navigation: [
       { href: "#inicio", label: "Inicio" },
@@ -145,3 +144,21 @@ export const publicSiteContent = {
       "© 2026 Vista Valle Lodging House. Todos los derechos reservados.",
   },
 } as const;
+
+/**
+ * Same header nav everywhere: on the landing page anchors resolve on the
+ * current route ("#nosotros"); on any other page they must point back home
+ * first ("/#nosotros"). `/habitaciones` is already an absolute path, so it
+ * is left untouched.
+ */
+export function publicNavigationForRoute(
+  isHome: boolean,
+): readonly PublicNavigationItem[] {
+  if (isHome) {
+    return publicSiteContent.navigation;
+  }
+
+  return publicSiteContent.navigation.map((item) =>
+    item.href.startsWith("#") ? { ...item, href: `/${item.href}` } : item,
+  );
+}

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { ToastProvider } from "@/presentation/organisms";
 import {
+  BedDouble,
   CalendarDays,
   CircleAlert,
   Ellipsis,
@@ -44,6 +45,7 @@ const navigationGroups: ReadonlyArray<
   {
     label: "SISTEMA",
     items: [
+      { href: "/admin/habitaciones", label: "Habitaciones", icon: BedDouble },
       { href: "/admin/bloqueos", label: "Bloqueos", icon: Power },
       {
         href: "/admin/sincronizaciones",
@@ -64,7 +66,7 @@ const mobileItems: readonly NavigationItem[] = [
   navigationGroups[0].items[0],
   navigationGroups[0].items[1],
   navigationGroups[0].items[2],
-  navigationGroups[1].items[2],
+  allItems.find((item) => item.href === "/admin/alertas")!,
 ] as const;
 
 function isActiveRoute(pathname: string, href: string) {

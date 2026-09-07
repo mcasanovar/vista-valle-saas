@@ -30,7 +30,7 @@ export function ThemeToggle() {
       size="icon"
       aria-label={isDark ? "Activar modo claro" : "Activar modo oscuro"}
       onClick={toggle}
-      className="!border-primary/25 !bg-warm hover:!bg-warm active:!bg-warm dark:!border-transparent dark:!bg-gold dark:!text-on-gold dark:hover:!bg-gold dark:active:!bg-gold"
+      className="vv-theme-toggle !border-border !bg-background hover:!bg-background active:!bg-background dark:!border-transparent dark:!bg-gold dark:!text-on-gold dark:hover:!bg-gold dark:active:!bg-gold"
     >
       <Icon decorative name={isDark ? "Sun" : "Moon"} />
     </Button>

@@ -15,7 +15,7 @@ export default function AvailabilityError({
   return (
     <main
       id="main-content"
-      className="mx-auto max-w-content space-y-6 bg-warm px-4 py-10 phone:px-6 tablet:px-8 tablet:py-14"
+      className="mx-auto max-w-content space-y-6 bg-background px-4 py-10 phone:px-6 tablet:px-8 tablet:py-14"
     >
       <Heading level={1}>Disponibilidad</Heading>
       <Feedback variant="error" title="No pudimos cargar los resultados">

@@ -19,7 +19,7 @@ export function PublicHeader({
   bookingLabel: string;
 }) {
   return (
-    <header className="sticky top-0 z-30 bg-warm/95 shadow-sm backdrop-blur">
+    <header className="vv-header sticky top-0 z-30 bg-background/95 backdrop-blur">
       <a
         href="#main-content"
         className="sr-only z-50 rounded-md bg-card p-3 text-foreground shadow-md focus:not-sr-only"

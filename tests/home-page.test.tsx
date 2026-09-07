@@ -29,7 +29,7 @@ describe("HomePage", () => {
       expect(
         screen.getByRole("heading", {
           level: 1,
-          name: "Descansa con una experiencia para recordar",
+          name: "Un lugar para bajar el ritmo.",
         })
       ).toBeVisible()
     );
@@ -38,7 +38,7 @@ describe("HomePage", () => {
         screen.getByRole("img", {
           name: "Fachada de Vista Valle con montañas nevadas al fondo",
         })
-      ).toHaveAttribute("src", expect.stringContaining("bg-hero.jpg"))
+      ).toHaveAttribute("src", expect.stringContaining("bg-hero.png"))
     );
     expect(screen.getByText("Habitación Individual")).toBeVisible();
     expect(screen.getByText("Habitación Matrimonial")).toBeVisible();
@@ -48,11 +48,10 @@ describe("HomePage", () => {
     for (const [label, href] of [
       ["Inicio", "#inicio"],
       ["Habitaciones", "/habitaciones"],
-      ["Servicios", "#servicios"],
-      ["Nosotros", "#nosotros"],
+      ["Experiencia", "#nosotros"],
       ["Ubicación", "#ubicacion"],
       ["Contacto", "#contacto"],
-      ["Reserva", "#consulta-disponibilidad"],
+      ["Reservar", "#consulta-disponibilidad"],
     ]) {
       expect(screen.getAllByRole("link", { name: label })[0]).toHaveAttribute(
         "href",
@@ -66,7 +65,7 @@ describe("HomePage", () => {
       expect(
         screen.getByRole("heading", {
           level: 2,
-          name: "Por qué elegir Vista Valle",
+          name: "Lo esencial, bien cuidado.",
         })
       ).toBeVisible()
     );
@@ -75,7 +74,7 @@ describe("HomePage", () => {
       expect(
         screen.getByRole("heading", {
           level: 2,
-          name: "Tu próxima estadía en Illapel comienza aquí",
+          name: "Tu próxima estadía comienza aquí.",
         })
       ).toBeVisible()
     );

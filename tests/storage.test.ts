@@ -1,11 +1,40 @@
-import { readFile } from "node:fs/promises";
-import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@supabase/supabase-js", () => ({ createClient: vi.fn() }));
+const { config, url, upload, destroy, resources } = vi.hoisted(() => ({
+  config: vi.fn(),
+  destroy: vi.fn(async () => ({ result: "ok" })),
+  resources: vi.fn(
+    async () =>
+      ({ resources: [] }) as {
+        resources: readonly Readonly<{
+          bytes: number;
+          format: string;
+          public_id: string;
+        }>[];
+      }
+  ),
+  upload: vi.fn(async () => ({})),
+  url: vi.fn(
+    () =>
+      "https://res.cloudinary.com/mock-cloud/image/upload/room-images/rooms/room-1/photo"
+  ),
+}));
+
+vi.mock("cloudinary", () => ({
+  v2: { api: { resources }, config, uploader: { destroy, upload }, url },
+}));
 
 import { createMockRoomImageStorage } from "@/infrastructure/storage/mock";
-import { createRoomImageStorage } from "@/infrastructure/storage/server";
+import {
+  createCloudinaryRoomImageStorage,
+  createRoomImageStorage,
+} from "@/infrastructure/storage/server";
+
+const cloudinaryCredentials = {
+  apiKey: "mock-cloudinary-api-key",
+  apiSecret: "mock-cloudinary-api-secret",
+  cloudName: "mock-cloudinary-cloud-name",
+};
 
 const roomId = "00000000-0000-4000-8000-000000000101";
 const image = {
@@ -14,8 +43,8 @@ const image = {
   path: `rooms/${roomId}/technical-image.webp`,
 };
 
-describe("room image storage", () => {
-  it("is isolated, idempotent, supports CRUD, and never fetches", async () => {
+describe("mock room image storage", () => {
+  it("is isolated per instance, idempotent, supports CRUD, and never fetches", async () => {
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
     const first = createMockRoomImageStorage();
@@ -37,6 +66,17 @@ describe("room image storage", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("accepts safe room-id slugs beyond strict UUIDs", async () => {
+    const storage = createMockRoomImageStorage();
+    const demoImage = { ...image, path: "rooms/demo-room-valle/photo.webp" };
+
+    await storage.upload(demoImage);
+
+    expect(await storage.list("demo-room-valle")).toEqual([
+      { contentType: "image/webp", path: demoImage.path, size: 3 },
+    ]);
+  });
+
   it("rejects unsafe paths, inconsistent MIME types, and invalid byte limits", async () => {
     const storage = createMockRoomImageStorage();
 
@@ -49,32 +89,92 @@ describe("room image storage", () => {
     await expect(
       storage.upload({ ...image, bytes: new Uint8Array(0) })
     ).rejects.toThrow(/size/);
-    await expect(storage.remove("rooms/not-a-uuid/image.webp")).rejects.toThrow(
-      /path/
-    );
-    await expect(storage.list("not-a-uuid")).rejects.toThrow(/room ID/);
+    await expect(storage.remove("rooms//image.webp")).rejects.toThrow(/path/);
+    await expect(storage.list("")).rejects.toThrow(/room ID/);
     expect(() => storage.getPublicUrl("/rooms/x.webp")).toThrow(/path/);
   });
 
-  it("selects the mock adapter without creating an SDK client", () => {
+  it("selects the mock adapter without configuring an SDK client", () => {
     const storage = createRoomImageStorage();
 
     expect(storage.context).toBe("mock");
-    expect(createClient).not.toHaveBeenCalled();
+    expect(config).not.toHaveBeenCalled();
+  });
+});
+
+describe("production room image storage (Cloudinary)", () => {
+  it("uploads bytes as a base64 data URI under an explicit public ID without extension", async () => {
+    const storage = createCloudinaryRoomImageStorage(cloudinaryCredentials);
+    expect(storage.context).toBe("production");
+    expect(config).toHaveBeenCalledWith(
+      expect.objectContaining({ cloud_name: cloudinaryCredentials.cloudName })
+    );
+
+    const result = await storage.upload(image);
+
+    expect(upload).toHaveBeenCalledWith(
+      `data:image/webp;base64,${Buffer.from(image.bytes).toString("base64")}`,
+      expect.objectContaining({
+        overwrite: true,
+        public_id: `room-images/rooms/${roomId}/technical-image`,
+      })
+    );
+    expect(result).toEqual({
+      contentType: "image/webp",
+      path: image.path,
+      size: 3,
+    });
   });
 
-  it("declares an idempotent public-read-only bucket policy", async () => {
-    const sql = await readFile("supabase/storage/room-images.sql", "utf8");
+  it("removes by the same public ID it uploaded under", async () => {
+    const storage = createCloudinaryRoomImageStorage(cloudinaryCredentials);
+    await storage.remove(image.path);
 
-    expect(sql).toContain("room-images");
-    expect(sql).toMatch(/on conflict/i);
-    expect(sql).toMatch(/drop policy if exists/i);
-    // storage.objects ships with RLS enabled by Supabase itself; this
-    // connection's role cannot ALTER it and does not need to (see
-    // openspec/changes/configure-production-supabase task 4.2).
-    expect(sql).toMatch(/row level security enabled by supabase/i);
-    expect(sql).not.toMatch(/alter table storage\.objects enable row level security/i);
-    expect(sql).toMatch(/for select/i);
-    expect(sql).not.toMatch(/for (insert|update|delete)/i);
+    expect(destroy).toHaveBeenCalledWith(
+      `room-images/rooms/${roomId}/technical-image`,
+      expect.objectContaining({ resource_type: "image" })
+    );
+  });
+
+  it("lists resources under the room's folder prefix and rebuilds each path", async () => {
+    resources.mockResolvedValueOnce({
+      resources: [
+        {
+          bytes: 42,
+          format: "webp",
+          public_id: `room-images/rooms/${roomId}/technical-image`,
+        },
+      ],
+    });
+    const storage = createCloudinaryRoomImageStorage(cloudinaryCredentials);
+
+    expect(await storage.list(roomId)).toEqual([
+      { contentType: "image/webp", path: image.path, size: 42 },
+    ]);
+    expect(resources).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prefix: `room-images/rooms/${roomId}/`,
+        type: "upload",
+      })
+    );
+  });
+
+  it("builds public URLs from the extension-less public ID", () => {
+    const storage = createCloudinaryRoomImageStorage(cloudinaryCredentials);
+    storage.getPublicUrl(image.path);
+
+    expect(url).toHaveBeenCalledWith(
+      `room-images/rooms/${roomId}/technical-image`,
+      expect.objectContaining({ secure: true })
+    );
+  });
+
+  it("wraps SDK failures in a provider-agnostic error", async () => {
+    upload.mockRejectedValueOnce(new Error("cloudinary said no"));
+    const storage = createCloudinaryRoomImageStorage(cloudinaryCredentials);
+
+    await expect(storage.upload(image)).rejects.toThrow(
+      /room image storage operation/
+    );
   });
 });

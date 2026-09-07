@@ -66,6 +66,9 @@ const serverEnvironmentSchema = z.object({
   BOOKING_HOLD_DURATION_MINUTES: positiveInteger,
   /** Bearer secret for the internal channel-sync polling endpoint (same pattern as OUTBOX_PROCESSOR_SECRET); optional so an unset value disables the endpoint rather than defaulting to an insecure one. */
   CHANNEL_SYNC_PROCESSOR_SECRET: z.string().trim().min(32).optional(),
+  CLOUDINARY_API_KEY: z.string().trim().min(1),
+  CLOUDINARY_API_SECRET: z.string().trim().min(1),
+  CLOUDINARY_CLOUD_NAME: z.string().trim().min(1),
   DATABASE_URL: z
     .url()
     .refine(
@@ -105,6 +108,9 @@ const configurationValuesThatMayBeMocked = [
   "AI_API_KEY",
   "AI_MODEL",
   "AI_PROVIDER",
+  "CLOUDINARY_API_KEY",
+  "CLOUDINARY_API_SECRET",
+  "CLOUDINARY_CLOUD_NAME",
   "DATABASE_URL",
   "FINTOC_API_KEY",
   "FINTOC_WEBHOOK_SECRET",
@@ -173,6 +179,9 @@ export function getServerEnvironment(
     BOOKING_ENABLED: environment.BOOKING_ENABLED,
     BOOKING_HOLD_DURATION_MINUTES: environment.BOOKING_HOLD_DURATION_MINUTES,
     CHANNEL_SYNC_PROCESSOR_SECRET: environment.CHANNEL_SYNC_PROCESSOR_SECRET,
+    CLOUDINARY_API_KEY: environment.CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET: environment.CLOUDINARY_API_SECRET,
+    CLOUDINARY_CLOUD_NAME: environment.CLOUDINARY_CLOUD_NAME,
     DATABASE_URL: environment.DATABASE_URL,
     FINTOC_API_KEY: environment.FINTOC_API_KEY,
     FINTOC_WEBHOOK_SECRET: environment.FINTOC_WEBHOOK_SECRET,

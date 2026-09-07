@@ -33,7 +33,7 @@ export default async function AvailabilityPage({
             value.message,
           ])
         )}
-        bookingSearch={<AvailabilitySearchController />}
+        bookingSearch={<AvailabilitySearchController presentation="hero" />}
       />
     );
   }
@@ -44,6 +44,7 @@ export default async function AvailabilityPage({
       initialCheckOut={validation.value.checkOut}
       initialGuests={validation.value.guests}
       room={validation.value.room}
+      presentation="hero"
     />
   );
   if (process.env.NODE_ENV !== "production" && paramsForTestError(params)) {

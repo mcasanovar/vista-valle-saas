@@ -1,4 +1,4 @@
-export const roomImagesBucket = "room-images";
+export const roomImagesFolder = "room-images";
 export const maxRoomImageBytes = 5 * 1024 * 1024;
 export const allowedRoomImageMimeTypes = [
   "image/avif",
@@ -7,10 +7,12 @@ export const allowedRoomImageMimeTypes = [
   "image/webp",
 ] as const;
 
-const roomImagePathPattern =
-  /^rooms\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})\/([A-Za-z0-9][A-Za-z0-9._-]*\.(?:avif|jpe?g|png|webp))$/i;
+const roomImageRoomIdPattern = /^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$/;
 
-const extensionForContentType = {
+const roomImagePathPattern =
+  /^rooms\/([A-Za-z0-9][A-Za-z0-9_-]{0,119})\/([A-Za-z0-9][A-Za-z0-9._-]*\.(?:avif|jpe?g|png|webp))$/;
+
+export const extensionForContentType = {
   "image/avif": ["avif"],
   "image/jpeg": ["jpeg", "jpg"],
   "image/png": ["png"],
@@ -40,11 +42,7 @@ export type RoomImageStorage = Readonly<{
 }>;
 
 export function assertRoomImageRoomId(roomId: string) {
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      roomId
-    )
-  ) {
+  if (!roomImageRoomIdPattern.test(roomId)) {
     throw new Error("Invalid room image room ID");
   }
 }

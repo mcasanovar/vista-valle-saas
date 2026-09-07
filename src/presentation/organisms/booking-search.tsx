@@ -21,7 +21,7 @@ function HeroField({
     <div className={`flex min-w-0 items-start gap-3 ${className}`}>
       <span
         aria-hidden="true"
-        className={`${iconClassName} inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-accent/10 text-primary`}
+        className={`vv-booking-icon ${iconClassName} inline-flex size-12 shrink-0 items-center justify-center rounded-full bg-accent/10 text-primary`}
       >
         <Icon decorative name={icon} className="size-6" />
       </span>
@@ -103,7 +103,7 @@ export function BookingSearch({
       action={action}
       method="get"
       onSubmit={submit}
-      className={`${isHero ? "grid gap-5 rounded-[1.75rem] border border-border/80 bg-card p-4 shadow-2xl ring-1 ring-background/70 phone:p-5 tablet:grid-cols-2 tablet:p-6 laptop:flex laptop:items-center laptop:gap-0" : "grid gap-3 rounded-xl bg-card p-3 shadow-lg tablet:grid-cols-2 laptop:flex laptop:justify-between laptop:gap-6 laptop:[&>*]:min-w-0 laptop:[&>div]:w-48"} ${className}`}
+      className={`${isHero ? "vv-booking grid gap-5 rounded-[1.75rem] border border-border/80 bg-card p-4 shadow-2xl ring-1 ring-background/70 phone:p-5 tablet:grid-cols-2 tablet:p-6 laptop:flex laptop:items-center laptop:gap-0" : "grid gap-3 rounded-xl bg-card p-3 shadow-lg tablet:grid-cols-2 laptop:flex laptop:justify-between laptop:gap-6 laptop:[&>*]:min-w-0 laptop:[&>div]:w-48"} ${className}`}
     >
       {isHero ? (
         <HeroField

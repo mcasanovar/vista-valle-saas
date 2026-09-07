@@ -5,7 +5,7 @@ export default function Loading() {
     <main
       aria-busy="true"
       aria-live="polite"
-      className="mx-auto max-w-content space-y-8 bg-warm px-4 py-10 phone:px-6 tablet:px-8 tablet:py-14"
+      className="mx-auto max-w-content space-y-8 bg-background px-4 py-10 phone:px-6 tablet:px-8 tablet:py-14"
     >
       <Skeleton className="h-12 w-56 rounded" />
       <Skeleton className="h-40 rounded-xl shadow-sm" />

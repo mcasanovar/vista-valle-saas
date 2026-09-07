@@ -6,6 +6,7 @@ import type { NextConfig } from "next";
 const supabaseImageHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
   : undefined;
+const cloudinaryImageHostname = "res.cloudinary.com";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -13,7 +14,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' ${cloudinaryImageHostname} data: blob:`,
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   `script-src 'self' 'unsafe-inline'${
@@ -51,15 +52,22 @@ const nextConfig: NextConfig = {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
   images: {
-    remotePatterns: supabaseImageHostname
-      ? [
-          {
-            protocol: "https",
-            hostname: supabaseImageHostname,
-            pathname: "/storage/v1/object/public/**",
-          },
-        ]
-      : [],
+    remotePatterns: [
+      ...(supabaseImageHostname
+        ? [
+            {
+              protocol: "https" as const,
+              hostname: supabaseImageHostname,
+              pathname: "/storage/v1/object/public/**",
+            },
+          ]
+        : []),
+      {
+        protocol: "https",
+        hostname: cloudinaryImageHostname,
+        pathname: "/**",
+      },
+    ],
   },
 };
 

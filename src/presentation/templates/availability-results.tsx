@@ -6,18 +6,14 @@ import {
   PublicHeader,
   PublicFooter,
 } from "@/presentation/organisms";
-import { publicSiteContent } from "@/config/public-site-content";
+import {
+  publicNavigationForRoute,
+  publicSiteContent,
+} from "@/config/public-site-content";
 import type { ReactNode } from "react";
 import { RoomSelectionSummary } from "@/features/reservations/room-selection-summary";
 
-const navigation = [
-  { href: "/", label: "Inicio" },
-  { href: "/habitaciones", label: "Habitaciones" },
-  { href: "/#servicios", label: "Servicios" },
-  { href: "/#nosotros", label: "Nosotros" },
-  { href: "/#ubicacion", label: "Ubicación" },
-  { href: "/#contacto", label: "Contacto" },
-] as const;
+const navigation = publicNavigationForRoute(false);
 
 type Room = Readonly<{
   id: string;
@@ -69,7 +65,7 @@ export function AvailabilityResultsTemplate({
         bookingHref="#busqueda-disponibilidad"
         bookingLabel="Reservar"
       />
-      <main id="main-content" className="bg-warm">
+      <main id="main-content" className="vv-availability-page bg-background">
         <RoomPhotoGalleryProvider>
           <section className="mx-auto max-w-content space-y-8 px-4 py-10 pb-32 phone:px-6 tablet:px-8 tablet:py-14 tablet:pb-32">
             <header className="max-w-prose space-y-3">

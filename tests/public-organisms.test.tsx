@@ -87,7 +87,7 @@ it("renders the configured hero photograph as the full-bleed image", () => {
       copy="Texto"
       primaryCta={{ href: "/r", label: "Ir" }}
       image={{
-        src: "/brand/bg-hero.jpg",
+        src: "/brand/bg-hero.png",
         alt: "Fachada de Vista Valle con montañas nevadas al fondo",
       }}
     />
@@ -97,7 +97,7 @@ it("renders the configured hero photograph as the full-bleed image", () => {
     screen.getByRole("img", {
       name: "Fachada de Vista Valle con montañas nevadas al fondo",
     })
-  ).toHaveAttribute("src", expect.stringContaining("bg-hero.jpg"));
+  ).toHaveAttribute("src", expect.stringContaining("bg-hero.png"));
 });
 
 it("submits controlled booking search once while pending", async () => {

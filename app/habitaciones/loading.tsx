@@ -5,7 +5,7 @@ export default function Loading() {
     <main
       aria-busy="true"
       aria-live="polite"
-      className="mx-auto max-w-content space-y-7 bg-warm px-4 py-10 phone:px-6 tablet:px-8 tablet:py-14"
+      className="mx-auto max-w-content space-y-7 bg-background px-4 py-10 phone:px-6 tablet:px-8 tablet:py-14"
     >
       <div className="max-w-prose space-y-3">
         <Skeleton className="h-10 w-48" />
