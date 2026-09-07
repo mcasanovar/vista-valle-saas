@@ -83,7 +83,7 @@ describe("public lodging structured data", () => {
     ]);
   });
 
-  it("includes approved room facts without inventing address, coordinates, or price", () => {
+  it("includes approved room facts and the approved business address/telephone, without inventing coordinates or price", () => {
     const data = createRoomStructuredData("https://vista-valle.example", {
       amenities: ["Wi‑Fi"],
       capacity: 2,
@@ -98,6 +98,11 @@ describe("public lodging structured data", () => {
       "@type": "HotelRoom",
       name: "Habitación aprobada",
     });
-    expect(serialized).not.toMatch(/address|telephone|geo|price/);
+    expect(data.address).toMatchObject({
+      "@type": "PostalAddress",
+      addressLocality: "Illapel",
+    });
+    expect(data.telephone).toBe("+56945981722");
+    expect(serialized).not.toMatch(/geo|price/);
   });
 });

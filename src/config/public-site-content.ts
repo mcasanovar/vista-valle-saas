@@ -106,10 +106,7 @@ export const publicSiteContent = {
   footer: {
     brandDescription:
       "Comodidad, tranquilidad y una vista privilegiada para que te sientas como en casa en Illapel.",
-    socials: [
-      { id: "instagram", href: "https://www.instagram.com/", icon: "MapPin" },
-      { id: "facebook", href: "https://www.facebook.com/", icon: "MapPin" },
-    ],
+    socials: [],
     navigation: [
       { href: "#inicio", label: "Inicio" },
       { href: "/habitaciones", label: "Habitaciones" },
@@ -120,8 +117,8 @@ export const publicSiteContent = {
     contacts: [
       {
         id: "phone",
-        href: "tel:+56912345678",
-        label: "+56 9 1234 5678",
+        href: "tel:+56945981722",
+        label: "+56 9 4598 1722",
         icon: "Phone",
       },
       {
@@ -132,14 +129,14 @@ export const publicSiteContent = {
       },
       {
         id: "address",
-        href: "https://maps.app.goo.gl/m81b5nZ5gGfCF8C87",
-        label: "Camino a Cuz Cuz s/n, Illapel, Coquimbo, Chile",
+        href: "https://www.google.com/maps/search/?api=1&query=Flor+de+Mayo+55%2C+Illapel",
+        label: "Flor de Mayo #55, Illapel",
         icon: "MapPin",
       },
     ],
     whatsapp: {
-      href: "https://wa.me/56912345678",
-      label: "+56 9 1234 5678",
+      href: "https://wa.me/56945981722",
+      label: "+56 9 4598 1722",
       description:
         "Escríbenos directamente por WhatsApp para consultas y reservas.",
       icon: "MessageCircle",

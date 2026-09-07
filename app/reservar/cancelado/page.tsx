@@ -1,6 +1,12 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Feedback, Heading } from "@/presentation/atoms";
+
+export const metadata: Metadata = {
+  title: "Pago cancelado",
+  robots: { index: false, follow: true },
+};
 
 export default function FintocCancelledPage() {
   return (

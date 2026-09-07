@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { LoadingState } from "@/presentation/atoms";
 import { FintocProcessingController } from "@/features/payments/fintoc-processing-controller";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Procesando pago",
+  robots: { index: false, follow: true },
+};
 
 export default function FintocProcessingPage() {
   return (
