@@ -5,7 +5,10 @@ import {
   type LodgingInterval,
 } from "@/features/availability";
 import type { RoomReadModel, RoomReadSource } from "@/features/rooms";
-import type { CompanyQuotationRoomSelection } from "./quotation";
+import type {
+  CompanyQuotationBreakfastCatalog,
+  CompanyQuotationRoomSelection,
+} from "./quotation";
 
 export type CompanyQuotationAvailableRoom = Readonly<{
   availableUnits: number;
@@ -15,12 +18,28 @@ export type CompanyQuotationAvailableRoom = Readonly<{
   slug: string;
 }>;
 
+/**
+ * Per-type breakdown covering every active room type, free or not, so the
+ * quotation UI can explain *why* availability is null or partial instead of
+ * only reporting the free rooms (see `rooms`).
+ */
+export type CompanyQuotationRoomTypeAvailability = Readonly<{
+  availableUnits: number;
+  capacity: number;
+  name: string;
+  nightlyPriceClp: number;
+  slug: string;
+  totalUnits: number;
+}>;
+
 export type CompanyQuotationAvailabilityResult = Readonly<{
+  breakfast: CompanyQuotationBreakfastCatalog | null;
   checkIn: string;
   checkOut: string;
   coversGuestCount: boolean;
   guestCount: number;
   rooms: readonly CompanyQuotationAvailableRoom[];
+  roomTypes: readonly CompanyQuotationRoomTypeAvailability[];
   totalActiveRooms: number;
   totalAvailableCapacity: number;
   totalAvailableRooms: number;
@@ -63,9 +82,14 @@ function groupByType(rooms: readonly RoomReadModel[]) {
  * evaluated in aggregate across every free room, not per room.
  */
 export async function resolveCompanyQuotationAvailability(
-  candidate: Readonly<{ checkIn?: unknown; checkOut?: unknown; guestCount?: unknown }>,
+  candidate: Readonly<{
+    checkIn?: unknown;
+    checkOut?: unknown;
+    guestCount?: unknown;
+  }>,
   dependencies: Readonly<{
     availabilityRepository: AvailabilityRepository;
+    breakfastCatalog?: CompanyQuotationBreakfastCatalog | null;
     roomSource: RoomReadSource;
   }>
 ): Promise<CompanyQuotationAvailabilityResult> {
@@ -94,6 +118,9 @@ export async function resolveCompanyQuotationAvailability(
       room,
     }))
   );
+  const freeRoomIds = new Set(
+    checks.filter((entry) => entry.free).map((entry) => entry.room.id)
+  );
   const freeRooms = checks
     .filter((entry) => entry.free)
     .map((entry) => entry.room);
@@ -114,6 +141,24 @@ export async function resolveCompanyQuotationAvailability(
       })
       .sort((a, b) => a.name.localeCompare(b.name))
   );
+  const roomTypes = Object.freeze(
+    groupByType(activeRooms)
+      .map((group) => {
+        const [representative] = [...group].sort((a, b) =>
+          a.slug.localeCompare(b.slug)
+        );
+        return Object.freeze({
+          availableUnits: group.filter((room) => freeRoomIds.has(room.id))
+            .length,
+          capacity: representative!.capacity,
+          name: representative!.name,
+          nightlyPriceClp: representative!.nightlyPriceClp,
+          slug: representative!.slug,
+          totalUnits: group.length,
+        });
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  );
   const totalAvailableRooms = rooms.reduce(
     (sum, room) => sum + room.availableUnits,
     0
@@ -124,11 +169,13 @@ export async function resolveCompanyQuotationAvailability(
   );
 
   return Object.freeze({
+    breakfast: dependencies.breakfastCatalog ?? null,
     checkIn: interval.checkIn,
     checkOut: interval.checkOut,
     coversGuestCount: totalAvailableCapacity >= guestCount,
     guestCount,
     rooms,
+    roomTypes,
     totalActiveRooms: activeRooms.length,
     totalAvailableCapacity,
     totalAvailableRooms,

@@ -36,6 +36,34 @@ export type NotificationDeliveryRecord = Readonly<{
   status: "delivered" | "failed" | "retrying";
 }>;
 
+/** Async-compatible subset used by delivery workers in mock and PostgreSQL. */
+export type NotificationDeliveryOutbox = Readonly<{
+  completeDelivery: (
+    id: string,
+    now: Date
+  ) => NotificationOutboxIntent | Promise<NotificationOutboxIntent>;
+  failDelivery: (
+    id: string,
+    input: Readonly<{
+      errorCode: string;
+      now: Date;
+      retryAt?: Date;
+    }>
+  ) => NotificationOutboxIntent | Promise<NotificationOutboxIntent>;
+  listReady: (
+    now: Date
+  ) =>
+    | readonly NotificationOutboxIntent[]
+    | Promise<readonly NotificationOutboxIntent[]>;
+  startDelivery: (
+    id: string,
+    now: Date
+  ) =>
+    | NotificationOutboxIntent
+    | null
+    | Promise<NotificationOutboxIntent | null>;
+}>;
+
 export type NotificationOutboxWriter<TContext> = Readonly<{
   writePaymentCollected: (
     context: TContext,
@@ -60,6 +88,7 @@ export type NotificationOutboxWriter<TContext> = Readonly<{
 
 export type NotificationOutboxRepository<TContext> =
   NotificationOutboxWriter<TContext> &
+    NotificationDeliveryOutbox &
     Readonly<{
       completeDelivery: (id: string, now: Date) => NotificationOutboxIntent;
       failDelivery: (

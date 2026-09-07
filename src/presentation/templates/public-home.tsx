@@ -171,11 +171,13 @@ export function PublicHomeTemplate({
                 : undefined
             }
             ctaHref={
-              companyEnquiry.kind === "demo" ? "/cotizacion-empresa" : undefined
+              content.company.quotation.enabled
+                ? content.company.quotation.href
+                : undefined
             }
             ctaLabel={
-              companyEnquiry.kind === "demo"
-                ? "Solicitar cotización"
+              content.company.quotation.enabled
+                ? content.company.quotation.label
                 : undefined
             }
           />

@@ -1,0 +1,1 @@
+ALTER TABLE "company_quotations" DROP COLUMN "requirements";

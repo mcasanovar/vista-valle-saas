@@ -7,6 +7,7 @@ export type DeliveryEmail = Readonly<{
   html: string;
   idempotencyKey: string;
   recipient: string;
+  replyTo?: string;
   subject: string;
 }>;
 
@@ -26,6 +27,25 @@ export type ResendTransport = Readonly<{
 export type ResendEmailAdapter = Readonly<{
   deliver: (email: DeliveryEmail) => Promise<void>;
 }>;
+
+export function classifyResendHttpFailure(status: number): EmailDeliveryError {
+  return new EmailDeliveryError(
+    status >= 500 ? "transient" : "permanent",
+    status >= 500 ? "delivery_transient" : "delivery_permanent"
+  );
+}
+
+export function shouldUseRealResendDelivery(
+  environment: Pick<
+    ReturnType<typeof getServerEnvironment>,
+    "RESEND_DELIVERY_MODE" | "VISTA_VALLE_CONFIG_CONTEXT"
+  >
+) {
+  return (
+    environment.VISTA_VALLE_CONFIG_CONTEXT === "production" &&
+    environment.RESEND_DELIVERY_MODE === "real"
+  );
+}
 
 /**
  * Typed server-only boundary for Resend. Production wiring deliberately
@@ -50,18 +70,16 @@ export function createResendEmailAdapter(
 
 export function getResendEmailAdapter() {
   const environment = getServerEnvironment();
-  if (
-    environment.VISTA_VALLE_CONFIG_CONTEXT === "mock" ||
-    environment.RESEND_DELIVERY_MODE === "mock"
-  ) {
+  if (!shouldUseRealResendDelivery(environment)) {
     return createMockResendEmailAdapter();
   }
   return createResendEmailAdapter({
     send: async (email) => {
       const response = await fetch("https://api.resend.com/emails", {
         body: JSON.stringify({
-          from: `Vista Valle SpA <${email.from ?? environment.RESEND_FROM_EMAIL}>`,
+          from: `${environment.RESEND_FROM_NAME} <${email.from ?? environment.RESEND_FROM_EMAIL}>`,
           html: email.html,
+          reply_to: email.replyTo,
           subject: email.subject,
           to: [email.recipient],
         }),
@@ -72,10 +90,7 @@ export function getResendEmailAdapter() {
         method: "POST",
       });
       if (!response.ok) {
-        throw new EmailDeliveryError(
-          response.status >= 500 ? "transient" : "permanent",
-          response.status >= 500 ? "delivery_transient" : "delivery_permanent"
-        );
+        throw classifyResendHttpFailure(response.status);
       }
     },
   });

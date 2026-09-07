@@ -36,6 +36,34 @@
       "when": 1788382451838,
       "tag": "0004_cute_ironclad",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788540225340,
+      "tag": "0005_parched_sumo",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788540607172,
+      "tag": "0006_hesitant_lake",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788787999776,
+      "tag": "0007_groovy_scorpion",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788788008141,
+      "tag": "0008_brave_wolfsbane",
+      "breakpoints": true
     }
   ]
 }

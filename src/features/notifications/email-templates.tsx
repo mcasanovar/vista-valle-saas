@@ -129,6 +129,18 @@ function CompanyQuotationCoverageNotice({
   );
 }
 
+function CompanyQuotationBreakfastLine({
+  props,
+}: Readonly<{ props: CompanyQuotationEmailData }>) {
+  if (!props.breakfastRequested) return null;
+  return (
+    <p>
+      {props.breakfastQuantity} × Desayuno:{" "}
+      {formatClp(props.breakfastSubtotalClp)}
+    </p>
+  );
+}
+
 export function CompanyQuotationCustomerEmail(
   props: CompanyQuotationEmailData
 ) {
@@ -142,6 +154,7 @@ export function CompanyQuotationCustomerEmail(
         <p>Entrada: {props.checkIn}</p>
         <p>Salida: {props.checkOut}</p>
         <p>Personas: {props.guestCount}</p>
+        <p>Estacionamiento: {props.requireParking ? "Sí" : "No"}</p>
         <CompanyQuotationCoverageNotice
           capacity={props.capacity}
           guestCount={props.guestCount}
@@ -151,6 +164,7 @@ export function CompanyQuotationCustomerEmail(
             {line.quantity} × {line.name}: {formatClp(line.subtotalClp)}
           </p>
         ))}
+        <CompanyQuotationBreakfastLine props={props} />
         <p>Total: {formatClp(props.totalClp)}</p>
       </body>
     </html>
@@ -166,7 +180,7 @@ export function CompanyQuotationAdminEmail(props: CompanyQuotationEmailData) {
         <p>Contacto: {props.contact}</p>
         <p>Correo: {props.email}</p>
         <p>Teléfono: {props.phone || "No informado"}</p>
-        <p>Requisitos: {props.requirements}</p>
+        <p>Estacionamiento: {props.requireParking ? "Sí" : "No"}</p>
         <p>Mensaje: {props.message}</p>
         <p>Entrada: {props.checkIn}</p>
         <p>Salida: {props.checkOut}</p>
@@ -180,6 +194,7 @@ export function CompanyQuotationAdminEmail(props: CompanyQuotationEmailData) {
             {line.quantity} × {line.name}: {formatClp(line.subtotalClp)}
           </p>
         ))}
+        <CompanyQuotationBreakfastLine props={props} />
         <p>Total: {formatClp(props.totalClp)}</p>
       </body>
     </html>

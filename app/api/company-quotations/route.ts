@@ -9,11 +9,11 @@ import {
   type CompanyQuotationRecord,
 } from "@/features/company-quotations";
 import { getAvailabilitySearchRepository } from "@/features/availability/search-source";
+import { getScheduledOutboxProcessor } from "@/features/notifications";
 import {
-  getNotificationOutboxWriter,
-  getScheduledOutboxProcessor,
-} from "@/features/notifications";
-import { getServerCompanyQuotationRepository } from "@/infrastructure/database/company-quotation-source";
+  getServerCompanyQuotationBreakfastCatalogRepository,
+  getServerCompanyQuotationCreationService,
+} from "@/infrastructure/database/company-quotation-source";
 import { getServerEnvironment } from "@/config/server";
 import { getRoomReadSource } from "@/features/rooms";
 
@@ -45,9 +45,14 @@ export async function POST(request: Request) {
 
     const input = normalizeCompanyQuotationInput(await request.json());
     const roomSource = await getRoomReadSource();
+    const breakfastCatalog = input.breakfastRequested
+      ? ((await getServerCompanyQuotationBreakfastCatalogRepository()?.get()) ??
+        null)
+      : null;
     const quotation = calculateCompanyQuotation(
       input,
-      roomSource.listActive()
+      roomSource.listActive(),
+      breakfastCatalog
     );
     const availability = await resolveCompanyQuotationAvailability(
       {
@@ -61,9 +66,8 @@ export async function POST(request: Request) {
       }
     );
     assertCompanyQuotationRoomsAvailable(input.rooms, availability);
-    const repository = getServerCompanyQuotationRepository();
-    const writer = getNotificationOutboxWriter();
-    if (!repository || !writer) {
+    const creationService = getServerCompanyQuotationCreationService();
+    if (!creationService) {
       return Response.json(
         {
           code: "QUOTATION_UNAVAILABLE",
@@ -73,10 +77,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const record = await repository.create(quotation, idempotencyKey);
-    await writer.writeCompanyQuotationRequested(undefined, {
-      quotation: record,
-    });
+    const record = await creationService.create(quotation, idempotencyKey);
     if (getServerEnvironment().VISTA_VALLE_CONFIG_CONTEXT === "mock") {
       await getScheduledOutboxProcessor()?.run();
     }

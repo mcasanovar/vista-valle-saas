@@ -9,6 +9,7 @@ vi.mock("@/features/availability/search-source", () => ({
 }));
 
 const body = {
+  breakfastRequested: false,
   checkIn: "2026-10-05",
   checkOut: "2026-10-08",
   company: "Empresa demo",
@@ -16,7 +17,7 @@ const body = {
   email: "ana@example.com",
   guestCount: 1,
   message: "Mensaje",
-  requirements: "Requisitos",
+  requireParking: false,
   rooms: [{ quantity: 1, slug: "habitacion-valle-demo" }],
 };
 
@@ -64,7 +65,11 @@ describe("company quotation route availability re-check", () => {
 
   it("accepts a submission whose requested rooms are still free at submit time", async () => {
     getAvailabilitySearchRepository.mockReturnValue(
-      createMockAvailabilityRepository({ blocks: [], holds: [], reservations: [] })
+      createMockAvailabilityRepository({
+        blocks: [],
+        holds: [],
+        reservations: [],
+      })
     );
     const { POST } = await import("../app/api/company-quotations/route");
 

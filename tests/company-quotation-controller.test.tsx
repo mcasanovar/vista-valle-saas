@@ -61,6 +61,37 @@ describe("CompanyQuotationController", () => {
     ).toBeGreaterThan(0);
   });
 
+  it("shows the number of nights as soon as both dates are entered, before querying availability", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const user = userEvent.setup();
+    render(<CompanyQuotationController />);
+
+    await user.type(screen.getByLabelText(/Fecha de entrada/), "2026-10-05");
+    expect(screen.queryByText(/noche/)).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/Fecha de salida/), "2026-10-08");
+    expect(screen.getByText("Estás seleccionando 3 noches.")).toBeVisible();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("updates the night count when dates change, and hides it for an invalid range", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const user = userEvent.setup();
+    render(<CompanyQuotationController />);
+
+    await user.type(screen.getByLabelText(/Fecha de entrada/), "2026-10-05");
+    await user.type(screen.getByLabelText(/Fecha de salida/), "2026-10-06");
+    expect(screen.getByText("Estás seleccionando 1 noche.")).toBeVisible();
+
+    await user.clear(screen.getByLabelText(/Fecha de salida/));
+    await user.type(screen.getByLabelText(/Fecha de salida/), "2026-10-09");
+    expect(screen.getByText("Estás seleccionando 4 noches.")).toBeVisible();
+
+    await user.clear(screen.getByLabelText(/Fecha de salida/));
+    await user.type(screen.getByLabelText(/Fecha de salida/), "2026-10-05");
+    expect(screen.queryByText(/noche/)).not.toBeInTheDocument();
+  });
+
   it("queries availability with the entered dates and guest count via keyboard", async () => {
     mockFetchOnce({
       checkIn: "2026-10-05",
@@ -74,6 +105,16 @@ describe("CompanyQuotationController", () => {
           name: "Habitación Doble",
           nightlyPriceClp: 70000,
           slug: "doble",
+        },
+      ],
+      roomTypes: [
+        {
+          availableUnits: 1,
+          capacity: 2,
+          name: "Habitación Doble",
+          nightlyPriceClp: 70000,
+          slug: "doble",
+          totalUnits: 1,
         },
       ],
       totalActiveRooms: 3,
@@ -107,6 +148,16 @@ describe("CompanyQuotationController", () => {
           name: "Habitación Individual",
           nightlyPriceClp: 55000,
           slug: "individual",
+        },
+      ],
+      roomTypes: [
+        {
+          availableUnits: 1,
+          capacity: 1,
+          name: "Habitación Individual",
+          nightlyPriceClp: 55000,
+          slug: "individual",
+          totalUnits: 1,
         },
       ],
       totalActiveRooms: 1,
@@ -143,6 +194,16 @@ describe("CompanyQuotationController", () => {
           name: "Habitación Doble",
           nightlyPriceClp: 70000,
           slug: "doble",
+        },
+      ],
+      roomTypes: [
+        {
+          availableUnits: 1,
+          capacity: 2,
+          name: "Habitación Doble",
+          nightlyPriceClp: 70000,
+          slug: "doble",
+          totalUnits: 1,
         },
       ],
       totalActiveRooms: 3,
@@ -184,6 +245,16 @@ describe("CompanyQuotationController", () => {
           slug: "individual",
         },
       ],
+      roomTypes: [
+        {
+          availableUnits: 1,
+          capacity: 1,
+          name: "Habitación Individual",
+          nightlyPriceClp: 55000,
+          slug: "individual",
+          totalUnits: 1,
+        },
+      ],
       totalActiveRooms: 3,
       totalAvailableCapacity: 1,
       totalAvailableRooms: 1,
@@ -210,6 +281,16 @@ describe("CompanyQuotationController", () => {
       coversGuestCount: false,
       guestCount: 2,
       rooms: [],
+      roomTypes: [
+        {
+          availableUnits: 0,
+          capacity: 1,
+          name: "Habitación Individual",
+          nightlyPriceClp: 55000,
+          slug: "individual",
+          totalUnits: 1,
+        },
+      ],
       totalActiveRooms: 3,
       totalAvailableCapacity: 0,
       totalAvailableRooms: 0,
@@ -246,6 +327,16 @@ describe("CompanyQuotationController", () => {
           slug: "individual",
         },
       ],
+      roomTypes: [
+        {
+          availableUnits: 1,
+          capacity: 1,
+          name: "Habitación Individual",
+          nightlyPriceClp: 55000,
+          slug: "individual",
+          totalUnits: 1,
+        },
+      ],
       totalActiveRooms: 1,
       totalAvailableCapacity: 1,
       totalAvailableRooms: 1,
@@ -266,6 +357,16 @@ describe("CompanyQuotationController", () => {
       coversGuestCount: false,
       guestCount: 2,
       rooms: [],
+      roomTypes: [
+        {
+          availableUnits: 0,
+          capacity: 1,
+          name: "Habitación Individual",
+          nightlyPriceClp: 55000,
+          slug: "individual",
+          totalUnits: 1,
+        },
+      ],
       totalActiveRooms: 1,
       totalAvailableCapacity: 0,
       totalAvailableRooms: 0,

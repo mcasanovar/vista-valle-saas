@@ -17,7 +17,11 @@ type DeliveryProcessor = Readonly<{
 }>;
 
 type ScheduledOutboxProcessorDependencies = Readonly<{
-  listReady: (now: Date) => readonly Readonly<{ id: string }>[];
+  listReady: (
+    now: Date
+  ) =>
+    | readonly Readonly<{ id: string }>[]
+    | Promise<readonly Readonly<{ id: string }>[]>;
   now?: () => Date;
   process: DeliveryProcessor;
 }>;
@@ -41,7 +45,10 @@ export function createScheduledOutboxProcessor(
   return Object.freeze({
     run: async (): Promise<ScheduledOutboxProcessorResult> => {
       const startedAt = now().getTime();
-      const ready = dependencies.listReady(now()).slice(0, safeBatchSize);
+      const ready = (await dependencies.listReady(now())).slice(
+        0,
+        safeBatchSize
+      );
       if (ready.length === 0) return { processed: 0, stopped: "no_ready" };
 
       let processed = 0;
@@ -55,7 +62,7 @@ export function createScheduledOutboxProcessor(
       return {
         processed,
         stopped:
-          dependencies.listReady(now()).length > 0 &&
+          (await dependencies.listReady(now())).length > 0 &&
           processed === safeBatchSize
             ? "batch_limit"
             : "no_ready",

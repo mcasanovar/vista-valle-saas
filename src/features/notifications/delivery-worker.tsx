@@ -11,8 +11,8 @@ import {
 } from "./email-template-renderer";
 import type { PayAtPropertyConfirmationEmailData } from "./email-templates";
 import type {
+  NotificationDeliveryOutbox,
   NotificationOutboxIntent,
-  NotificationOutboxRepository,
 } from "./outbox";
 import { EmailDeliveryError, type ResendEmailAdapter } from "./resend-adapter";
 import { getServerEnvironment } from "@/config/server";
@@ -95,14 +95,14 @@ async function renderEmail(
 
 /** Processes persisted intents only; it has no scheduler or UI responsibility. */
 export function createNotificationDeliveryWorker(
-  outbox: NotificationOutboxRepository<unknown>,
+  outbox: NotificationDeliveryOutbox,
   adapter: ResendEmailAdapter,
   source: NotificationTemplateDataSource,
   now: () => Date = () => new Date(),
   maxAttempts = 3
 ): NotificationDeliveryWorker {
   const process = async (outboxId: string) => {
-    const started = outbox.startDelivery(outboxId, now());
+    const started = await outbox.startDelivery(outboxId, now());
     if (!started) return;
 
     try {
@@ -112,14 +112,15 @@ export function createNotificationDeliveryWorker(
         from: getServerEnvironment().RESEND_FROM_EMAIL,
         idempotencyKey: started.id,
         recipient: started.recipient,
+        replyTo: getServerEnvironment().ADMIN_NOTIFICATION_EMAIL,
       });
-      outbox.completeDelivery(started.id, now());
+      await outbox.completeDelivery(started.id, now());
     } catch (error) {
       const deliveryError =
         error instanceof EmailDeliveryError
           ? error
           : new EmailDeliveryError("transient", "delivery_transient");
-      outbox.failDelivery(started.id, {
+      await outbox.failDelivery(started.id, {
         errorCode: deliveryError.safeCode,
         now: now(),
         retryAt:
@@ -133,7 +134,7 @@ export function createNotificationDeliveryWorker(
   return Object.freeze({
     process,
     processReady: async () => {
-      const ready = outbox.listReady(now());
+      const ready = await outbox.listReady(now());
       for (const intent of ready) await process(intent.id);
     },
   });

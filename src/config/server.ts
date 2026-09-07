@@ -81,7 +81,9 @@ const serverEnvironmentSchema = z.object({
   OUTBOX_PROCESSOR_SECRET: z.string().trim().min(32).optional(),
   RESEND_API_KEY: z.string().trim().min(1),
   RESEND_DELIVERY_MODE: z.enum(["mock", "real"]).default("mock"),
-  RESEND_FROM_EMAIL: z.email().default("reservas@vistavalle.cl"),
+  RESEND_FROM_EMAIL: z.email(),
+  /** Display name shown alongside RESEND_FROM_EMAIL in the sender identity, e.g. "Name <email>". Configurable so a testing domain can use its own name instead of the production brand. */
+  RESEND_FROM_NAME: z.string().trim().min(1).default("Vista Valle SpA"),
   SITE_URL: z
     .url()
     .refine(
@@ -111,8 +113,10 @@ const configurationValuesThatMayBeMocked = [
   "NEXT_PUBLIC_SUPABASE_ANON_KEY",
   "NEXT_PUBLIC_SUPABASE_URL",
   "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
   "SITE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
+  "OUTBOX_PROCESSOR_SECRET",
 ] as const;
 
 function isMockValue(value: string | undefined) {
@@ -134,6 +138,24 @@ function assertMockValuesAreExplicitlyAllowed(
   if (mockedKeys.length > 0) {
     throw new Error(
       `Invalid server environment configuration: ${mockedKeys.join(", ")} must not use mock or placeholder values in production`
+    );
+  }
+}
+
+function assertProductionNotificationConfiguration(
+  environment: Record<string, string | undefined>,
+  configuration: ServerEnvironment
+) {
+  if (configuration.VISTA_VALLE_CONFIG_CONTEXT !== "production") return;
+
+  if (configuration.RESEND_DELIVERY_MODE !== "real") {
+    throw new Error(
+      "Invalid server environment configuration: RESEND_DELIVERY_MODE must be real in production"
+    );
+  }
+  if (!environment.OUTBOX_PROCESSOR_SECRET?.trim()) {
+    throw new Error(
+      "Invalid server environment configuration: OUTBOX_PROCESSOR_SECRET is required in production"
     );
   }
 }
@@ -161,6 +183,7 @@ export function getServerEnvironment(
     RESEND_API_KEY: environment.RESEND_API_KEY,
     RESEND_DELIVERY_MODE: environment.RESEND_DELIVERY_MODE,
     RESEND_FROM_EMAIL: environment.RESEND_FROM_EMAIL,
+    RESEND_FROM_NAME: environment.RESEND_FROM_NAME,
     SITE_URL: environment.SITE_URL,
     SUPABASE_SERVICE_ROLE_KEY: environment.SUPABASE_SERVICE_ROLE_KEY,
     TIMEZONE: environment.TIMEZONE,
@@ -175,6 +198,7 @@ export function getServerEnvironment(
     environment,
     parsed.data.VISTA_VALLE_CONFIG_CONTEXT
   );
+  assertProductionNotificationConfiguration(environment, parsed.data);
 
   return parsed.data;
 }

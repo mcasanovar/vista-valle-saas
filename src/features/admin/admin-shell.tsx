@@ -17,6 +17,7 @@ import {
   LogOut,
   RefreshCw,
   ScrollText,
+  Settings,
 } from "lucide-react";
 
 type NavigationItem = Readonly<{
@@ -52,6 +53,7 @@ const navigationGroups: ReadonlyArray<
       },
       { href: "/admin/alertas", label: "Alertas", icon: CircleAlert },
       { href: "/admin/asistente", label: "Asistente", icon: BotMessageSquare },
+      { href: "/admin/configuracion", label: "Configuración", icon: Settings },
     ],
   },
 ] as const;

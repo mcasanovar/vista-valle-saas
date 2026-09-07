@@ -8,6 +8,7 @@ import {
 import { mockDemoRooms } from "@/features/rooms";
 
 const validInput = {
+  breakfastRequested: false,
   checkIn: "2026-10-05",
   checkOut: "2026-10-08",
   company: "Empresa demo",
@@ -16,12 +17,14 @@ const validInput = {
   guestCount: 4,
   message: "Necesitamos alojamiento.",
   phone: "+56 9 1111 1111",
-  requirements: "Tres noches y desayuno.",
+  requireParking: true,
   rooms: [
     { quantity: 2, slug: "habitacion-valle-demo" },
     { quantity: 1, slug: "habitacion-terra-demo" },
   ],
 };
+
+const breakfastCatalog = { description: "Desayuno demo", unitPriceClp: 8000 };
 
 describe("company quotation", () => {
   it("normalizes a multi-room request and calculates authoritative line totals", () => {
@@ -84,5 +87,50 @@ describe("company quotation", () => {
     const quote = calculateCompanyQuotation(input, mockDemoRooms);
 
     expect(quote.totalClp).toBe(210000);
+  });
+
+  it("rejects a request without an explicit parking answer", () => {
+    const withoutParking: Record<string, unknown> = { ...validInput };
+    delete withoutParking.requireParking;
+    expect(() => normalizeCompanyQuotationInput(withoutParking)).toThrow(
+      CompanyQuotationInputError
+    );
+  });
+
+  it("requires a valid quantity when breakfast is requested", () => {
+    expect(() =>
+      normalizeCompanyQuotationInput({
+        ...validInput,
+        breakfastRequested: true,
+      })
+    ).toThrow(CompanyQuotationInputError);
+  });
+
+  it("adds the breakfast subtotal, using the provided catalog price, to the total", () => {
+    const input = normalizeCompanyQuotationInput({
+      ...validInput,
+      breakfastQuantity: 3,
+      breakfastRequested: true,
+    });
+    const quote = calculateCompanyQuotation(
+      input,
+      mockDemoRooms,
+      breakfastCatalog
+    );
+
+    expect(quote.breakfastSubtotalClp).toBe(24000);
+    expect(quote.breakfastUnitPriceClp).toBe(8000);
+    expect(quote.totalClp).toBe(540000 + 24000);
+  });
+
+  it("rejects a breakfast request when no catalog is available", () => {
+    const input = normalizeCompanyQuotationInput({
+      ...validInput,
+      breakfastQuantity: 1,
+      breakfastRequested: true,
+    });
+    expect(() => calculateCompanyQuotation(input, mockDemoRooms)).toThrow(
+      CompanyQuotationInputError
+    );
   });
 });

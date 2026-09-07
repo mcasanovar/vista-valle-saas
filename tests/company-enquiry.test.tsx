@@ -24,7 +24,7 @@ describe("company enquiry path", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the form unavailable in production and returns pending without a configured channel", async () => {
+  it("keeps the quotation CTA in production without a generic contact channel", async () => {
     expect(createCompanyEnquiryPath("production")).toEqual({ kind: "pending" });
     expect(
       createCompanyEnquiryPath("production", {
@@ -48,10 +48,13 @@ describe("company enquiry path", () => {
         name: "Formulario de consulta para empresas de demostración",
       })
     ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Solicitar cotización" })
+    ).toHaveAttribute("href", "/cotizacion-empresa");
     await waitFor(() =>
       expect(
-        screen.getByText("Canal de contacto pendiente de configuración.")
-      ).toBeVisible()
+        screen.queryByText("Canal de contacto pendiente de configuración.")
+      ).not.toBeInTheDocument()
     );
   });
 });

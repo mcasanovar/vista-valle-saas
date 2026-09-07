@@ -1,0 +1,3 @@
+ALTER TABLE "notification_outbox" ADD COLUMN "quotation_id" uuid;--> statement-breakpoint
+ALTER TABLE "notification_outbox" ADD CONSTRAINT "notification_outbox_quotation_id_company_quotations_id_fk" FOREIGN KEY ("quotation_id") REFERENCES "public"."company_quotations"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "notification_outbox_quotation_idx" ON "notification_outbox" USING btree ("quotation_id");

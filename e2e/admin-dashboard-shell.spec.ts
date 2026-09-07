@@ -1,5 +1,32 @@
 import { expect, test } from "@playwright/test";
 
+test("admin dashboard summary responds to the month selector while alerts and recent reservations stay put", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  // The configured mock adapter supplies the authorized administrator session.
+  await page.goto("/admin/login");
+  await page.goto("/admin?month=2026-10");
+  await expect(page.getByText("octubre de 2026").last()).toBeVisible();
+
+  const reservationsCard = page.locator("article", {
+    hasText: "Reservas del mes",
+  });
+  await expect(reservationsCard).toContainText("1");
+
+  const alertsCard = page.locator("article", { hasText: "Alertas abiertas" });
+  const alertsBeforeText = await alertsCard.textContent();
+  await expect(page.getByText("Huésped demo").first()).toBeVisible();
+
+  await page.getByLabel("Mes siguiente").last().click();
+
+  await expect(page.getByText("noviembre de 2026").last()).toBeVisible();
+  await expect(page).toHaveURL(/month=2026-11/);
+  await expect(reservationsCard).toContainText("0");
+  await expect(alertsCard).toHaveText(alertsBeforeText ?? "");
+  await expect(page.getByText("Huésped demo").first()).toBeVisible();
+});
+
 test("admin shell adapts the authenticated dashboard at desktop, tablet and mobile widths", async ({
   page,
 }) => {

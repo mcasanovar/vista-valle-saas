@@ -10,7 +10,14 @@ export type CompanyQuotationRoomSelection = Readonly<{
   slug: string;
 }>;
 
+export type CompanyQuotationBreakfastCatalog = Readonly<{
+  description: string;
+  unitPriceClp: number;
+}>;
+
 export type CompanyQuotationInput = Readonly<{
+  breakfastQuantity?: number;
+  breakfastRequested: boolean;
   checkIn: string;
   checkOut: string;
   company: string;
@@ -19,7 +26,7 @@ export type CompanyQuotationInput = Readonly<{
   guestCount: number;
   message: string;
   phone?: string;
-  requirements: string;
+  requireParking: boolean;
   rooms: readonly CompanyQuotationRoomSelection[];
 }>;
 
@@ -34,6 +41,10 @@ export type CompanyQuotationLine = Readonly<{
 }>;
 
 export type CompanyQuotation = Readonly<{
+  breakfastQuantity?: number;
+  breakfastRequested: boolean;
+  breakfastSubtotalClp: number;
+  breakfastUnitPriceClp?: number;
   capacity: number;
   checkIn: string;
   checkOut: string;
@@ -45,7 +56,7 @@ export type CompanyQuotation = Readonly<{
   message: string;
   nights: number;
   phone: string;
-  requirements: string;
+  requireParking: boolean;
   totalClp: number;
 }>;
 
@@ -116,7 +127,6 @@ export function normalizeCompanyQuotationInput(
     "company",
     "contact",
     "email",
-    "requirements",
     "message",
   ] as const) {
     if (!text(candidate[field]))
@@ -132,6 +142,19 @@ export function normalizeCompanyQuotationInput(
     issues.push({
       field: "guestCount",
       message: "Indique una cantidad válida de personas.",
+    });
+  }
+  if (typeof candidate.requireParking !== "boolean") {
+    issues.push({
+      field: "requireParking",
+      message: "Indique si requiere estacionamiento.",
+    });
+  }
+  const breakfastRequested = candidate.breakfastRequested === true;
+  if (breakfastRequested && !positiveInteger(candidate.breakfastQuantity)) {
+    issues.push({
+      field: "breakfastQuantity",
+      message: "Indique una cantidad válida de desayunos.",
     });
   }
   if (!rooms.length) {
@@ -162,6 +185,10 @@ export function normalizeCompanyQuotationInput(
     throw new CompanyQuotationInputError(Object.freeze(issues));
 
   return Object.freeze({
+    breakfastQuantity: breakfastRequested
+      ? (candidate.breakfastQuantity as number)
+      : undefined,
+    breakfastRequested,
     checkIn: text(candidate.checkIn),
     checkOut: text(candidate.checkOut),
     company: text(candidate.company),
@@ -170,14 +197,15 @@ export function normalizeCompanyQuotationInput(
     guestCount: candidate.guestCount as number,
     message: text(candidate.message),
     phone: text(candidate.phone),
-    requirements: text(candidate.requirements),
+    requireParking: candidate.requireParking === true,
     rooms: Object.freeze(rooms as CompanyQuotationRoomSelection[]),
   });
 }
 
 export function calculateCompanyQuotation(
   input: CompanyQuotationInput,
-  activeRooms: readonly RoomReadModel[]
+  activeRooms: readonly RoomReadModel[],
+  breakfastCatalog: CompanyQuotationBreakfastCatalog | null = null
 ): CompanyQuotation {
   let interval: LodgingInterval;
   try {
@@ -219,7 +247,36 @@ export function calculateCompanyQuotation(
     0
   );
 
+  if (input.breakfastRequested && !breakfastCatalog) {
+    throw new CompanyQuotationInputError([
+      {
+        field: "breakfastQuantity",
+        message: "El desayuno no está disponible en este momento.",
+      },
+    ]);
+  }
+  const breakfastSubtotalClp = input.breakfastRequested
+    ? (input.breakfastQuantity as number) * breakfastCatalog!.unitPriceClp
+    : 0;
+  if (!Number.isSafeInteger(breakfastSubtotalClp))
+    throw new CompanyQuotationInputError([
+      {
+        field: "breakfastQuantity",
+        message: "El total calculado no es válido.",
+      },
+    ]);
+
+  const roomsTotalClp = lines.reduce((sum, line) => sum + line.subtotalClp, 0);
+
   return Object.freeze({
+    breakfastQuantity: input.breakfastRequested
+      ? input.breakfastQuantity
+      : undefined,
+    breakfastRequested: input.breakfastRequested,
+    breakfastSubtotalClp,
+    breakfastUnitPriceClp: input.breakfastRequested
+      ? breakfastCatalog!.unitPriceClp
+      : undefined,
     capacity,
     checkIn: interval.checkIn,
     checkOut: interval.checkOut,
@@ -231,7 +288,7 @@ export function calculateCompanyQuotation(
     message: input.message,
     nights: stayNights,
     phone: input.phone ?? "",
-    requirements: input.requirements,
-    totalClp: lines.reduce((sum, line) => sum + line.subtotalClp, 0),
+    requireParking: input.requireParking,
+    totalClp: roomsTotalClp + breakfastSubtotalClp,
   });
 }

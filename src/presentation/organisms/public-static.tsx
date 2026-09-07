@@ -79,9 +79,8 @@ export function CompanyCta({
             <Text className="max-w-prose !text-on-primary/85">{copy}</Text>
           </div>
         </div>
-        {href && label ? (
-          <ContactLink href={href}>{label}</ContactLink>
-        ) : ctaHref && ctaLabel ? (
+        {href && label ? <ContactLink href={href}>{label}</ContactLink> : null}
+        {ctaHref && ctaLabel ? (
           <InteractiveSurface>
             <ActionLink
               href={ctaHref}
@@ -91,11 +90,12 @@ export function CompanyCta({
               {ctaLabel}
             </ActionLink>
           </InteractiveSurface>
-        ) : (
+        ) : null}
+        {!href && !ctaHref ? (
           <Text className="!text-on-primary/70">
             Canal de contacto pendiente de configuración.
           </Text>
-        )}
+        ) : null}
       </div>
     </section>
   );

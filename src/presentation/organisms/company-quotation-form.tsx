@@ -17,22 +17,31 @@ type AvailableRoomOption = Readonly<{
   slug: string;
 }>;
 
+type BreakfastCatalog = Readonly<{
+  description: string;
+  unitPriceClp: number;
+}>;
+
 type FormValues = Readonly<{
+  breakfastQuantity: string;
+  breakfastRequested: boolean;
   company: string;
   contact: string;
   email: string;
   message: string;
   phone: string;
-  requirements: string;
+  requireParking: boolean | undefined;
 }>;
 
 const initialValues: FormValues = {
+  breakfastQuantity: "",
+  breakfastRequested: false,
   company: "",
   contact: "",
   email: "",
   message: "",
   phone: "",
-  requirements: "",
+  requireParking: undefined,
 };
 
 function formatCapacity(value: number) {
@@ -44,11 +53,13 @@ function formatUnits(value: number) {
 }
 
 export function CompanyQuotationForm({
+  breakfast,
   checkIn,
   checkOut,
   guestCount,
   rooms,
 }: Readonly<{
+  breakfast: BreakfastCatalog | null;
   checkIn: string;
   checkOut: string;
   guestCount: number;
@@ -71,7 +82,7 @@ export function CompanyQuotationForm({
   );
   const capacityShortfall = guestCount > capacity ? guestCount - capacity : 0;
 
-  function update(field: keyof FormValues, value: string) {
+  function update<K extends keyof FormValues>(field: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: "" }));
     setStatus("idle");
@@ -96,8 +107,15 @@ export function CompanyQuotationForm({
       nextErrors.email = "Ingrese un correo válido.";
     if (!selectedRooms.length)
       nextErrors.rooms = "Seleccione al menos una habitación.";
-    if (!values.requirements)
-      nextErrors.requirements = "Este campo es obligatorio.";
+    if (values.requireParking === undefined)
+      nextErrors.requireParking = "Este campo es obligatorio.";
+    const breakfastQuantity = Number(values.breakfastQuantity);
+    if (
+      values.breakfastRequested &&
+      (!Number.isSafeInteger(breakfastQuantity) || breakfastQuantity < 1)
+    ) {
+      nextErrors.breakfastQuantity = "Indique una cantidad válida.";
+    }
     if (!values.message) nextErrors.message = "Este campo es obligatorio.";
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
@@ -111,6 +129,9 @@ export function CompanyQuotationForm({
       const response = await fetch("/api/company-quotations", {
         body: JSON.stringify({
           ...values,
+          breakfastQuantity: values.breakfastRequested
+            ? breakfastQuantity
+            : undefined,
           checkIn,
           checkOut,
           guestCount,
@@ -254,114 +275,218 @@ export function CompanyQuotationForm({
                 {errors.rooms}
               </p>
             ) : null}
-          </div>
-        </section>
-
-        <section
-          aria-labelledby="quotation-contact-heading"
-          className="space-y-5 rounded-xl border bg-card p-5 shadow-sm tablet:p-7"
-        >
-          <div>
-            <h2
-              id="quotation-contact-heading"
-              className="font-heading text-title font-normal text-foreground"
-            >
-              Datos de la empresa
-            </h2>
-            <Text className="mt-2 text-muted-foreground">
-              Usaremos estos datos para enviar el resumen calculado de tu
-              cotización.
-            </Text>
-          </div>
-          <div className="grid gap-5 tablet:grid-cols-2">
-            <FormField
-              id="quotation-company"
-              label="Empresa"
-              required
-              error={errors.company}
-              inputProps={{
-                autoComplete: "organization",
-                onChange: (event) => update("company", event.target.value),
-                value: values.company,
-              }}
-            />
-            <FormField
-              id="quotation-contact"
-              label="Persona de contacto"
-              required
-              error={errors.contact}
-              inputProps={{
-                autoComplete: "name",
-                onChange: (event) => update("contact", event.target.value),
-                value: values.contact,
-              }}
-            />
-            <FormField
-              id="quotation-email"
-              label="Correo electrónico"
-              required
-              error={errors.email}
-              inputProps={{
-                autoComplete: "email",
-                onChange: (event) => update("email", event.target.value),
-                type: "email",
-                value: values.email,
-              }}
-            />
-            <FormField
-              id="quotation-phone"
-              label="Teléfono"
-              hint="Opcional"
-              inputProps={{
-                autoComplete: "tel",
-                onChange: (event) => update("phone", event.target.value),
-                type: "tel",
-                value: values.phone,
-              }}
-            />
-          </div>
-          <FormField
-            id="quotation-requirements"
-            label="Requisitos"
-            required
-            error={errors.requirements}
-            inputProps={{
-              onChange: (event) => update("requirements", event.target.value),
-              value: values.requirements,
-            }}
-          />
-          <div className="space-y-2">
-            <Label htmlFor="quotation-message" required>
-              Mensaje
-            </Label>
-            <textarea
-              id="quotation-message"
-              rows={5}
-              value={values.message}
-              onChange={(event) => update("message", event.target.value)}
-              aria-invalid={errors.message ? true : undefined}
-              required
-              className="min-h-28 w-full rounded-md border bg-card px-4 py-3 text-base text-foreground focus:border-ring"
-            />
-            {errors.message ? (
-              <p role="alert" className="text-body text-destructive">
-                {errors.message}
+            {!selectedRooms.length ? (
+              <p className="text-sm text-foreground">
+                Selecciona una o más habitaciones para continuar con tu
+                cotización.
               </p>
             ) : null}
           </div>
-          {errors.form ? (
-            <Feedback variant="error" title="No pudimos preparar la cotización">
-              {errors.form}
-            </Feedback>
-          ) : null}
-          <Button
-            disabled={status === "submitting"}
-            loading={status === "submitting"}
-            type="submit"
-          >
-            Generar y enviar cotización
-          </Button>
         </section>
+
+        {selectedRooms.length ? (
+          <section
+            aria-labelledby="quotation-contact-heading"
+            className="space-y-5 rounded-xl border bg-card p-5 shadow-sm tablet:p-7"
+          >
+            <div>
+              <h2
+                id="quotation-contact-heading"
+                className="font-heading text-title font-normal text-foreground"
+              >
+                Datos de la empresa
+              </h2>
+              <Text className="mt-2 text-muted-foreground">
+                Usaremos estos datos para enviar el resumen calculado de tu
+                cotización.
+              </Text>
+            </div>
+            <div className="grid gap-5 tablet:grid-cols-2">
+              <FormField
+                id="quotation-company"
+                label="Empresa"
+                required
+                error={errors.company}
+                inputProps={{
+                  autoComplete: "organization",
+                  onChange: (event) => update("company", event.target.value),
+                  value: values.company,
+                }}
+              />
+              <FormField
+                id="quotation-contact"
+                label="Persona de contacto"
+                required
+                error={errors.contact}
+                inputProps={{
+                  autoComplete: "name",
+                  onChange: (event) => update("contact", event.target.value),
+                  value: values.contact,
+                }}
+              />
+              <FormField
+                id="quotation-email"
+                label="Correo electrónico"
+                required
+                error={errors.email}
+                inputProps={{
+                  autoComplete: "email",
+                  onChange: (event) => update("email", event.target.value),
+                  type: "email",
+                  value: values.email,
+                }}
+              />
+              <FormField
+                id="quotation-phone"
+                label="Teléfono"
+                hint="Opcional"
+                inputProps={{
+                  autoComplete: "tel",
+                  onChange: (event) => update("phone", event.target.value),
+                  type: "tel",
+                  value: values.phone,
+                }}
+              />
+            </div>
+            <div
+              className="space-y-2"
+              aria-describedby={
+                errors.requireParking ? "quotation-parking-error" : undefined
+              }
+            >
+              <Label id="quotation-parking-label" required>
+                ¿Requiere estacionamiento?
+              </Label>
+              <div
+                className="flex gap-3"
+                role="group"
+                aria-labelledby="quotation-parking-label"
+                id="quotation-parking"
+              >
+                <Button
+                  id="quotation-parking-yes"
+                  aria-pressed={values.requireParking === true}
+                  onClick={() => update("requireParking", true)}
+                  type="button"
+                  variant={
+                    values.requireParking === true ? "primary" : "secondary"
+                  }
+                >
+                  Sí
+                </Button>
+                <Button
+                  aria-pressed={values.requireParking === false}
+                  onClick={() => update("requireParking", false)}
+                  type="button"
+                  variant={
+                    values.requireParking === false ? "primary" : "secondary"
+                  }
+                >
+                  No
+                </Button>
+              </div>
+              {errors.requireParking ? (
+                <p
+                  id="quotation-parking-error"
+                  role="alert"
+                  className="text-body text-destructive"
+                >
+                  {errors.requireParking}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label id="quotation-breakfast-label">¿Desea desayunos?</Label>
+              <div
+                className="flex gap-3"
+                role="group"
+                aria-labelledby="quotation-breakfast-label"
+                id="quotation-breakfast"
+              >
+                <Button
+                  id="quotation-breakfast-yes"
+                  aria-pressed={values.breakfastRequested}
+                  onClick={() => update("breakfastRequested", true)}
+                  type="button"
+                  variant={values.breakfastRequested ? "primary" : "secondary"}
+                >
+                  Sí
+                </Button>
+                <Button
+                  aria-pressed={!values.breakfastRequested}
+                  onClick={() => {
+                    update("breakfastRequested", false);
+                    update("breakfastQuantity", "");
+                  }}
+                  type="button"
+                  variant={!values.breakfastRequested ? "primary" : "secondary"}
+                >
+                  No
+                </Button>
+              </div>
+              {values.breakfastRequested && breakfast ? (
+                <div className="space-y-3 rounded-md border border-border bg-muted p-4">
+                  <Text className="text-foreground">
+                    {breakfast.description}
+                  </Text>
+                  <Price amount={breakfast.unitPriceClp} suffix="/ desayuno" />
+                  <FormField
+                    id="quotation-breakfast-quantity"
+                    label="Cantidad de desayunos"
+                    required
+                    error={errors.breakfastQuantity}
+                    inputProps={{
+                      min: 1,
+                      onChange: (event) =>
+                        update("breakfastQuantity", event.target.value),
+                      type: "number",
+                      value: values.breakfastQuantity,
+                    }}
+                  />
+                </div>
+              ) : null}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quotation-message" required>
+                Mensaje
+              </Label>
+              <Text id="quotation-message-hint" className="text-foreground">
+                Agrega aquí cualquier información adicional que consideres
+                relevante para tu cotización.
+              </Text>
+              <textarea
+                id="quotation-message"
+                rows={5}
+                value={values.message}
+                onChange={(event) => update("message", event.target.value)}
+                aria-describedby="quotation-message-hint"
+                aria-invalid={errors.message ? true : undefined}
+                required
+                className="min-h-28 w-full rounded-md border bg-card px-4 py-3 text-base text-foreground focus:border-ring"
+              />
+              {errors.message ? (
+                <p role="alert" className="text-body text-destructive">
+                  {errors.message}
+                </p>
+              ) : null}
+            </div>
+            {errors.form ? (
+              <Feedback
+                variant="error"
+                title="No pudimos preparar la cotización"
+              >
+                {errors.form}
+              </Feedback>
+            ) : null}
+            <Button
+              disabled={status === "submitting"}
+              loading={status === "submitting"}
+              type="submit"
+            >
+              Generar y enviar cotización
+            </Button>
+          </section>
+        ) : null}
       </form>
       {status === "success" ? <CompanyQuotationConfirmationModal /> : null}
     </>

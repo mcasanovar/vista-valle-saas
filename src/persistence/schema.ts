@@ -63,6 +63,7 @@ export const channelConnectionPollStatusEnum = pgEnum(
 export const notificationStatusEnum = pgEnum("notification_status", [
   "pending",
   "processing",
+  "retrying",
   "delivered",
   "failed",
 ]);
@@ -510,6 +511,9 @@ export const notificationOutbox = pgTable(
   "notification_outbox",
   {
     id: id(),
+    quotationId: uuid("quotation_id").references(() => companyQuotations.id, {
+      onDelete: "restrict",
+    }),
     reservationId: uuid("reservation_id").references(() => reservations.id, {
       onDelete: "restrict",
     }),
@@ -520,6 +524,7 @@ export const notificationOutbox = pgTable(
     status: notificationStatusEnum("status").default("pending").notNull(),
     attempts: integer("attempts").default(0).notNull(),
     lastError: text("last_error"),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -532,6 +537,7 @@ export const notificationOutbox = pgTable(
       table.status,
       table.createdAt
     ),
+    index("notification_outbox_quotation_idx").on(table.quotationId),
     check(
       "notification_outbox_attempts_non_negative",
       sql`${table.attempts} >= 0`
@@ -548,13 +554,19 @@ export const companyQuotations = pgTable(
     contact: varchar("contact", { length: 200 }).notNull(),
     email: varchar("email", { length: 320 }).notNull(),
     phone: varchar("phone", { length: 80 }).notNull(),
-    requirements: text("requirements").notNull(),
+    requireParking: boolean("require_parking").notNull().default(false),
     message: text("message").notNull(),
     checkIn: date("check_in").notNull(),
     checkOut: date("check_out").notNull(),
     guestCount: integer("guest_count").notNull(),
     capacity: integer("capacity").notNull(),
     nights: integer("nights").notNull(),
+    breakfastRequested: boolean("breakfast_requested").notNull().default(false),
+    breakfastQuantity: integer("breakfast_quantity"),
+    breakfastUnitPriceClpSnapshot: integer("breakfast_unit_price_clp_snapshot"),
+    breakfastSubtotalClp: integer("breakfast_subtotal_clp")
+      .notNull()
+      .default(0),
     totalClp: integer("total_clp").notNull(),
     status: companyQuotationStatusEnum("status").default("accepted").notNull(),
     createdAt: createdAt(),
@@ -572,6 +584,27 @@ export const companyQuotations = pgTable(
     check("company_quotations_capacity_positive", sql`${table.capacity} > 0`),
     check("company_quotations_nights_positive", sql`${table.nights} > 0`),
     check("company_quotations_total_non_negative", sql`${table.totalClp} >= 0`),
+    check(
+      "company_quotations_breakfast_detail_when_requested",
+      sql`(NOT ${table.breakfastRequested}) OR (${table.breakfastQuantity} > 0 AND ${table.breakfastUnitPriceClpSnapshot} >= 0 AND ${table.breakfastSubtotalClp} >= 0)`
+    ),
+  ]
+);
+
+export const companyQuotationBreakfastCatalog = pgTable(
+  "company_quotation_breakfast_catalog",
+  {
+    id: id(),
+    description: text("description").notNull(),
+    unitPriceClp: integer("unit_price_clp").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    check(
+      "company_quotation_breakfast_catalog_price_non_negative",
+      sql`${table.unitPriceClp} >= 0`
+    ),
   ]
 );
 
@@ -654,7 +687,5 @@ export const operationalAlerts = pgTable(
     message: text("message").notNull(),
     createdAt: createdAt(),
   },
-  (table) => [
-    index("operational_alerts_created_at_idx").on(table.createdAt),
-  ]
+  (table) => [index("operational_alerts_created_at_idx").on(table.createdAt)]
 );

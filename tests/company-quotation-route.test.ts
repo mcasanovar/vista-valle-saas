@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { POST } from "../app/api/company-quotations/route";
 
 const body = {
+  breakfastRequested: false,
   checkIn: "2026-10-05",
   checkOut: "2026-10-08",
   company: "Empresa demo",
@@ -10,7 +11,7 @@ const body = {
   email: "ana@example.com",
   guestCount: 3,
   message: "Mensaje",
-  requirements: "Requisitos",
+  requireParking: false,
   rooms: [
     { quantity: 1, slug: "habitacion-valle-demo" },
     { quantity: 1, slug: "habitacion-terra-demo" },

@@ -1,27 +1,79 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
+type AvailableRoom = Readonly<{
+  availableUnits: number;
+  capacity: number;
+  name: string;
+  nightlyPriceClp: number;
+  slug: string;
+}>;
+
+const DEMO_ROOM_TYPES: readonly Omit<AvailableRoom, "availableUnits">[] = [
+  {
+    capacity: 1,
+    name: "Habitación Individual",
+    nightlyPriceClp: 55000,
+    slug: "habitacion-valle-demo",
+  },
+  {
+    capacity: 1,
+    name: "Habitación Matrimonial",
+    nightlyPriceClp: 60000,
+    slug: "habitacion-andes-demo",
+  },
+  {
+    capacity: 2,
+    name: "Habitación Doble",
+    nightlyPriceClp: 70000,
+    slug: "habitacion-terra-demo",
+  },
+];
+
+/**
+ * Builds the full per-type breakdown (available and unavailable) the real
+ * availability route always returns, from just the free `rooms`, so each
+ * test only has to say what's free.
+ */
+function roomTypesFrom(rooms: readonly AvailableRoom[]) {
+  const availableBySlug = new Map(rooms.map((room) => [room.slug, room]));
+  return DEMO_ROOM_TYPES.map((type) => {
+    const available = availableBySlug.get(type.slug);
+    return {
+      ...type,
+      availableUnits: available?.availableUnits ?? 0,
+      totalUnits: 1,
+    };
+  });
+}
+
+const DEMO_BREAKFAST = Object.freeze({
+  description: "Desayuno continental con café, jugo y pan.",
+  unitPriceClp: 8000,
+});
+
 async function mockAvailability(
   page: Page,
   body: Readonly<{
+    breakfast?: typeof DEMO_BREAKFAST | null;
     checkIn: string;
     checkOut: string;
     coversGuestCount: boolean;
     guestCount: number;
-    rooms: readonly Readonly<{
-      availableUnits: number;
-      capacity: number;
-      name: string;
-      nightlyPriceClp: number;
-      slug: string;
-    }>[];
+    rooms: readonly AvailableRoom[];
     totalActiveRooms: number;
     totalAvailableCapacity: number;
     totalAvailableRooms: number;
   }>
 ) {
   await page.route("**/api/company-quotations/availability**", (route) =>
-    route.fulfill({ json: body })
+    route.fulfill({
+      json: {
+        breakfast: DEMO_BREAKFAST,
+        ...body,
+        roomTypes: roomTypesFrom(body.rooms),
+      },
+    })
   );
 }
 
@@ -38,7 +90,16 @@ async function fillReliably(page: Page, label: string, value: string) {
 }
 
 function roomCard(page: Page, roomName: string) {
-  return page.locator(".rounded-lg.border-border").filter({ hasText: roomName });
+  return page
+    .locator(".rounded-lg.border-border")
+    .filter({ hasText: roomName });
+}
+
+async function answerParking(page: Page, requireParking: boolean) {
+  await page
+    .locator("#quotation-parking")
+    .getByRole("button", { name: requireParking ? "Sí" : "No" })
+    .click();
 }
 
 async function fillSearch(
@@ -48,9 +109,7 @@ async function fillSearch(
   await fillReliably(page, "Fecha de entrada", checkIn);
   await fillReliably(page, "Fecha de salida", checkOut);
   await fillReliably(page, "Personas a alojar", guests);
-  await page
-    .getByRole("button", { name: "Consultar disponibilidad" })
-    .click();
+  await page.getByRole("button", { name: "Consultar disponibilidad" }).click();
 }
 
 test.describe("company quotation flow", () => {
@@ -81,6 +140,29 @@ test.describe("company quotation flow", () => {
     expect(results.violations).toEqual([]);
   });
 
+  test("navigates from the landing CTA without rendering the quotation form there", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    const cta = page.getByRole("link", { name: "Solicitar cotización" });
+
+    await expect(cta).toHaveAttribute("href", "/cotizacion-empresa");
+    await expect(
+      page.getByRole("form", {
+        name: "Formulario de cotización para empresas",
+      })
+    ).toHaveCount(0);
+
+    await cta.click();
+    await expect(page).toHaveURL("/cotizacion-empresa");
+    await expect(
+      page.getByRole("heading", {
+        level: 1,
+        name: "Solicita una cotización para tu empresa",
+      })
+    ).toBeVisible();
+  });
+
   test("moves from the landing CTA through full availability to a calculated quotation", async ({
     page,
   }) => {
@@ -95,6 +177,38 @@ test.describe("company quotation flow", () => {
       }
     });
 
+    await mockAvailability(page, {
+      checkIn: "2026-10-05",
+      checkOut: "2026-10-08",
+      coversGuestCount: true,
+      guestCount: 4,
+      rooms: [
+        {
+          availableUnits: 1,
+          capacity: 1,
+          name: "Habitación Individual",
+          nightlyPriceClp: 55000,
+          slug: "habitacion-valle-demo",
+        },
+        {
+          availableUnits: 1,
+          capacity: 1,
+          name: "Habitación Matrimonial",
+          nightlyPriceClp: 60000,
+          slug: "habitacion-andes-demo",
+        },
+        {
+          availableUnits: 1,
+          capacity: 2,
+          name: "Habitación Doble",
+          nightlyPriceClp: 70000,
+          slug: "habitacion-terra-demo",
+        },
+      ],
+      totalActiveRooms: 3,
+      totalAvailableCapacity: 4,
+      totalAvailableRooms: 3,
+    });
     await page.goto("/");
     await expect(
       page.getByRole("link", { name: "Solicitar cotización" })
@@ -108,10 +222,8 @@ test.describe("company quotation flow", () => {
       })
     ).toBeVisible();
 
-    // The mock inventory has exactly one free room of each type, so
-    // requesting capacity for all three (1 + 1 + 2 = 4) exercises the
-    // "every active room is free" availability outcome against the real
-    // endpoint, without mocking the network.
+    // A local route fixture makes this outcome deterministic and ensures the
+    // quotation journey remains fully offline in the mock configuration.
     await fillSearch(page, { guests: "4" });
     await expect(
       page.getByText(/Todas las habitaciones están disponibles/)
@@ -139,9 +251,7 @@ test.describe("company quotation flow", () => {
     await page
       .getByRole("textbox", { name: "Correo electrónico (requerido)" })
       .fill("ana@example.com");
-    await page
-      .getByRole("textbox", { name: "Requisitos (requerido)" })
-      .fill("Desayuno y estacionamiento");
+    await answerParking(page, true);
     await page
       .getByRole("textbox", { name: "Mensaje (requerido)" })
       .fill("Solicitud de prueba");
@@ -150,7 +260,7 @@ test.describe("company quotation flow", () => {
       .click();
     await expect(
       page.getByRole("dialog", { name: "Cotización enviada" })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(/\$555\.000/)).toHaveCount(0);
     expect(externalRequests).toEqual([]);
   });
@@ -182,10 +292,9 @@ test.describe("company quotation flow", () => {
     await expect(page.getByText(/Hay 1 habitación disponible/)).toBeVisible();
     await expect(page.getByText(/Faltan 2 personas/)).toBeVisible();
 
-    const select = roomCard(page, "Habitación Individual").getByRole(
-      "button",
-      { name: "Seleccionar" }
-    );
+    const select = roomCard(page, "Habitación Individual").getByRole("button", {
+      name: "Seleccionar",
+    });
     await select.click();
     await expect(
       roomCard(page, "Habitación Individual").getByRole("button", {
@@ -207,9 +316,7 @@ test.describe("company quotation flow", () => {
     await page
       .getByRole("textbox", { name: "Correo electrónico (requerido)" })
       .fill("ana@example.com");
-    await page
-      .getByRole("textbox", { name: "Requisitos (requerido)" })
-      .fill("Desayuno y estacionamiento");
+    await answerParking(page, true);
     await page
       .getByRole("textbox", { name: "Mensaje (requerido)" })
       .fill("Solicitud de prueba");
@@ -256,9 +363,7 @@ test.describe("company quotation flow", () => {
     await page
       .getByRole("textbox", { name: "Correo electrónico (requerido)" })
       .fill("ana@example.com");
-    await page
-      .getByRole("textbox", { name: "Requisitos (requerido)" })
-      .fill("Desayuno y estacionamiento");
+    await answerParking(page, true);
     await page
       .getByRole("textbox", { name: "Mensaje (requerido)" })
       .fill("Solicitud de prueba");
@@ -274,6 +379,66 @@ test.describe("company quotation flow", () => {
 
     await expect(dialog).toHaveCount(0);
     await expect(page).toHaveURL(/\/$/);
+  });
+
+  test("shows the breakfast detail only after selecting Sí and submits with a quantity", async ({
+    page,
+  }) => {
+    await mockAvailability(page, {
+      checkIn: "2026-10-05",
+      checkOut: "2026-10-08",
+      coversGuestCount: true,
+      guestCount: 1,
+      rooms: [
+        {
+          availableUnits: 1,
+          capacity: 1,
+          name: "Habitación Individual",
+          nightlyPriceClp: 55000,
+          slug: "habitacion-valle-demo",
+        },
+      ],
+      totalActiveRooms: 3,
+      totalAvailableCapacity: 1,
+      totalAvailableRooms: 1,
+    });
+    await page.goto("/cotizacion-empresa");
+    await fillSearch(page, { guests: "1" });
+    await roomCard(page, "Habitación Individual")
+      .getByRole("button", { name: "Seleccionar" })
+      .click();
+
+    await expect(page.getByText(DEMO_BREAKFAST.description)).toHaveCount(0);
+
+    await page
+      .locator("#quotation-breakfast")
+      .getByRole("button", { name: "Sí" })
+      .click();
+    await expect(page.getByText(DEMO_BREAKFAST.description)).toBeVisible();
+
+    await page
+      .getByRole("textbox", { name: "Empresa (requerido)" })
+      .fill("Empresa demo");
+    await page
+      .getByRole("textbox", { name: "Persona de contacto (requerido)" })
+      .fill("Ana Pérez");
+    await page
+      .getByRole("textbox", { name: "Correo electrónico (requerido)" })
+      .fill("ana@example.com");
+    await answerParking(page, false);
+    await page
+      .getByRole("spinbutton", { name: "Cantidad de desayunos (requerido)" })
+      .fill("2");
+    await page
+      .getByRole("textbox", { name: "Mensaje (requerido)" })
+      .fill("Solicitud de prueba");
+    await page
+      .getByRole("button", { name: "Generar y enviar cotización" })
+      .click();
+
+    await expect(
+      page.getByRole("dialog", { name: "Cotización enviada" })
+    ).toBeVisible({ timeout: 30_000 });
   });
 
   test("shows zero availability and hides the quotation form", async ({

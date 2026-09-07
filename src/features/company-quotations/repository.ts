@@ -20,6 +20,17 @@ export type CompanyQuotationRepository = Readonly<{
   list: () => Promise<readonly CompanyQuotationRecord[]>;
 }>;
 
+/**
+ * Server-side application boundary for accepting a quotation. Production
+ * implementations persist the quotation and notification intents as one unit.
+ */
+export type CompanyQuotationCreationService = Readonly<{
+  create: (
+    quotation: CompanyQuotation,
+    idempotencyKey: string
+  ) => Promise<CompanyQuotationRecord>;
+}>;
+
 export function createMockCompanyQuotationRepository(): CompanyQuotationRepository {
   const records: CompanyQuotationRecord[] = [];
   const keys = new Map<string, string>();

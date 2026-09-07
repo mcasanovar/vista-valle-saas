@@ -9,6 +9,7 @@ import { mockDemoRooms } from "@/features/rooms";
 
 const quotation = calculateCompanyQuotation(
   normalizeCompanyQuotationInput({
+    breakfastRequested: false,
     checkIn: "2026-10-05",
     checkOut: "2026-10-08",
     company: "Empresa demo",
@@ -16,7 +17,7 @@ const quotation = calculateCompanyQuotation(
     email: "ana@example.com",
     guestCount: 2,
     message: "Mensaje",
-    requirements: "Requisitos",
+    requireParking: false,
     rooms: [{ quantity: 2, slug: "habitacion-valle-demo" }],
   }),
   mockDemoRooms

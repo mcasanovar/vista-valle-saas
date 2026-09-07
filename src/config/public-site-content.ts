@@ -84,6 +84,11 @@ export const publicSiteContent = {
     title: "Alojamiento para empresas",
     copy: "Soluciones de hospedaje cómodas y convenientes para empresas y trabajadores. Habitaciones equipadas para garantizar buen descanso, cercanas a los principales puntos de la zona",
     contact: undefined,
+    quotation: {
+      enabled: true,
+      href: "/cotizacion-empresa",
+      label: "Solicitar cotización",
+    },
   },
   location: {
     title: "Tu próxima estadía en Illapel comienza aquí",

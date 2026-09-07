@@ -94,6 +94,11 @@ describe("notification delivery worker", () => {
     await worker.processReady();
 
     expect(adapter.listDelivered()).toHaveLength(2);
+    expect(
+      adapter
+        .listDelivered()
+        .every((email) => email.replyTo === "admin@example.test")
+    ).toBe(true);
     expect(outbox.list().every((intent) => intent.status === "delivered")).toBe(
       true
     );

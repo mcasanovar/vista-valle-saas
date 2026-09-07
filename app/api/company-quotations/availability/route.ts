@@ -4,12 +4,16 @@ import {
   resolveCompanyQuotationAvailability,
 } from "@/features/company-quotations";
 import { getRoomReadSource } from "@/features/rooms";
+import { getServerCompanyQuotationBreakfastCatalogRepository } from "@/infrastructure/database/company-quotation-source";
 
 export async function GET(request: Request) {
   const search = request.url
     ? new URL(request.url).searchParams
     : new URLSearchParams();
   try {
+    const breakfastCatalog =
+      (await getServerCompanyQuotationBreakfastCatalogRepository()?.get()) ??
+      null;
     const result = await resolveCompanyQuotationAvailability(
       {
         checkIn: search.get("checkIn"),
@@ -18,6 +22,7 @@ export async function GET(request: Request) {
       },
       {
         availabilityRepository: getAvailabilitySearchRepository(),
+        breakfastCatalog,
         roomSource: await getRoomReadSource(),
       }
     );

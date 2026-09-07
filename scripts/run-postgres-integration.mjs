@@ -58,6 +58,8 @@ try {
       "vitest",
       "run",
       "tests/postgres-reservation.integration.test.ts",
+      "tests/postgres-company-quotation.integration.test.ts",
+      "tests/postgres-notification-outbox.integration.test.ts",
       "tests/postgres-room-block.integration.test.ts",
       "tests/postgres-operational-alerts.integration.test.ts",
       "tests/postgres-admin-pending-payments.integration.test.ts",
