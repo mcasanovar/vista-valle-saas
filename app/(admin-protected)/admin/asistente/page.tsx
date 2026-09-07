@@ -1,16 +1,6 @@
-import { CalendarAssistantChat } from "@/features/assistant/calendar-assistant-chat";
-import {
-  cancelBlockProposalAction,
-  confirmBlockProposalAction,
-  startBlockProposalAction,
-} from "@/features/assistant/actions";
+import { redirect } from "next/navigation";
 
+// Módulo temporalmente cerrado; ver decisión del 2026-09-07.
 export default function AssistantPage() {
-  return (
-    <CalendarAssistantChat
-      cancel={cancelBlockProposalAction}
-      confirm={confirmBlockProposalAction}
-      start={startBlockProposalAction}
-    />
-  );
+  redirect("/admin");
 }
