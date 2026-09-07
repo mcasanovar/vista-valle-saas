@@ -189,16 +189,19 @@ export function PublicHomeTemplate({
               className="object-cover"
             />
             <div className="vv-panorama-overlay absolute inset-0 flex items-center justify-center px-4 text-center">
-              <div className="space-y-5">
+              <div className="max-w-prose space-y-5">
                 <h2 className="font-heading text-display font-normal text-on-primary">
                   {content.location.title}
                 </h2>
+                <p className="text-on-primary/90">
+                  {content.location.teaserCopy}
+                </p>
                 <ActionLink
-                  href="#consulta-disponibilidad"
+                  href={content.location.mapCta.href}
                   variant="action"
                   className="!rounded-[0.2rem] !bg-primary !font-heading !font-semibold !text-on-primary hover:!bg-primary active:!bg-primary"
                 >
-                  Reservar ahora
+                  {content.location.mapCta.label}
                 </ActionLink>
               </div>
             </div>

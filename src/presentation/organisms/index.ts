@@ -24,6 +24,8 @@ export {
   WhatsAppContact,
 } from "./public-static";
 export { MobileNavigation } from "./mobile-navigation";
+export { LocationMapLoader } from "./location-map-loader";
+export type { LocationMapPoint, LocationMapProps } from "./location-map";
 export { ThemeToggle } from "./theme-toggle";
 export { InteractiveSurface, Reveal, usePublicReducedMotion } from "./motion";
 export type { PublicNavigationItem } from "./public-header";
