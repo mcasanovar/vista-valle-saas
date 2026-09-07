@@ -26,5 +26,24 @@
         ]
       }
     ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm install*)",
+      "Bash(npm run typecheck*)",
+      "Bash(npm run lint*)",
+      "Bash(npm run test:unit*)",
+      "Bash(npm run build*)",
+      "Bash(npm run dev*)",
+      "Edit(app/**)",
+      "Edit(src/**)",
+      "Edit(openspec/**)",
+      "Edit(next.config.ts)",
+      "Edit(package.json)",
+      "Edit(package-lock.json)",
+      "Write(app/**)",
+      "Write(src/**)",
+      "Write(openspec/**)"
+    ]
   }
 }

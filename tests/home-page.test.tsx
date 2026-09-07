@@ -49,7 +49,7 @@ describe("HomePage", () => {
       ["Inicio", "#inicio"],
       ["Habitaciones", "/habitaciones"],
       ["Experiencia", "#nosotros"],
-      ["Ubicación", "#ubicacion"],
+      ["Ubicación", "/ubicacion"],
       ["Contacto", "#contacto"],
       ["Reservar", "#consulta-disponibilidad"],
     ]) {

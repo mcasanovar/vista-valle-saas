@@ -12,7 +12,7 @@ export const publicSiteContent = {
     { href: "#inicio", label: "Inicio" },
     { href: "/habitaciones", label: "Habitaciones" },
     { href: "#nosotros", label: "Experiencia" },
-    { href: "#ubicacion", label: "Ubicación" },
+    { href: "/ubicacion", label: "Ubicación" },
     { href: "#contacto", label: "Contacto" },
   ] satisfies readonly PublicNavigationItem[],
   hero: {
@@ -92,6 +92,70 @@ export const publicSiteContent = {
   },
   location: {
     title: "Tu próxima estadía comienza aquí.",
+    // Invented placeholder copy pending the owner's own text — see
+    // openspec/changes/add-location-page-map.
+    teaserCopy:
+      "Illapel te recibe con calma de valle y montaña. Descubre en el mapa cómo llegar desde la Plaza de Armas hasta el hostal.",
+    mapCta: {
+      href: "/ubicacion",
+      label: "Ver mapa y cómo llegar",
+    },
+    // Geocoded once from a Google Maps pin and OpenStreetMap lookups (see
+    // proposal.md); never re-fetched at runtime.
+    hostal: {
+      position: [-31.630434, -71.1754513],
+      label: "Hostal Vista Valle",
+    },
+    plazaDeArmas: {
+      position: [-31.6327658, -71.168334],
+      label: "Plaza de Armas de Illapel",
+    },
+    // Walking route from the Plaza de Armas to the hostal, traced once via
+    // OSRM's public foot-routing demo and frozen here as static data — the
+    // running app never calls a routing service.
+    route: [
+      [-31.633118, -71.168065],
+      [-31.632939, -71.167743],
+      [-31.632887, -71.167641],
+      [-31.632151, -71.168192],
+      [-31.631363, -71.168776],
+      [-31.63183, -71.169648],
+      [-31.632295, -71.1705],
+      [-31.632771, -71.171366],
+      [-31.633246, -71.172248],
+      [-31.632837, -71.172599],
+      [-31.632747, -71.17267],
+      [-31.632656, -71.172738],
+      [-31.632534, -71.17282],
+      [-31.63247, -71.17286],
+      [-31.632402, -71.172891],
+      [-31.632334, -71.172911],
+      [-31.632211, -71.17294],
+      [-31.632119, -71.172953],
+      [-31.632027, -71.172963],
+      [-31.63191, -71.172969],
+      [-31.631794, -71.172969],
+      [-31.631029, -71.172901],
+      [-31.630999, -71.172898],
+      [-31.630968, -71.1729],
+      [-31.630942, -71.172905],
+      [-31.630916, -71.172912],
+      [-31.630883, -71.172929],
+      [-31.630853, -71.172953],
+      [-31.630831, -71.172981],
+      [-31.630814, -71.173013],
+      [-31.630927, -71.173958],
+      [-31.630965, -71.174606],
+      [-31.630948, -71.174704],
+      [-31.630905, -71.175005],
+      [-31.630261, -71.175288],
+      [-31.630353, -71.1755],
+    ],
+    // Invented placeholder copy pending the owner's own text.
+    cityInfo:
+      "Illapel es la capital de la provincia del Choapa, en la Región de Coquimbo, rodeada por cerros y el valle que da nombre a la zona. Su Plaza de Armas concentra el comercio, los servicios y la vida del centro de la ciudad, a pocos minutos a pie de la mayoría de los puntos de interés.",
+    transportInfo:
+      "Illapel se conecta por buses interurbanos que llegan al Terminal de Buses de Illapel, con servicios regulares desde La Serena y Santiago. Dentro de la ciudad, colectivos y taxis cubren los trayectos cortos, y el centro —incluida la Plaza de Armas— es fácilmente recorrible a pie hasta el hostal.",
   },
   contact: {
     title: "Contacto",
@@ -110,7 +174,7 @@ export const publicSiteContent = {
       { href: "#inicio", label: "Inicio" },
       { href: "/habitaciones", label: "Habitaciones" },
       { href: "#servicios", label: "Servicios" },
-      { href: "#ubicacion", label: "Ubicación" },
+      { href: "/ubicacion", label: "Ubicación" },
       { href: "#contacto", label: "Contacto" },
     ],
     contacts: [

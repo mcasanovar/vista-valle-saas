@@ -7,6 +7,9 @@ const supabaseImageHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   ? new URL(process.env.NEXT_PUBLIC_SUPABASE_URL).hostname
   : undefined;
 const cloudinaryImageHostname = "res.cloudinary.com";
+// The /ubicacion map (Leaflet) requests raster tiles as plain <img>s from
+// OpenStreetMap's public tile servers — free, keyless, no billing surface.
+const osmTileHostnames = "*.tile.openstreetmap.org";
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -14,7 +17,7 @@ const contentSecurityPolicy = [
   "object-src 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
-  `img-src 'self' ${cloudinaryImageHostname} data: blob:`,
+  `img-src 'self' ${cloudinaryImageHostname} ${osmTileHostnames} data: blob:`,
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   `script-src 'self' 'unsafe-inline'${
