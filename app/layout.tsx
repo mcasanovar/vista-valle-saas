@@ -35,7 +35,7 @@ export default function RootLayout({
   validateRuntimeEnvironment();
 
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <body className={`${montserrat.variable} ${dmSerifDisplay.variable}`}>
         <Script id="vv-theme-init" strategy="beforeInteractive">
           {THEME_INIT_SCRIPT}

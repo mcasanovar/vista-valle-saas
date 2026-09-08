@@ -24,6 +24,14 @@ export default async function AvailabilityPage({
   const params = await searchParams;
   const validation = validateAvailabilityResultsQuery(params);
   if (!validation.ok) {
+    if (isUnattemptedSearch(params)) {
+      return (
+        <AvailabilityResultsTemplate
+          state="empty"
+          bookingSearch={<AvailabilitySearchController presentation="hero" />}
+        />
+      );
+    }
     return (
       <AvailabilityResultsTemplate
         state="invalid"
@@ -76,4 +84,16 @@ function paramsForTestError(
   params: Record<string, string | string[] | undefined>
 ) {
   return params._testAvailabilityError === "1";
+}
+
+/** A first-time visit with no search criteria yet isn't an invalid query. */
+function isUnattemptedSearch(
+  params: Record<string, string | string[] | undefined>
+) {
+  return (
+    params.checkIn === undefined &&
+    params.checkOut === undefined &&
+    params.guests === undefined &&
+    params.room === undefined
+  );
 }

@@ -480,12 +480,6 @@
   padding-bottom: 6.5rem;
 }
 
-.vv-quotation-notice {
-  border-left: 3px solid var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-  padding: 1rem 1.25rem;
-}
-
 .vv-quotation-panel {
   border: 1px solid var(--color-border);
   background: var(--color-card);

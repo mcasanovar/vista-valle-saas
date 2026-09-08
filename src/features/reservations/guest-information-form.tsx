@@ -91,7 +91,7 @@ export function GuestInformationForm() {
       noValidate
       onSubmit={(event) => event.preventDefault()}
       aria-label="Datos del huésped"
-      className="space-y-4 rounded-2xl bg-[#FBF5F0] p-5 shadow-md tablet:p-6"
+      className="space-y-4 rounded-2xl bg-card p-5 shadow-md tablet:p-6"
     >
       <h2 className="font-heading text-title text-foreground">
         Datos del huésped
