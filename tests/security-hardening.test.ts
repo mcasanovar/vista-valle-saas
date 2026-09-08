@@ -15,14 +15,20 @@ const operationalTables = [
   "room_amenities",
   "guests",
   "reservations",
+  "reservation_items",
   "reservation_holds",
   "room_blocks",
   "payments",
   "payment_events",
   "channel_sync_tasks",
+  "channel_connections",
   "audit_events",
   "notification_outbox",
+  "company_quotation_breakfast_catalog",
   "assistant_interactions",
+  "operational_alerts",
+  "company_quotations",
+  "company_quotation_lines",
 ];
 
 describe("security hardening contracts", () => {

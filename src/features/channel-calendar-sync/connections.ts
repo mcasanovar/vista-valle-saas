@@ -20,6 +20,40 @@ export type ChannelConnection = Readonly<{
   lastPollError?: string;
 }>;
 
+export type ChannelConnectionStore = Readonly<{
+  list: () => readonly ChannelConnection[];
+  listActive: () => readonly ChannelConnection[];
+  getByRoomAndPlatform: (
+    roomId: string,
+    platform: ChannelPlatform
+  ) => ChannelConnection | null;
+  getByOutboundToken: (token: string) => ChannelConnection | null;
+  setInboundFeedUrl: (input: SetInboundFeedUrlInput) => ChannelConnection;
+  setEnabled: (id: string, enabled: boolean) => ChannelConnection;
+  regenerateOutboundToken: (id: string) => ChannelConnection;
+  recordPollResult: (input: RecordPollResultInput) => ChannelConnection;
+  getInboundFeedUrl: (id: string) => string | undefined;
+}>;
+
+export type AsyncChannelConnectionStore = Readonly<{
+  list: () => Promise<readonly ChannelConnection[]>;
+  listActive: () => Promise<readonly ChannelConnection[]>;
+  getByRoomAndPlatform: (
+    roomId: string,
+    platform: ChannelPlatform
+  ) => Promise<ChannelConnection | null>;
+  getByOutboundToken: (token: string) => Promise<ChannelConnection | null>;
+  setInboundFeedUrl: (
+    input: SetInboundFeedUrlInput
+  ) => Promise<ChannelConnection>;
+  setEnabled: (id: string, enabled: boolean) => Promise<ChannelConnection>;
+  regenerateOutboundToken: (id: string) => Promise<ChannelConnection>;
+  recordPollResult: (
+    input: RecordPollResultInput
+  ) => Promise<ChannelConnection>;
+  getInboundFeedUrl: (id: string) => Promise<string | undefined>;
+}>;
+
 export type SetInboundFeedUrlInput = Readonly<{
   roomId: string;
   platform: ChannelPlatform;
@@ -42,9 +76,7 @@ function generateOutboundToken() {
 type InternalChannelConnection = ChannelConnection &
   Readonly<{ inboundFeedUrl?: string }>;
 
-const connectionsKey = Symbol.for(
-  "vista-valle.mock.channel-connections"
-);
+const connectionsKey = Symbol.for("vista-valle.mock.channel-connections");
 
 function getConnections(): InternalChannelConnection[] {
   const scope = globalThis as typeof globalThis & {
@@ -76,8 +108,7 @@ function toPublic(connection: InternalChannelConnection): ChannelConnection {
  * context is a separate task, not yet built.
  */
 export function getChannelConnections() {
-  if (getServerEnvironment().VISTA_VALLE_CONFIG_CONTEXT !== "mock")
-    return null;
+  if (getServerEnvironment().VISTA_VALLE_CONFIG_CONTEXT !== "mock") return null;
   const store = getConnections();
   return Object.freeze({
     list: () => Object.freeze(store.map(toPublic)),

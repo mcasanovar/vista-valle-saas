@@ -14,7 +14,7 @@ Vista Valle necesita transformar su presencia digital en un canal de venta direc
 - Mostrar y registrar el trabajo pendiente de bloquear manualmente las fechas de una reserva web en Airbnb y Booking.
 - Incorporar un asistente de calendario que interprete instrucciones en español para proponer cierres de fechas, valide conflictos y exija confirmación humana antes de crear el bloqueo.
 - Organizar la interfaz con Atomic Design y la lógica del producto por capacidades de negocio.
-- Mantener fuera del MVP el pago online mediante Mercado Pago Checkout Pro, la sincronización automática con Airbnb/Booking, un channel manager, tarifas dinámicas, CMS completo, analítica avanzada y múltiples roles administrativos.
+- Mantener fuera del MVP el pago online mediante Mercado Pago Checkout Pro, un channel manager, tarifas dinámicas, CMS completo, analítica avanzada y múltiples roles administrativos. La sincronización bidireccional mediante iCal con Airbnb y Booking sí forma parte del alcance productivo de este cambio.
 
 ## Capabilities
 
@@ -23,7 +23,8 @@ Vista Valle necesita transformar su presencia digital en un canal de venta direc
 - `public-lodging-site`: Experiencia pública responsive, contenido institucional, catálogo y detalle de habitaciones, ubicación, contacto, captación de empresas y fundamentos de SEO y accesibilidad.
 - `booking-engine`: Consulta de disponibilidad, cálculo de estadía, carrito de una o más habitaciones con fechas compartidas, captura de huésped y antecedentes tributarios condicionales, reservas, bloqueos y prevención de superposiciones. Conserva de forma genérica el concepto de retención temporal como base para una fase futura de pago online.
 - `payment-processing`: Seguimiento del estado de pago independiente del estado de la reserva y registro de pago presencial; la selección de modalidad de pago online mediante Checkout Pro queda fuera de este MVP.
-- `reservation-administration`: Autenticación y panel básico para calendario, reservas manuales multicanal, bloqueos, cancelaciones, pagos presenciales y control de sincronización manual.
+- `reservation-administration`: Autenticación y panel básico para calendario, reservas manuales multicanal, bloqueos, cancelaciones, pagos presenciales y control de sincronización iCal automática y manual.
+- `channel-calendar-sync`: Conexiones persistentes por habitación y plataforma, feeds iCal entrantes y salientes, sondeo programado, idempotencia, cancelación por desaparición, conflictos y comportamiento de pago específico para Airbnb y Booking.
 - `calendar-assistant`: Interpretación mediante IA de instrucciones de cierre de fechas, resolución de ambigüedades, validación determinista, vista previa, confirmación y auditoría.
 - `transactional-notifications`: Confirmaciones y alertas por correo para huéspedes, destinatarios tributarios y administradores, con entrega desacoplada del resultado de la reserva y deduplicación de destinatarios.
 
@@ -35,6 +36,6 @@ Vista Valle necesita transformar su presencia digital en un canal de venta direc
 
 - Se creará una aplicación Next.js con TypeScript, Tailwind CSS y componentes organizados mediante Atomic Design.
 - Se incorporarán PostgreSQL, Supabase Auth y Storage, Drizzle ORM y validación con Zod.
-- Se integrará un asistente de calendario mock y determinista para validar la experiencia conversacional sin red ni credenciales de IA, además de un proveedor transaccional de correo. La conexión a un proveedor de modelos mediante Vercel AI SDK y Mercado Pago Checkout Pro quedan para cambios OpenSpec posteriores.
+- Se integrará un asistente de calendario mock y determinista para validar la experiencia conversacional sin red ni credenciales de IA, además de un proveedor transaccional de correo. La conexión a un proveedor de modelos mediante Vercel AI SDK y Mercado Pago Checkout Pro quedan para cambios OpenSpec posteriores. La sincronización iCal de Airbnb y Booking se ejecutará con adaptadores persistentes y tareas programadas en producción; los dobles en memoria quedan limitados a pruebas automatizadas.
 - Se añadirán rutas públicas, endpoints protegidos, panel administrativo, un esquema de reserva cabecera-ítems, datos tributarios condicionales y procesos operativos para sincronización manual de canales.
 - Vista Valle deberá proporcionar fotografías, datos comerciales, información definitiva de habitaciones, precios, políticas y credenciales de los servicios externos antes de producción.

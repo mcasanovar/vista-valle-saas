@@ -9,10 +9,20 @@ import {
   type ReservationRecord,
 } from "@/features/reservations";
 import { getRoomReadSource } from "@/features/rooms";
+import { createProductionDatabase } from "@/infrastructure/database/client";
+import { createDrizzleGuestRepository } from "@/infrastructure/database/guest-repository";
+import { createDrizzleReservationRepository } from "@/infrastructure/database/reservation-repository";
+import { createDrizzleRoomLockGateway } from "@/infrastructure/database/room-lock";
+import { createDatabaseBoundary } from "@/infrastructure/database/server";
+import { and, eq } from "drizzle-orm";
+import { reservationItems, reservations } from "@/persistence/schema";
 import { recordChannelSyncConflictAlert } from "./conflict-alerts";
 import type { ChannelConnection } from "./connections";
 import { createChannelSyncGuestCandidate } from "./guest-placeholder";
-import { parseInboundIcalEvents, type InboundIcalEvent } from "./inbound-parser";
+import {
+  parseInboundIcalEvents,
+  type InboundIcalEvent,
+} from "./inbound-parser";
 
 export type ChannelSyncIngestResult = Readonly<{
   created: readonly ReservationRecord[];
@@ -25,8 +35,24 @@ async function findExistingByExternalRef(
   platform: ChannelConnection["platform"],
   uid: string
 ) {
-  const reservations = (await mockReservationRepository.listReservations?.()) ?? [];
-  return reservations.find(
+  const boundary = createDatabaseBoundary();
+  if (boundary.context === "production") {
+    const db = createProductionDatabase(boundary);
+    const [row] = await db
+      .select({ id: reservations.id })
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.externalPlatform, platform),
+          eq(reservations.externalRef, uid)
+        )
+      );
+    if (!row) return undefined;
+    return createDrizzleReservationRepository(db).getReservationById(row.id);
+  }
+  const mockReservations =
+    (await mockReservationRepository.listReservations?.()) ?? [];
+  return mockReservations.find(
     (r) => r.externalPlatform === platform && r.externalRef === uid
   );
 }
@@ -39,14 +65,29 @@ async function createReservationFromEvent(
   const room = rooms.listActive().find((r) => r.id === connection.roomId);
   if (!room) return {};
 
+  const boundary = createDatabaseBoundary();
+  const production = boundary.context === "production";
+  const db = production ? createProductionDatabase(boundary) : null;
+  const reservationRepository = production
+    ? createDrizzleReservationRepository(db!)
+    : mockReservationRepository;
+  const guestRepository = production
+    ? createDrizzleGuestRepository()
+    : mockGuestRepository;
+  const roomLockGateway = production
+    ? createDrizzleRoomLockGateway(db!)
+    : mockRoomLockGateway;
   try {
-    const result = await createMultiRoomPayAtPropertyReservation({
+    // The mock and Drizzle transaction contexts are structurally unrelated,
+    // so no single TContext satisfies both branches selected above.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await createMultiRoomPayAtPropertyReservation<any>({
       guestCandidate: createChannelSyncGuestCandidate(connection.platform),
-      guestRepository: mockGuestRepository,
+      guestRepository,
       interval: event.interval,
-      reservationRepository: mockReservationRepository,
+      reservationRepository,
       rooms: [room],
-      roomLockGateway: mockRoomLockGateway,
+      roomLockGateway,
       origin: connection.platform,
       paymentStatus:
         connection.paymentBehavior === "auto_approved" ? "approved" : "pending",
@@ -76,8 +117,40 @@ async function cancelDisappearedReservations(
   connection: ChannelConnection,
   currentUids: ReadonlySet<string>
 ): Promise<readonly ReservationRecord[]> {
-  const reservations = (await mockReservationRepository.listReservations?.()) ?? [];
-  const disappeared = reservations.filter(
+  const boundary = createDatabaseBoundary();
+  const production = boundary.context === "production";
+  const db = production ? createProductionDatabase(boundary) : null;
+  const reservationRepository = production
+    ? createDrizzleReservationRepository(db!)
+    : mockReservationRepository;
+  const roomLockGateway = production
+    ? createDrizzleRoomLockGateway(db!)
+    : mockRoomLockGateway;
+  const reservationRecords = production
+    ? await db!
+        .select({ id: reservations.id })
+        .from(reservations)
+        .innerJoin(
+          reservationItems,
+          eq(reservationItems.reservationId, reservations.id)
+        )
+        .where(
+          and(
+            eq(reservations.externalPlatform, connection.platform),
+            eq(reservationItems.roomId, connection.roomId),
+            eq(reservations.status, "confirmed")
+          )
+        )
+        .then((rows) =>
+          Promise.all(
+            rows.map((row) => reservationRepository.getReservationById(row.id))
+          )
+        )
+        .then((rows) =>
+          rows.filter((row): row is ReservationRecord => Boolean(row))
+        )
+    : ((await mockReservationRepository.listReservations?.()) ?? []);
+  const disappeared = reservationRecords.filter(
     (r) =>
       r.externalPlatform === connection.platform &&
       r.externalRef &&
@@ -88,12 +161,15 @@ async function cancelDisappearedReservations(
 
   const cancelled: ReservationRecord[] = [];
   for (const reservation of disappeared) {
-    const result = await transitionReservationState({
+    // Same mock/Drizzle context mismatch as createReservationFromEvent above.
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    const result = await transitionReservationState<any>({
       reservationId: reservation.id,
-      reservationRepository: mockReservationRepository,
-      roomLockGateway: mockRoomLockGateway,
+      reservationRepository: reservationRepository as any,
+      roomLockGateway: roomLockGateway as any,
       to: "cancelled",
     });
+    /* eslint-enable @typescript-eslint/no-explicit-any */
     cancelled.push(result);
   }
   return Object.freeze(cancelled);

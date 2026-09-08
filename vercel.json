@@ -4,6 +4,10 @@
     {
       "path": "/api/internal/outbox/process",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/internal/channel-sync/poll",
+      "schedule": "*/5 * * * *"
     }
   ]
 }

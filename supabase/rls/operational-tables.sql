@@ -11,9 +11,12 @@ alter table public.room_blocks enable row level security;
 alter table public.payments enable row level security;
 alter table public.payment_events enable row level security;
 alter table public.channel_sync_tasks enable row level security;
+alter table public.channel_connections enable row level security;
 alter table public.audit_events enable row level security;
 alter table public.notification_outbox enable row level security;
+alter table public.company_quotation_breakfast_catalog enable row level security;
 alter table public.assistant_interactions enable row level security;
+alter table public.operational_alerts enable row level security;
 alter table public.company_quotations enable row level security;
 alter table public.company_quotation_lines enable row level security;
 
@@ -29,10 +32,13 @@ alter table public.room_blocks force row level security;
 alter table public.payments force row level security;
 alter table public.payment_events force row level security;
 alter table public.channel_sync_tasks force row level security;
+alter table public.channel_connections force row level security;
 alter table public.audit_events force row level security;
 alter table public.notification_outbox force row level security;
+alter table public.company_quotation_breakfast_catalog force row level security;
 alter table public.assistant_interactions force row level security;
+alter table public.operational_alerts force row level security;
 alter table public.company_quotations force row level security;
 alter table public.company_quotation_lines force row level security;
 
-revoke all privileges on table public.rooms, public.room_images, public.amenities, public.room_amenities, public.guests, public.reservations, public.reservation_items, public.reservation_holds, public.room_blocks, public.payments, public.payment_events, public.channel_sync_tasks, public.audit_events, public.notification_outbox, public.assistant_interactions, public.company_quotations, public.company_quotation_lines from anon, authenticated;
+revoke all privileges on table public.rooms, public.room_images, public.amenities, public.room_amenities, public.guests, public.reservations, public.reservation_items, public.reservation_holds, public.room_blocks, public.payments, public.payment_events, public.channel_sync_tasks, public.channel_connections, public.audit_events, public.notification_outbox, public.company_quotation_breakfast_catalog, public.assistant_interactions, public.operational_alerts, public.company_quotations, public.company_quotation_lines from anon, authenticated;

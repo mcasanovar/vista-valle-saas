@@ -1,6 +1,6 @@
 ## Context
 
-El repositorio contiene la especificación inicial, pero aún no existe una aplicación ni un modelo persistente. Vista Valle opera tres habitaciones y hoy recibe reservas desde Airbnb, Booking, teléfono y WhatsApp; durante el MVP, el ingreso y bloqueo entre canales seguirá siendo manual. El sistema debe aceptar reservas directas concurrentes, dos modalidades de pago y datos personales, por lo que la consistencia y la seguridad son más importantes que una arquitectura distribuida.
+El repositorio contiene la especificación inicial, pero aún no existe una aplicación ni un modelo persistente. Vista Valle opera tres habitaciones y hoy recibe reservas desde Airbnb, Booking, teléfono y WhatsApp; la versión productiva debe sincronizar Airbnb y Booking mediante iCal por habitación y conservar el ingreso manual como respaldo. El sistema debe aceptar reservas directas concurrentes, dos modalidades de pago y datos personales, por lo que la consistencia y la seguridad son más importantes que una arquitectura distribuida.
 
 El producto combina sitio público orientado a SEO, checkout, webhook de pago, panel protegido, correo transaccional y una interpretación breve mediante IA. Véanse `proposal.md` y las seis especificaciones para el comportamiento esperado.
 
@@ -20,7 +20,7 @@ El producto combina sitio público orientado a SEO, checkout, webhook de pago, p
 - Construir microservicios, API pública, GraphQL o comunicación en tiempo real.
 - Convertir el panel en un PMS o channel manager completo.
 - Dar acceso directo del navegador o del modelo de IA a tablas operativas.
-- Automatizar devoluciones, conciliación contable, facturación o sincronización con OTAs en el MVP.
+- Automatizar devoluciones, conciliación contable o facturación en el MVP. La sincronización iCal bidireccional con Airbnb y Booking sí está incluida; quedan fuera las APIs de partners, scraping y reglas comerciales propias de un channel manager.
 - Crear un CMS general; los contenidos iniciales se gestionarán como datos controlados y assets preparados.
 - Ofrecer pago online mediante Mercado Pago Checkout Pro u otro proveedor; este MVP solo admite pago al llegar, y la integración de pago online queda para una fase posterior.
 
@@ -70,6 +70,7 @@ Las entidades centrales serán:
 - `audit_events`: acciones sensibles y actor.
 - `notification_outbox`: entrega durable de correos.
 - `assistant_interactions`: texto, interpretación, aprobación y resultado.
+- `channel_connections`: una conexión por habitación y plataforma, URL entrante cifrada o protegida, token saliente no adivinable, comportamiento de pago, activación y estado del último sondeo.
 
 Las fechas de alojamiento se almacenarán como fechas locales y los eventos técnicos como instantes UTC. Los intervalos hoteleros se interpretarán como `[check_in, check_out)` bajo `America/Santiago`.
 
@@ -95,13 +96,21 @@ Las reservas usarán `CONFIRMED`, `CANCELLED`, `COMPLETED` y `NO_SHOW`; las rete
 
 Cancelar una reserva pagada libera disponibilidad, pero no altera automáticamente el pago. El panel mostrará la resolución financiera pendiente; la política y devolución se gestionarán explícitamente fuera del MVP automatizado.
 
-### 9. Panel mínimo y operación multicanal manual
+### 9. Panel y operación multicanal
 
-El panel incluirá calendario por habitaciones, listado/detalle de reservas, creación manual, bloqueos, estados operativos, registro de pagos presenciales y cola de sincronización. Una reserva manual tendrá origen `AIRBNB`, `BOOKING`, `PHONE`, `WHATSAPP` o `ADMIN` y bloqueará inmediatamente la web.
+El panel incluirá calendario por habitaciones, listado/detalle de reservas, creación manual, bloqueos, estados operativos, registro de pagos presenciales, conexiones iCal y cola de sincronización. Una reserva manual tendrá origen `AIRBNB`, `BOOKING`, `PHONE`, `WHATSAPP` o `ADMIN` y bloqueará inmediatamente la web. Las conexiones iCal persistirán su configuración y estado; sus URLs entrantes no se volverán a mostrar después de guardarse.
 
-Una reserva `WEBSITE` confirmada creará tareas independientes para Airbnb y Booking. Completar estas tareas no cambia el estado de la reserva; registra plataforma, usuario y hora. Las alertas del panel priorizarán reservas web que siguen pendientes.
+Una reserva `WEBSITE` confirmada creará tareas manuales solo para las plataformas sin conexión iCal activa. Completar estas tareas no cambia el estado de la reserva; registra plataforma, usuario y hora. Las alertas del panel priorizarán reservas web que siguen pendientes.
 
-### 10. Asistente como extractor estructurado, no agente autónomo
+### 10. Sincronización iCal productiva
+
+Cada combinación habitación-plataforma tendrá una fila persistente en `channel_connections`. El feed entrante de cada conexión se consultará mediante un endpoint interno autenticado y programado; el proceso guardará el resultado del sondeo, reconocerá eventos por identificador externo, creará reservas reales de forma transaccional, cancelará reservas cuando desaparezcan del feed y registrará conflictos persistentes. Airbnb usará pago aprobado automáticamente; Booking usará pago pendiente al llegar.
+
+Cada conexión expondrá un feed saliente protegido por token, incluyendo reservas, bloqueos y retenciones de otros orígenes, pero excluyendo las reservas del mismo canal. El administrador configurará por habitación la URL entrante de cada plataforma y copiará el feed saliente correspondiente en el extranet del canal.
+
+El runtime productivo no usará almacenamiento en memoria ni fixtures comerciales. Los adaptadores mock se conservarán solo en pruebas unitarias y de contrato. El sondeo será breve, idempotente, tolerante a fallos por conexión y protegido con un secreto server-only; el cron de despliegue no recibirá credenciales de los canales.
+
+### 11. Asistente como extractor estructurado, no agente autónomo
 
 Durante este MVP, el asistente usará una única respuesta mock y determinista para validar la conversación y convertir la instrucción española en la intención `CREATE_ROOM_BLOCK`, validada con Zod. No realizará solicitudes de red ni requerirá credenciales de IA. La conexión a Vercel AI SDK y a un proveedor intercambiable queda diferida a un cambio OpenSpec posterior. La salida no tendrá función ejecutora automática.
 
@@ -111,7 +120,7 @@ El formulario manual seguirá disponible. Solo se conservará el contexto mínim
 
 **Alternativa considerada:** un agente con herramientas ejecutables añade capacidad no requerida y aumenta el riesgo de acciones inesperadas. Una extracción estructurada cubre el caso de uso con una superficie menor.
 
-### 11. Notificaciones mediante outbox
+### 12. Notificaciones mediante outbox
 
 La transacción que confirma una reserva insertará también los eventos de correo requeridos en `notification_outbox`. La lista de destinatarios parte del correo normalizado del huésped y agrega el correo de facturación solo si se solicitó factura y es distinto tras normalizar espacios y mayúsculas/minúsculas. Un procesador enviará mediante Resend y React Email, registrando intentos e idempotencia. Un fallo de correo nunca revertirá una reserva confirmada; podrá reintentarse y verse desde el detalle administrativo.
 
