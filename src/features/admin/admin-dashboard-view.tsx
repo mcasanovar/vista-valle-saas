@@ -21,6 +21,7 @@ import { useState } from "react";
 import type {
   AdminDashboardChannelBreakdown,
   AdminDashboardDailySales,
+  AdminDashboardPeriod,
   AdminDashboardRoomOccupancy,
   AdminDashboardSummary,
   AdminRecentReservation,
@@ -29,7 +30,7 @@ import { originIcons, originLabels } from "@/features/admin/origin-icon";
 
 type Props = Readonly<{
   initialSummary: AdminDashboardSummary | null;
-  initialMonth: string;
+  initialPeriod: AdminDashboardPeriod;
 }>;
 
 const currency = new Intl.NumberFormat("es-CL", {
@@ -42,25 +43,29 @@ const dates = new Intl.DateTimeFormat("es-CL", {
   month: "short",
   timeZone: "America/Santiago",
 });
-const monthLabel = new Intl.DateTimeFormat("es-CL", {
+const monthNameLabel = new Intl.DateTimeFormat("es-CL", {
   month: "long",
   timeZone: "UTC",
-  year: "numeric",
 });
 
 function formatDate(value: string) {
   return dates.format(new Date(`${value}T12:00:00-04:00`));
 }
 
-function shiftMonth(month: string, delta: number): string {
-  const [year, monthNumber] = month.split("-").map(Number);
-  const date = new Date(Date.UTC(year, monthNumber - 1 + delta, 1));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
-function formatMonth(month: string): string {
-  const [year, monthNumber] = month.split("-").map(Number);
-  return monthLabel.format(new Date(Date.UTC(year, monthNumber - 1, 1)));
+function monthOptionLabel(monthNumber: number): string {
+  return capitalize(
+    monthNameLabel.format(new Date(Date.UTC(2000, monthNumber - 1, 1)))
+  );
+}
+
+function periodQuery(period: AdminDashboardPeriod): string {
+  return period.month
+    ? `year=${period.year}&month=${period.month}`
+    : `year=${period.year}`;
 }
 
 function statusMeta(status: AdminRecentReservation["status"]) {
@@ -106,39 +111,75 @@ function Amount({
   return <>{currency.format(amount)}</>;
 }
 
-function MonthSelector({
+function YearSelector({
   disabled,
-  month,
   onChange,
+  year,
 }: Readonly<{
   disabled: boolean;
-  month: string;
-  onChange: (month: string) => void;
+  onChange: (year: number) => void;
+  year: number;
 }>) {
   return (
     <div className="flex items-center gap-1.5">
       <button
-        aria-label="Mes anterior"
+        aria-label="Año anterior"
         className="flex size-8 items-center justify-center rounded-lg border border-border bg-card disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
-        onClick={() => onChange(shiftMonth(month, -1))}
+        onClick={() => onChange(year - 1)}
         type="button"
       >
         <ChevronLeft aria-hidden="true" className="size-4" />
       </button>
-      <span className="min-w-[11ch] text-center text-[13px] font-bold capitalize">
-        {formatMonth(month)}
+      <span className="min-w-[5ch] text-center text-[13px] font-bold">
+        {year}
       </span>
       <button
-        aria-label="Mes siguiente"
+        aria-label="Año siguiente"
         className="flex size-8 items-center justify-center rounded-lg border border-border bg-card disabled:cursor-not-allowed disabled:opacity-60"
         disabled={disabled}
-        onClick={() => onChange(shiftMonth(month, 1))}
+        onClick={() => onChange(year + 1)}
         type="button"
       >
         <ChevronRight aria-hidden="true" className="size-4" />
       </button>
     </div>
+  );
+}
+
+function MonthSelector({
+  disabled,
+  onChange,
+  period,
+}: Readonly<{
+  disabled: boolean;
+  onChange: (month: string | null) => void;
+  period: AdminDashboardPeriod;
+}>) {
+  return (
+    <label className="flex items-center gap-1.5 text-[13px] font-bold">
+      <span className="sr-only">Mes</span>
+      <select
+        className="h-8 min-w-[12ch] rounded-lg border border-border bg-card px-2 text-[13px] font-bold capitalize disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={disabled}
+        onChange={(event) =>
+          onChange(event.target.value === "" ? null : event.target.value)
+        }
+        value={period.month ?? ""}
+      >
+        <option value="">Año completo</option>
+        {Array.from({ length: 12 }, (_, index) => index + 1).map(
+          (monthNumber) => (
+            <option
+              key={monthNumber}
+              value={`${period.year}-${String(monthNumber).padStart(2, "0")}`}
+            >
+              {monthOptionLabel(monthNumber)}
+            </option>
+          )
+        )}
+      </select>
+    </label>
   );
 }
 
@@ -325,7 +366,11 @@ function RoomOccupancy({
 
 function DailySalesChart({
   days,
-}: Readonly<{ days: readonly AdminDashboardDailySales[] }>) {
+  periodNoun,
+}: Readonly<{
+  days: readonly AdminDashboardDailySales[];
+  periodNoun: "mes" | "año";
+}>) {
   const [hovered, setHovered] = useState<number | null>(null);
   const total = days.reduce((sum, day) => sum + day.amountClp, 0);
   const max = Math.max(1, ...days.map((day) => day.amountClp));
@@ -345,10 +390,10 @@ function DailySalesChart({
 
   return (
     <section className="rounded-xl border border-border bg-card p-4 laptop:p-5">
-      <SectionHeading icon={TrendingUp}>Ventas del mes</SectionHeading>
+      <SectionHeading icon={TrendingUp}>Ventas del {periodNoun}</SectionHeading>
       {total === 0 ? (
         <p role="status" className="mt-3.5 text-sm text-muted-foreground">
-          No hay ventas registradas en el mes.
+          No hay ventas registradas en el {periodNoun}.
         </p>
       ) : (
         <div className="relative mt-6">
@@ -529,6 +574,7 @@ function RecentReservations({
 function SummaryContent({
   summary,
 }: Readonly<{ summary: AdminDashboardSummary }>) {
+  const periodNoun = summary.period.month ? "mes" : "año";
   const cards = [
     {
       icon: Wallet,
@@ -537,7 +583,7 @@ function SummaryContent({
     },
     {
       icon: CalendarCheck2,
-      label: "Reservas del mes",
+      label: `Reservas del ${periodNoun}`,
       value: String(summary.kpis.validReservationCount),
     },
     {
@@ -601,7 +647,7 @@ function SummaryContent({
       </div>
       <ChannelBreakdown rows={summary.channelBreakdown} />
       <div className="grid gap-3 tablet:gap-3.5 laptop:grid-cols-2">
-        <DailySalesChart days={summary.dailySales} />
+        <DailySalesChart days={summary.dailySales} periodNoun={periodNoun} />
         <RoomOccupancy rows={summary.roomOccupancy} />
       </div>
       <section className="overflow-hidden rounded-xl border border-border bg-card">
@@ -623,18 +669,18 @@ function SummaryContent({
   );
 }
 
-export function AdminDashboardView({ initialSummary, initialMonth }: Props) {
-  const [month, setMonth] = useState(initialMonth);
+export function AdminDashboardView({ initialSummary, initialPeriod }: Props) {
+  const [period, setPeriod] = useState(initialPeriod);
   const [summary, setSummary] = useState(initialSummary);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const load = async (targetMonth: string) => {
+  const load = async (targetPeriod: AdminDashboardPeriod) => {
     setLoading(true);
     setError(null);
     try {
       const response = await fetch(
-        `/api/admin/dashboard?month=${targetMonth}`,
+        `/api/admin/dashboard?${periodQuery(targetPeriod)}`,
         { cache: "no-store", credentials: "same-origin" }
       );
       if (!response.ok) throw new Error();
@@ -646,17 +692,24 @@ export function AdminDashboardView({ initialSummary, initialMonth }: Props) {
     }
   };
 
-  const refresh = () => load(month);
+  const refresh = () => load(period);
 
-  const changeMonth = (nextMonth: string) => {
-    setMonth(nextMonth);
+  const changePeriod = (nextPeriod: AdminDashboardPeriod) => {
+    setPeriod(nextPeriod);
     // A plain history update, not `router.replace`: this already refetches
     // client-side, and a Next.js navigation would additionally trigger the
     // route's RSC round-trip (and its `loading.tsx`), fighting this
     // component's own skeleton state.
-    window.history.replaceState(null, "", `/admin?month=${nextMonth}`);
-    void load(nextMonth);
+    window.history.replaceState(null, "", `/admin?${periodQuery(nextPeriod)}`);
+    void load(nextPeriod);
   };
+
+  // Switching year always lands on "Año completo" for that year - see
+  // design.md decision 4: it is simpler for the operator to reason about
+  // than guessing whether the previously selected month still applies.
+  const changeYear = (year: number) => changePeriod({ month: null, year });
+  const changeMonth = (month: string | null) =>
+    changePeriod({ month, year: period.year });
 
   return (
     <section
@@ -689,12 +742,14 @@ export function AdminDashboardView({ initialSummary, initialMonth }: Props) {
             {loading ? "Actualizando…" : "Actualizar datos"}
           </button>
         </div>
-        <div className="mt-3 tablet:hidden">
-          <MonthSelector disabled={loading} month={month} onChange={changeMonth} />
+        <div className="mt-3 flex items-center gap-2 tablet:hidden">
+          <YearSelector disabled={loading} onChange={changeYear} year={period.year} />
+          <MonthSelector disabled={loading} onChange={changeMonth} period={period} />
         </div>
       </header>
-      <div className="hidden items-center justify-between tablet:flex">
-        <MonthSelector disabled={loading} month={month} onChange={changeMonth} />
+      <div className="hidden items-center gap-2 tablet:flex">
+        <YearSelector disabled={loading} onChange={changeYear} year={period.year} />
+        <MonthSelector disabled={loading} onChange={changeMonth} period={period} />
       </div>
       <button
         type="button"
