@@ -52,9 +52,15 @@ export type AdminRecentReservation = Readonly<{
   status: ReservationStatus;
 }>;
 
+/** A resolved dashboard period: a specific month, or a whole year when `month` is `null`. */
+export type AdminDashboardPeriod = Readonly<{
+  year: number;
+  month: string | null;
+}>;
+
 export type AdminDashboardSummary = Readonly<{
-  /** `YYYY-MM`, the month every field below except `kpis.openAlerts` and `recentReservations` is scoped to. */
-  month: string;
+  /** The period every field below except `kpis.openAlerts` and `recentReservations` is scoped to. */
+  period: AdminDashboardPeriod;
   kpis: AdminDashboardKpis;
   cancelledReservationCount: number;
   noShowReservationCount: number;
@@ -66,6 +72,7 @@ export type AdminDashboardSummary = Readonly<{
 }>;
 
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
+const YEAR_PATTERN = /^\d{4}$/;
 
 function currentMonth(): string {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -78,13 +85,28 @@ function currentMonth(): string {
   return `${year}-${month}`;
 }
 
-function normalizeMonth(month?: string): string {
-  return month && MONTH_PATTERN.test(month) ? month : currentMonth();
+function defaultPeriod(): AdminDashboardPeriod {
+  const month = currentMonth();
+  return Object.freeze({ month, year: Number(month.slice(0, 4)) });
 }
 
-/** Exposed so the page/API route can resolve the same default month even before (or without) a summary. */
-export function resolveAdminDashboardMonth(month?: string): string {
-  return normalizeMonth(month);
+/**
+ * Exposed so the page/API route can resolve the same default period even
+ * before (or without) a summary. A valid `month` wins over `year` (and
+ * determines its own year); a valid `year` alone selects that whole year;
+ * neither defaults to the current calendar month.
+ */
+export function resolveAdminDashboardPeriod(
+  params?: Readonly<{ year?: string; month?: string }>
+): AdminDashboardPeriod {
+  const { month, year } = params ?? {};
+  if (month && MONTH_PATTERN.test(month)) {
+    return Object.freeze({ month, year: Number(month.slice(0, 4)) });
+  }
+  if (year && YEAR_PATTERN.test(year)) {
+    return Object.freeze({ month: null, year: Number(year) });
+  }
+  return defaultPeriod();
 }
 
 function monthRange(month: string): AdminDashboardMonthRange {
@@ -96,6 +118,18 @@ function monthRange(month: string): AdminDashboardMonthRange {
     from: `${month}-01`,
     to: `${month}-${String(lastDay).padStart(2, "0")}`,
   });
+}
+
+/** Exposed for direct unit testing; also used by `getSummary` for a year-scoped period. */
+export function yearRange(year: number): AdminDashboardMonthRange {
+  return Object.freeze({
+    from: `${year}-01-01`,
+    to: `${year}-12-31`,
+  });
+}
+
+function periodRange(period: AdminDashboardPeriod): AdminDashboardMonthRange {
+  return period.month ? monthRange(period.month) : yearRange(period.year);
 }
 
 function normalizeLimit(limit: number) {
@@ -324,7 +358,7 @@ const dashboardDependencies: AdminDashboardDependencies = Object.freeze({
 });
 
 function toSummary(
-  month: string,
+  period: AdminDashboardPeriod,
   core: MonthlySummaryCore,
   openAlerts: number,
   recentReservations: readonly AdminRecentReservation[]
@@ -339,8 +373,8 @@ function toSummary(
       openAlerts,
       validReservationCount: core.validReservationCount,
     }),
-    month,
     noShowReservationCount: core.noShowReservationCount,
+    period,
     recentReservations,
     roomOccupancy: core.roomOccupancy,
   });
@@ -356,18 +390,17 @@ export function createAdminDashboardSource(
     const db = createProductionDatabase(boundary);
 
     const getSummary = async (
-      month?: string,
+      period: AdminDashboardPeriod = resolveAdminDashboardPeriod(),
       recentLimit = 5
     ): Promise<AdminDashboardSummary> => {
-      const selectedMonth = normalizeMonth(month);
       const [core, alerts, recent] = await Promise.all([
-        getAdminDashboardMonthlySummary(db, monthRange(selectedMonth)),
+        getAdminDashboardMonthlySummary(db, periodRange(period)),
         getOperationalAlerts(),
         listAdminReservations(db, { page: 1, pageSize: recentLimit }),
       ]);
 
       return toSummary(
-        selectedMonth,
+        period,
         core,
         alerts.length,
         Object.freeze(
@@ -392,23 +425,22 @@ export function createAdminDashboardSource(
   if (context !== "mock") return null;
 
   const getSummary = async (
-    month?: string,
+    period: AdminDashboardPeriod = resolveAdminDashboardPeriod(),
     recentLimit = 5
   ): Promise<AdminDashboardSummary> => {
-    const selectedMonth = normalizeMonth(month);
     const [core, alerts] = await Promise.all([
       Promise.resolve(
         aggregateMockMonthlySummary(
           dependencies.listMonthlyLedger(),
           dependencies.listRooms(),
-          monthRange(selectedMonth)
+          periodRange(period)
         )
       ),
       dependencies.listAlerts(),
     ]);
 
     return toSummary(
-      selectedMonth,
+      period,
       core,
       alerts.length,
       selectRecentAdminReservations(
@@ -421,10 +453,10 @@ export function createAdminDashboardSource(
   return Object.freeze({ getSummary });
 }
 
-export async function getAdminDashboardSummary(month?: string) {
+export async function getAdminDashboardSummary(period?: AdminDashboardPeriod) {
   return (
     (await createAdminDashboardSource(
       getServerEnvironment().VISTA_VALLE_CONFIG_CONTEXT
-    )?.getSummary(month)) ?? null
+    )?.getSummary(period)) ?? null
   );
 }

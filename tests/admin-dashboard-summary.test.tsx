@@ -1,10 +1,13 @@
 import { act, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { AdminDashboardView } from "@/features/admin/admin-dashboard-view";
 import {
   createAdminDashboardSource,
+  resolveAdminDashboardPeriod,
   selectRecentAdminReservations,
+  yearRange,
   type AdminDashboardSummary,
   type MockDashboardReservation,
   type MockDashboardRoom,
@@ -119,7 +122,7 @@ describe("admin dashboard aggregate", () => {
       listRecentReservations: () => recentReservations,
       listRooms: () => rooms,
     });
-    const summary = await source?.getSummary("2026-10");
+    const summary = await source?.getSummary({ month: "2026-10", year: 2026 });
 
     expect(summary).toMatchObject({
       cancelledReservationCount: 1,
@@ -129,8 +132,8 @@ describe("admin dashboard aggregate", () => {
         openAlerts: 1,
         validReservationCount: 2,
       },
-      month: "2026-10",
       noShowReservationCount: 1,
+      period: { month: "2026-10", year: 2026 },
     });
 
     const website = summary?.channelBreakdown.find(
@@ -167,7 +170,10 @@ describe("admin dashboard aggregate", () => {
       listRooms: () => [],
     });
     const summary = await source?.getSummary();
-    expect(summary?.month).toMatch(/^\d{4}-\d{2}$/);
+    expect(summary?.period.month).toMatch(/^\d{4}-\d{2}$/);
+    expect(summary?.period.year).toBe(
+      Number(summary?.period.month?.slice(0, 4))
+    );
   });
 
   it("orders recent rows by the available trusted date and applies the requested limit", () => {
@@ -179,6 +185,93 @@ describe("admin dashboard aggregate", () => {
 
   it("fails closed when no production database boundary is available", () => {
     expect(createAdminDashboardSource("production")).toBeNull();
+  });
+
+  it("aggregates a full-year mock ledger across every month when scoped to a year", async () => {
+    const yearLedger: readonly MockDashboardReservation[] = [
+      ...ledger,
+      {
+        checkIn: "2026-01-10",
+        checkOut: "2026-01-12",
+        id: "january",
+        origin: "booking",
+        payments: [{ amountClp: 20_000, status: "approved" }],
+        roomId: "valle",
+        status: "confirmed",
+      },
+      {
+        checkIn: "2026-12-20",
+        checkOut: "2026-12-22",
+        id: "december",
+        origin: "airbnb",
+        payments: [{ amountClp: 30_000, status: "approved" }],
+        roomId: "andes",
+        status: "confirmed",
+      },
+    ];
+    const source = createAdminDashboardSource("mock", {
+      listAlerts: async () => [],
+      listMonthlyLedger: () => yearLedger,
+      listRecentReservations: () => [],
+      listRooms: () => rooms,
+    });
+    const summary = await source?.getSummary({ month: null, year: 2026 });
+
+    expect(summary).toMatchObject({
+      kpis: { approvedRevenueClp: 12_500 + 20_000 + 30_000, validReservationCount: 4 },
+      period: { month: null, year: 2026 },
+    });
+    const booking = summary?.channelBreakdown.find(
+      (channel) => channel.origin === "booking"
+    );
+    expect(booking).toMatchObject({ approvedAmountClp: 20_000, reservationCount: 1 });
+    const airbnb = summary?.channelBreakdown.find(
+      (channel) => channel.origin === "airbnb"
+    );
+    // Includes the base ledger's already-confirmed "confirmed-unpaid" airbnb
+    // reservation (0 approved) plus the new December one (30_000 approved).
+    expect(airbnb).toMatchObject({ approvedAmountClp: 30_000, reservationCount: 2 });
+    expect(summary?.dailySales).toHaveLength(365);
+    expect(
+      summary?.dailySales.find((day) => day.day === "2026-01-10")
+    ).toMatchObject({ amountClp: 20_000 });
+    expect(
+      summary?.dailySales.find((day) => day.day === "2026-12-20")
+    ).toMatchObject({ amountClp: 30_000 });
+  });
+});
+
+describe("resolveAdminDashboardPeriod", () => {
+  it("defaults to the current calendar month when neither year nor month is given", () => {
+    const period = resolveAdminDashboardPeriod();
+    expect(period.month).toMatch(/^\d{4}-\d{2}$/);
+    expect(period.year).toBe(Number(period.month?.slice(0, 4)));
+  });
+
+  it("resolves a specific month, deriving its own year", () => {
+    expect(resolveAdminDashboardPeriod({ month: "2025-03" })).toEqual({
+      month: "2025-03",
+      year: 2025,
+    });
+  });
+
+  it("resolves a whole year when only year is given", () => {
+    expect(resolveAdminDashboardPeriod({ year: "2025" })).toEqual({
+      month: null,
+      year: 2025,
+    });
+  });
+
+  it("prefers a valid month over an inconsistent year", () => {
+    expect(
+      resolveAdminDashboardPeriod({ month: "2025-03", year: "2020" })
+    ).toEqual({ month: "2025-03", year: 2025 });
+  });
+});
+
+describe("yearRange", () => {
+  it("spans the full calendar year inclusive", () => {
+    expect(yearRange(2025)).toEqual({ from: "2025-01-01", to: "2025-12-31" });
   });
 });
 
@@ -192,10 +285,15 @@ const emptySummary: AdminDashboardSummary = {
     occupancyPercentage: 0,
     openAlerts: 0,
   },
-  month: "2026-10",
   noShowReservationCount: 0,
+  period: { month: "2026-10", year: 2026 },
   recentReservations: [],
   roomOccupancy: [],
+};
+
+const yearSummary: AdminDashboardSummary = {
+  ...emptySummary,
+  period: { month: null, year: 2026 },
 };
 
 const currency = new Intl.NumberFormat("es-CL", {
@@ -225,10 +323,15 @@ const filledSummary: AdminDashboardSummary = {
   ],
 };
 
+const initialPeriod = { month: "2026-10", year: 2026 } as const;
+
 describe("admin dashboard view", () => {
   it("shows a channel's amount and reservation count together, and keeps a room with no occupancy visible", () => {
     render(
-      <AdminDashboardView initialMonth="2026-10" initialSummary={filledSummary} />
+      <AdminDashboardView
+        initialPeriod={initialPeriod}
+        initialSummary={filledSummary}
+      />
     );
     expect(screen.getByText("Sitio web")).toBeInTheDocument();
     expect(screen.getByLabelText("3 reservas")).toBeInTheDocument();
@@ -240,7 +343,7 @@ describe("admin dashboard view", () => {
     ).toHaveTextContent("0%");
   });
 
-  it("requests the newly selected month and shows shimmer while it loads", async () => {
+  it("requests the newly selected year and shows shimmer while it loads", async () => {
     let resolveFetch!: (value: Response) => void;
     const fetchMock = vi.fn(
       () =>
@@ -250,33 +353,80 @@ describe("admin dashboard view", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
     render(
-      <AdminDashboardView initialMonth="2026-10" initialSummary={emptySummary} />
+      <AdminDashboardView
+        initialPeriod={initialPeriod}
+        initialSummary={emptySummary}
+      />
     );
     await act(async () => {
-      screen.getAllByLabelText("Mes siguiente")[0]?.click();
+      screen.getAllByLabelText("Año siguiente")[0]?.click();
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/admin/dashboard?month=2026-11",
+      "/api/admin/dashboard?year=2027",
       expect.anything()
     );
-    expect(window.location.search).toBe("?month=2026-11");
+    expect(window.location.search).toBe("?year=2027");
     expect(screen.getByRole("status")).toHaveTextContent(
       "Cargando resumen operativo"
     );
     await act(async () => {
-      resolveFetch(new Response(JSON.stringify(emptySummary), { status: 200 }));
+      resolveFetch(new Response(JSON.stringify(yearSummary), { status: 200 }));
     });
+    expect(screen.getAllByRole("combobox")[0]).toHaveValue("");
+    vi.unstubAllGlobals();
+  });
+
+  it("switches between a month and 'Año completo' from the month select, and resets to 'Año completo' on year change", async () => {
+    const fetchMock = vi.fn(async () =>
+      Promise.resolve(new Response(JSON.stringify(yearSummary), { status: 200 }))
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+    render(
+      <AdminDashboardView
+        initialPeriod={initialPeriod}
+        initialSummary={emptySummary}
+      />
+    );
+
+    await user.selectOptions(screen.getAllByRole("combobox")[0]!, "");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/admin/dashboard?year=2026",
+      expect.anything()
+    );
+    expect(window.location.search).toBe("?year=2026");
+
+    await user.selectOptions(screen.getAllByRole("combobox")[0]!, "2026-03");
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/admin/dashboard?year=2026&month=2026-03",
+      expect.anything()
+    );
+    expect(window.location.search).toBe("?year=2026&month=2026-03");
+
+    await act(async () => {
+      screen.getAllByLabelText("Año anterior")[0]?.click();
+    });
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/admin/dashboard?year=2025",
+      expect.anything()
+    );
+    expect(window.location.search).toBe("?year=2025");
+    expect(screen.getAllByRole("combobox")[0]).toHaveValue("");
+
     vi.unstubAllGlobals();
   });
 
   it("explains unavailable and empty summary states", () => {
     const { unmount } = render(
-      <AdminDashboardView initialMonth="2026-10" initialSummary={null} />
+      <AdminDashboardView initialPeriod={initialPeriod} initialSummary={null} />
     );
     expect(screen.getByRole("status")).toHaveTextContent("no está disponible");
     unmount();
     render(
-      <AdminDashboardView initialMonth="2026-10" initialSummary={emptySummary} />
+      <AdminDashboardView
+        initialPeriod={initialPeriod}
+        initialSummary={emptySummary}
+      />
     );
     expect(screen.getAllByRole("status")[0]).toHaveTextContent(
       "No hay ventas registradas en el mes."
@@ -284,6 +434,20 @@ describe("admin dashboard view", () => {
     expect(screen.getByRole("link", { name: /Ver todas/ })).toHaveAttribute(
       "href",
       "/admin/reservas"
+    );
+  });
+
+  it("labels KPIs and the sales chart for the year when no month is selected", () => {
+    render(
+      <AdminDashboardView
+        initialPeriod={{ month: null, year: 2026 }}
+        initialSummary={yearSummary}
+      />
+    );
+    expect(screen.getAllByText("Reservas del año")[0]).toBeInTheDocument();
+    expect(screen.getAllByText("Ventas del año")[0]).toBeInTheDocument();
+    expect(screen.getAllByRole("status")[0]).toHaveTextContent(
+      "No hay ventas registradas en el año."
     );
   });
 
@@ -299,7 +463,10 @@ describe("admin dashboard view", () => {
       )
     );
     render(
-      <AdminDashboardView initialMonth="2026-10" initialSummary={emptySummary} />
+      <AdminDashboardView
+        initialPeriod={initialPeriod}
+        initialSummary={emptySummary}
+      />
     );
     await act(async () => {
       screen.getAllByRole("button", { name: "Actualizar datos" })[0]?.click();

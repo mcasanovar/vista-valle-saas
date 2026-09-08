@@ -6,8 +6,8 @@ test("admin dashboard summary responds to the month selector while alerts and re
   await page.setViewportSize({ width: 1440, height: 1000 });
   // The configured mock adapter supplies the authorized administrator session.
   await page.goto("/admin/login");
-  await page.goto("/admin?month=2026-10");
-  await expect(page.getByText("octubre de 2026").last()).toBeVisible();
+  await page.goto("/admin?year=2026&month=2026-10");
+  await expect(page.getByLabel("Mes").last()).toHaveValue("2026-10");
 
   const reservationsCard = page.locator("article", {
     hasText: "Reservas del mes",
@@ -18,13 +18,46 @@ test("admin dashboard summary responds to the month selector while alerts and re
   const alertsBeforeText = await alertsCard.textContent();
   await expect(page.getByText("Huésped demo").first()).toBeVisible();
 
-  await page.getByLabel("Mes siguiente").last().click();
+  await page.getByLabel("Mes").last().selectOption("2026-11");
 
-  await expect(page.getByText("noviembre de 2026").last()).toBeVisible();
-  await expect(page).toHaveURL(/month=2026-11/);
+  await expect(page).toHaveURL(/year=2026&month=2026-11/);
   await expect(reservationsCard).toContainText("0");
   await expect(alertsCard).toHaveText(alertsBeforeText ?? "");
   await expect(page.getByText("Huésped demo").first()).toBeVisible();
+});
+
+test("admin dashboard year selector shows the full year, drills into a month, and returns to the full year", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/admin/login");
+  await page.goto("/admin?year=2026");
+
+  await expect(page.getByLabel("Mes").last()).toHaveValue("");
+  const reservationsCard = page.locator("article", {
+    hasText: "Reservas del año",
+  });
+  await expect(reservationsCard).toContainText("1");
+
+  await page.getByLabel("Año siguiente").last().click();
+  await expect(page).toHaveURL(/year=2027(?!.*month)/);
+  await expect(page.getByLabel("Mes").last()).toHaveValue("");
+  await expect(
+    page.locator("article", { hasText: "Reservas del año" })
+  ).toContainText("0");
+
+  await page.getByLabel("Año anterior").last().click();
+  await expect(page).toHaveURL(/year=2026(?!.*month)/);
+
+  await page.getByLabel("Mes").last().selectOption("2026-10");
+  await expect(page).toHaveURL(/year=2026&month=2026-10/);
+  await expect(
+    page.locator("article", { hasText: "Reservas del mes" })
+  ).toContainText("1");
+
+  await page.getByLabel("Mes").last().selectOption("");
+  await expect(page).toHaveURL(/year=2026(?!.*month)/);
+  await expect(reservationsCard).toContainText("1");
 });
 
 test("admin shell adapts the authenticated dashboard at desktop, tablet and mobile widths", async ({

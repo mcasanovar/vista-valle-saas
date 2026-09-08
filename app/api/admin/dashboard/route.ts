@@ -1,6 +1,6 @@
 import {
   getAdminDashboardSummary,
-  resolveAdminDashboardMonth,
+  resolveAdminDashboardPeriod,
 } from "@/features/admin/dashboard";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
@@ -13,9 +13,11 @@ export async function GET(request: Request) {
     return Response.json({ error: "No autorizado" }, { status: 401 });
   }
 
-  const month = new URL(request.url).searchParams.get("month") ?? undefined;
+  const searchParams = new URL(request.url).searchParams;
+  const period = resolveAdminDashboardPeriod({
+    month: searchParams.get("month") ?? undefined,
+    year: searchParams.get("year") ?? undefined,
+  });
 
-  return Response.json(
-    await getAdminDashboardSummary(resolveAdminDashboardMonth(month))
-  );
+  return Response.json(await getAdminDashboardSummary(period));
 }
