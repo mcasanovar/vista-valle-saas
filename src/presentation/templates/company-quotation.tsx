@@ -36,12 +36,6 @@ export function CompanyQuotationTemplate() {
           </div>
         </header>
         <article className="vv-quotation-content mx-auto max-w-content space-y-8 px-4 phone:px-6 tablet:px-8">
-          <div className="vv-quotation-notice">
-            <p className="text-sm text-foreground">
-              <strong>Importante:</strong> las capacidades y precios actuales
-              son datos de demostración para validar esta experiencia.
-            </p>
-          </div>
           <CompanyQuotationController />
         </article>
       </main>

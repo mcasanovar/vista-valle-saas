@@ -64,7 +64,7 @@ export function PrebookingReviewController({
         </header>
         <section
           aria-label="Fechas de la reserva"
-          className="flex flex-wrap items-center gap-5 rounded-2xl bg-[#FBF5F0] p-5 shadow-md tablet:p-6"
+          className="flex flex-wrap items-center gap-5 rounded-2xl bg-card p-5 shadow-md tablet:p-6"
         >
           <div>
             <p className="text-xs font-medium text-muted-foreground">Entrada</p>
@@ -90,7 +90,7 @@ export function PrebookingReviewController({
             {review.rooms.map((room) => (
               <li
                 key={room.id}
-                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-[#FBF5F0] p-5 shadow-md tablet:p-6"
+                className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-card p-5 shadow-md tablet:p-6"
               >
                 <div className="flex items-center gap-4">
                   <span
@@ -121,7 +121,7 @@ export function PrebookingReviewController({
               </li>
             ))}
           </ul>
-          <div className="flex items-center justify-between rounded-2xl border border-[#F4E9DE] bg-[#F4E9DE] px-5 py-4 shadow-none tablet:px-6">
+          <div className="flex items-center justify-between rounded-2xl border border-border bg-card px-5 py-4 shadow-none tablet:px-6">
             <div>
               <p className="text-md font-medium text-muted-foreground">Total</p>
             </div>

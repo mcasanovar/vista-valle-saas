@@ -45,7 +45,7 @@ export function AvailabilityResultsTemplate({
   room?: string;
   errors?: Readonly<Record<string, string>>;
   rooms?: readonly Room[];
-  state?: "invalid" | "unavailable" | "error";
+  state?: "invalid" | "unavailable" | "error" | "empty";
   bookingSearch?: ReactNode;
   results?: ReactNode;
 }>) {

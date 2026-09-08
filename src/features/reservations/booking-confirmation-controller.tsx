@@ -139,7 +139,7 @@ export function BookingConfirmationController({
           className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 shadow-md transition-colors ${
             selectedMode === "pay_at_property"
               ? "border-accent bg-accent/10"
-              : "border-transparent bg-[#FBF5F0] hover:border-border"
+              : "border-transparent bg-card hover:border-border"
           }`}
         >
           <input
@@ -163,7 +163,7 @@ export function BookingConfirmationController({
             className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 shadow-md transition-colors ${
               selectedMode === "pay_now"
                 ? "border-accent bg-accent/10"
-                : "border-transparent bg-[#FBF5F0] hover:border-border"
+                : "border-transparent bg-card hover:border-border"
             }`}
           >
             <input
