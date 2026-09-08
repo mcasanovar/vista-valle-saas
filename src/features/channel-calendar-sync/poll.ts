@@ -1,6 +1,8 @@
 import "server-only";
-import { getChannelConnections, type ChannelConnection } from "./connections";
+import { getChannelConnectionStore } from "./store";
+import type { ChannelConnection } from "./connections";
 import { ingestChannelConnection } from "./ingest";
+import { writeStructuredLog } from "@/infrastructure/observability/sentry";
 
 export type ChannelSyncPollOutcome = Readonly<{
   connectionId: string;
@@ -10,9 +12,14 @@ export type ChannelSyncPollOutcome = Readonly<{
 }>;
 
 async function defaultFetchIcal(url: string): Promise<string> {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
   if (!response.ok) {
-    throw new Error(`Inbound feed request failed with status ${response.status}`);
+    throw new Error(
+      `Inbound feed request failed with status ${response.status}`
+    );
   }
   return response.text();
 }
@@ -27,12 +34,12 @@ async function defaultFetchIcal(url: string): Promise<string> {
 export async function pollAllActiveConnections(
   fetchIcal: (url: string) => Promise<string> = defaultFetchIcal
 ): Promise<readonly ChannelSyncPollOutcome[]> {
-  const connections = getChannelConnections();
+  const connections = getChannelConnectionStore();
   if (!connections) return [];
 
   const outcomes: ChannelSyncPollOutcome[] = [];
-  for (const connection of connections.listActive()) {
-    const inboundFeedUrl = connections.getInboundFeedUrl(connection.id);
+  for (const connection of await connections.listActive()) {
+    const inboundFeedUrl = await connections.getInboundFeedUrl(connection.id);
     if (!inboundFeedUrl) {
       outcomes.push({ connectionId: connection.id, status: "skipped" });
       continue;
@@ -49,23 +56,32 @@ async function pollOneConnection(
   inboundFeedUrl: string,
   fetchIcal: (url: string) => Promise<string>
 ): Promise<ChannelSyncPollOutcome> {
-  const connections = getChannelConnections()!;
+  const connections = getChannelConnectionStore()!;
   try {
     const document = await fetchIcal(inboundFeedUrl);
     const result = await ingestChannelConnection(connection, document);
     const eventCount = result.created.length + result.cancelled.length;
-    connections.recordPollResult({
+    await connections.recordPollResult({
       connectionId: connection.id,
       status: "ok",
       eventCount,
     });
+    writeStructuredLog("info", "channel_sync.poll_completed", {
+      channelConnectionId: connection.id,
+      eventCount,
+      platform: connection.platform,
+    });
     return { connectionId: connection.id, status: "ok", eventCount };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    connections.recordPollResult({
+    await connections.recordPollResult({
       connectionId: connection.id,
       status: "error",
       error: message,
+    });
+    writeStructuredLog("error", "channel_sync.poll_failed", {
+      channelConnectionId: connection.id,
+      platform: connection.platform,
     });
     return { connectionId: connection.id, status: "error", error: message };
   }

@@ -85,7 +85,18 @@ export function isBookingAcceptanceEnabled(): boolean {
   );
 }
 
-export const mockRoomLockGateway = createMockRoomLockGateway();
+const mockRoomLockGatewayKey = Symbol.for(
+  "vista-valle.mock.room-lock-gateway"
+);
+
+function getCanonicalMockRoomLockGateway() {
+  const scope = globalThis as typeof globalThis & {
+    [mockRoomLockGatewayKey]?: ReturnType<typeof createMockRoomLockGateway>;
+  };
+  return (scope[mockRoomLockGatewayKey] ??= createMockRoomLockGateway());
+}
+
+export const mockRoomLockGateway = getCanonicalMockRoomLockGateway();
 export const mockGuestRepository =
   createCanonicalMockGuestRepository<MockRoomLockOperationContext>();
 export const mockReservationRepository =

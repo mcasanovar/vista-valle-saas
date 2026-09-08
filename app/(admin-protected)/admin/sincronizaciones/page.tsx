@@ -7,7 +7,7 @@ import {
   regenerateChannelConnectionTokenAction,
   saveChannelConnectionAction,
 } from "@/features/channel-calendar-sync/actions";
-import { getChannelConnections } from "@/features/channel-calendar-sync/connections";
+import { getChannelConnectionStore } from "@/features/channel-calendar-sync";
 import {
   ChannelConnectionsPanel,
   type RoomConnectionCards,
@@ -23,40 +23,48 @@ export default async function SyncPage({
 
   const tasks = getChannelSyncTasks()?.pending() ?? [];
   const rooms = (await getRoomReadSource()).listActive();
-  const connections = getChannelConnections();
+  const connections = getChannelConnectionStore();
   const siteUrl = getServerEnvironment().SITE_URL;
 
-  const roomCards: readonly RoomConnectionCards[] = rooms.map((room) => ({
-    roomId: room.id,
-    roomName: room.name,
-    cards: PLATFORMS.map((platform) => {
-      const connection =
-        connections?.getByRoomAndPlatform(room.id, platform) ?? null;
-      return {
-        roomId: room.id,
-        platform,
-        connection: connection
-          ? {
-              id: connection.id,
-              outboundToken: connection.outboundToken,
-              paymentBehavior: connection.paymentBehavior,
-              lastPolledAt: connection.lastPolledAt,
-              lastPollStatus: connection.lastPollStatus,
-              lastPollEventCount: connection.lastPollEventCount,
-              lastPollError: connection.lastPollError,
-            }
-          : null,
-        outboundUrl: connection
-          ? `${siteUrl}/api/ical/${connection.outboundToken}`
-          : null,
-      };
-    }),
-  }));
+  const roomCards: readonly RoomConnectionCards[] = await Promise.all(
+    rooms.map(async (room) => ({
+      roomId: room.id,
+      roomName: room.name,
+      cards: await Promise.all(
+        PLATFORMS.map(async (platform) => {
+          const connection =
+            (await connections?.getByRoomAndPlatform(room.id, platform)) ??
+            null;
+          return {
+            roomId: room.id,
+            platform,
+            connection: connection
+              ? {
+                  id: connection.id,
+                  outboundToken: connection.outboundToken,
+                  paymentBehavior: connection.paymentBehavior,
+                  lastPolledAt: connection.lastPolledAt,
+                  lastPollStatus: connection.lastPollStatus,
+                  lastPollEventCount: connection.lastPollEventCount,
+                  lastPollError: connection.lastPollError,
+                }
+              : null,
+            outboundUrl: connection
+              ? `${siteUrl}/api/ical/${connection.outboundToken}`
+              : null,
+          };
+        })
+      ),
+    }))
+  );
 
   return (
     <section aria-labelledby="sincronizaciones-page-title">
       <h1 id="sincronizaciones-page-title">Sincronizaciones</h1>
-      <nav aria-label="Pestañas de sincronización" className="mt-4 flex gap-2 border-b border-border">
+      <nav
+        aria-label="Pestañas de sincronización"
+        className="mt-4 flex gap-2 border-b border-border"
+      >
         <a
           href="?tab=cola"
           aria-current={activeTab === "cola" ? "page" : undefined}

@@ -64,7 +64,7 @@ const serverEnvironmentSchema = z.object({
     .default("true")
     .transform((value) => value === "true"),
   BOOKING_HOLD_DURATION_MINUTES: positiveInteger,
-  /** Bearer secret for the internal channel-sync polling endpoint (same pattern as OUTBOX_PROCESSOR_SECRET); optional so an unset value disables the endpoint rather than defaulting to an insecure one. */
+  /** Bearer secret for the internal channel-sync polling endpoint. */
   CHANNEL_SYNC_PROCESSOR_SECRET: z.string().trim().min(32).optional(),
   CLOUDINARY_API_KEY: z.string().trim().min(1),
   CLOUDINARY_API_SECRET: z.string().trim().min(1),
@@ -111,6 +111,7 @@ const configurationValuesThatMayBeMocked = [
   "CLOUDINARY_API_KEY",
   "CLOUDINARY_API_SECRET",
   "CLOUDINARY_CLOUD_NAME",
+  "CHANNEL_SYNC_PROCESSOR_SECRET",
   "DATABASE_URL",
   "FINTOC_API_KEY",
   "FINTOC_WEBHOOK_SECRET",
@@ -162,6 +163,11 @@ function assertProductionNotificationConfiguration(
   if (!environment.OUTBOX_PROCESSOR_SECRET?.trim()) {
     throw new Error(
       "Invalid server environment configuration: OUTBOX_PROCESSOR_SECRET is required in production"
+    );
+  }
+  if (!environment.CHANNEL_SYNC_PROCESSOR_SECRET?.trim()) {
+    throw new Error(
+      "Invalid server environment configuration: CHANNEL_SYNC_PROCESSOR_SECRET is required in production"
     );
   }
 }

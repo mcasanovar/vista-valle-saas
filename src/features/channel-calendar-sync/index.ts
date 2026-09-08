@@ -1,5 +1,6 @@
 // Public API boundary for the channel calendar synchronization capability.
 export * from "./connections";
+export * from "./store";
 export * from "./inbound-parser";
 export * from "./guest-placeholder";
 export * from "./conflict-alerts";

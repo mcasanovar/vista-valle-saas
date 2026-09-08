@@ -1,5 +1,9 @@
 import { getChannelConnections } from "@/features/channel-calendar-sync";
-import { getMockOutboundFeedEntries } from "@/features/channel-calendar-sync/outbound-feed-source";
+import { getChannelConnectionStore } from "@/features/channel-calendar-sync";
+import {
+  getMockOutboundFeedEntries,
+  getProductionOutboundFeedEntries,
+} from "@/features/channel-calendar-sync/outbound-feed-source";
 import { generateOutboundIcalDocument } from "@/features/channel-calendar-sync/outbound-feed";
 
 export const dynamic = "force-dynamic";
@@ -15,16 +19,17 @@ export async function GET(
   { params }: Readonly<{ params: Promise<{ token: string }> }>
 ) {
   const { token } = await params;
-  const connections = getChannelConnections();
-  const connection = connections?.getByOutboundToken(token);
+  const connections = getChannelConnectionStore();
+  const connection = await connections?.getByOutboundToken(token);
   if (!connection) {
     return new Response("Not found.", { status: 404 });
   }
 
-  const entries = await getMockOutboundFeedEntries(connection.roomId);
-  if (!entries) {
-    return new Response("Not found.", { status: 404 });
-  }
+  const entries =
+    getChannelConnections() !== null
+      ? await getMockOutboundFeedEntries(connection.roomId)
+      : await getProductionOutboundFeedEntries(connection.roomId);
+  if (!entries) return new Response("Not found.", { status: 404 });
 
   const document = generateOutboundIcalDocument(entries, connection.platform);
   return new Response(document, {

@@ -4,6 +4,7 @@ import { GET } from "../app/api/ical/[token]/route";
 import { createLodgingInterval } from "@/features/availability";
 import { getChannelConnections } from "@/features/channel-calendar-sync";
 import { mockDemoRooms } from "@/features/rooms";
+import { createRoomBlock } from "@/features/room-blocks/manual-blocks";
 import { createPayAtPropertyReservation } from "@/features/reservations";
 import {
   mockGuestRepository,
@@ -80,5 +81,35 @@ describe("GET /api/ical/[token]", () => {
     const text = await second.text();
     expect(text).toContain("DTSTART;VALUE=DATE:20390501");
     expect(text).toContain("DTEND;VALUE=DATE:20390503");
+  });
+
+  it("reflects a room block created through the admin flow", async () => {
+    const room = mockDemoRooms[1]!;
+    const connections = getChannelConnections()!;
+    const connection = connections.setInboundFeedUrl({
+      roomId: room.id,
+      platform: "airbnb",
+      inboundFeedUrl: "https://www.airbnb.com/calendar/ical/block-test.ics",
+      paymentBehavior: "auto_approved",
+    });
+
+    await createRoomBlock(
+      {
+        roomId: room.id,
+        checkIn: "2042-05-01",
+        checkOut: "2042-05-03",
+        reason: "Prueba de feed iCal",
+      },
+      "test-admin"
+    );
+
+    const response = await GET(
+      new Request(`http://localhost/api/ical/${connection.outboundToken}`),
+      { params: Promise.resolve({ token: connection.outboundToken }) }
+    );
+    const text = await response.text();
+
+    expect(text).toContain("DTSTART;VALUE=DATE:20420501");
+    expect(text).toContain("DTEND;VALUE=DATE:20420503");
   });
 });

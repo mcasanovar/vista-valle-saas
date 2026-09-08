@@ -1,6 +1,13 @@
 import "server-only";
-import { getServerEnvironment } from "@/config/server";
-import { mockReservationRepository, mockRoomLockGateway } from "@/features/reservations";
+import {
+  mockReservationRepository,
+  mockRoomLockGateway,
+} from "@/features/reservations";
+import { createProductionDatabase } from "@/infrastructure/database/client";
+import { createDatabaseBoundary } from "@/infrastructure/database/server";
+import { listOccupyingIntervals } from "@/infrastructure/database/room-lock";
+import { reservations } from "@/persistence/schema";
+import { inArray } from "drizzle-orm";
 import type { ChannelFeedOccupancyEntry } from "./outbound-feed";
 
 /**
@@ -14,7 +21,8 @@ import type { ChannelFeedOccupancyEntry } from "./outbound-feed";
 export async function getMockOutboundFeedEntries(
   roomId: string
 ): Promise<readonly ChannelFeedOccupancyEntry[] | null> {
-  if (getServerEnvironment().VISTA_VALLE_CONFIG_CONTEXT !== "mock") return null;
+  const boundary = createDatabaseBoundary();
+  if (boundary.context !== "mock") return null;
   const occupying =
     (await mockRoomLockGateway.listOccupyingIntervals?.(roomId)) ?? [];
   return Promise.all(
@@ -36,5 +44,35 @@ export async function getMockOutboundFeedEntries(
         origin: reservation?.origin,
       };
     })
+  );
+}
+
+export async function getProductionOutboundFeedEntries(
+  roomId: string
+): Promise<readonly ChannelFeedOccupancyEntry[]> {
+  const boundary = createDatabaseBoundary();
+  if (boundary.context !== "production") return [];
+  const db = createProductionDatabase(boundary);
+  const occupying = await listOccupyingIntervals(db, roomId, new Date());
+  const reservationIds = occupying
+    .filter((entry) => entry.source === "reservation")
+    .map((entry) => entry.sourceId);
+  const reservationRows = reservationIds.length
+    ? await db
+        .select({ id: reservations.id, origin: reservations.origin })
+        .from(reservations)
+        .where(inArray(reservations.id, reservationIds))
+    : [];
+  const origins = new Map(reservationRows.map((row) => [row.id, row.origin]));
+  return Object.freeze(
+    occupying.map((entry) => ({
+      interval: entry.interval,
+      source: entry.source,
+      sourceId: entry.sourceId,
+      origin:
+        entry.source === "reservation"
+          ? origins.get(entry.sourceId)
+          : undefined,
+    }))
   );
 }
