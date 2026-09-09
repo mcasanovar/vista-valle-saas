@@ -173,7 +173,7 @@ export function PublicFooter({
           </ul>
         </div>
 
-        <div className="absolute top-0 left-1/4 h-full w-px bg-on-primary/20" />
+        <div className="absolute top-0 left-1/4 hidden h-full w-px bg-on-primary/20 tablet:block" />
         <div className="pl-6">
           <p className="font-heading text-lg font-normal leading-snug text-primary font-semibold text-xs text-white/75">
             Navegación
@@ -189,7 +189,7 @@ export function PublicFooter({
           </ul>
         </div>
 
-        <div className="absolute top-0 left-2/4 h-full w-px bg-on-primary/20" />
+        <div className="absolute top-0 left-2/4 hidden h-full w-px bg-on-primary/20 tablet:block" />
         <div className="pl-6">
           <p className="font-heading text-lg font-normal leading-snug text-primary font-semibold text-xs text-white/75">
             Contacto
@@ -205,7 +205,7 @@ export function PublicFooter({
           </ul>
         </div>
 
-        <div className="absolute top-0 left-3/4 h-full w-px bg-on-primary/20" />
+        <div className="absolute top-0 left-3/4 hidden h-full w-px bg-on-primary/20 tablet:block" />
         <div id="contacto" className="pl-6 scroll-mt-24">
           <p className="font-heading text-lg font-normal leading-snug text-primary font-semibold text-xs text-white/75">
             WhatsApp
