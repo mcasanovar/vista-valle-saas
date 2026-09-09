@@ -59,7 +59,7 @@ export async function queryProductionRooms(): Promise<
       images: imageRows
         .filter((image) => image.roomId === room.id)
         .map((image) => ({
-          alt: image.altText ?? room.name ?? "",
+          alt: image.altText?.trim() || room.name?.trim() || "",
           id: image.id,
           src: imageStorage.getPublicUrl(image.storagePath),
         })),
