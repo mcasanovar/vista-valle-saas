@@ -7,7 +7,8 @@ import {
   validateAvailabilityResultsQuery,
   type AvailabilityRepository,
 } from "@/features/availability";
-import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
+import { getRoomReadSource, resolveRoomNightlyPrice, type RoomReadSource } from "@/features/rooms";
+import { parseRoomSelectionParam } from "@/features/reservations/room-selection-codec";
 
 export type PrebookingSearchParams = Readonly<
   Record<string, string | readonly string[] | undefined>
@@ -29,6 +30,7 @@ export type PrebookingReview =
       nights: number;
       rooms: readonly Readonly<{
         id: string;
+        guestCount: number;
         name: string;
         nightlyPriceClp: number;
         slug: string;
@@ -37,10 +39,10 @@ export type PrebookingReview =
       totalClp: number;
     }>;
 
-function selectedRoomKeys(params: PrebookingSearchParams) {
+function selectedRoomEntries(params: PrebookingSearchParams) {
   const raw = params.rooms;
   if (raw !== undefined && typeof raw !== "string") return null;
-  return [...new Set((raw ?? "").split(",").filter(Boolean))];
+  return parseRoomSelectionParam(raw);
 }
 
 async function defaultDependencies(): Promise<PrebookingReviewDependencies> {
@@ -59,9 +61,9 @@ export async function composePrebookingReview(
   dependencies?: PrebookingReviewDependencies
 ): Promise<PrebookingReview> {
   const resolvedDependencies = dependencies ?? (await defaultDependencies());
-  const keys = selectedRoomKeys(params);
-  if (keys?.length === 0) return Object.freeze({ kind: "empty" });
-  if (!keys) {
+  const entries = selectedRoomEntries(params);
+  if (entries?.length === 0) return Object.freeze({ kind: "empty" });
+  if (!entries) {
     return Object.freeze({
       kind: "stale",
       message: "La selección de habitaciones no es válida.",
@@ -80,12 +82,20 @@ export async function composePrebookingReview(
     });
   }
 
-  const selected = keys.map((key) =>
-    resolvedDependencies.roomSource
+  const selected = entries.map((entry) => {
+    const room = resolvedDependencies.roomSource
       .listActive()
-      .find((room) => room.id === key || room.slug === key)
-  );
-  if (selected.some((room) => !room)) {
+      .find((candidate) => candidate.id === entry.roomId || candidate.slug === entry.roomId);
+    return room ? { guestCount: entry.guestCount, room } : null;
+  });
+  if (
+    selected.some(
+      (entry) =>
+        !entry ||
+        entry.guestCount < 1 ||
+        entry.guestCount > entry.room.capacity
+    )
+  ) {
     return Object.freeze({
       kind: "stale",
       message: "Una de las habitaciones seleccionadas ya no está disponible.",
@@ -94,9 +104,9 @@ export async function composePrebookingReview(
 
   try {
     await Promise.all(
-      selected.map((room) =>
+      selected.map((entry) =>
         searchAvailability(
-          { ...validation.value, room: room!.slug },
+          { ...validation.value, room: entry!.room.slug },
           resolvedDependencies
         )
       )
@@ -114,14 +124,20 @@ export async function composePrebookingReview(
     validation.value.checkOut
   );
   const rooms = Object.freeze(
-    selected.map((room) => {
-      const value = room!;
+    selected.map((entry) => {
+      const { guestCount, room } = entry!;
+      const resolvedNightlyPriceClp = resolveRoomNightlyPrice(
+        room,
+        room.occupancyPrices,
+        guestCount
+      );
       return Object.freeze({
-        id: value.id,
-        name: value.name,
-        nightlyPriceClp: value.nightlyPriceClp,
-        slug: value.slug,
-        subtotalClp: value.nightlyPriceClp * stayNights,
+        id: room.id,
+        guestCount,
+        name: room.name,
+        nightlyPriceClp: resolvedNightlyPriceClp,
+        slug: room.slug,
+        subtotalClp: resolvedNightlyPriceClp * stayNights,
       });
     })
   );

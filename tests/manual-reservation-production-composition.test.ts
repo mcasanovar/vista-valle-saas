@@ -30,6 +30,7 @@ const roomSource = createRoomReadSource("production", [
     isDemonstration: false,
     name: "Habitación A",
     nightlyPriceClp: 75_000,
+    occupancyPrices: [],
     slug: "production-room-a",
   },
 ]);

@@ -17,6 +17,14 @@ import {
   saveSessionRoomSelection,
   useSessionRoomSelection,
 } from "@/features/reservations/selection-session";
+// eslint-disable-next-line architecture/feature-public-api, architecture/presentation-boundaries
+import { isOccupancySelectable } from "@/features/reservations/guest-allocation";
+// eslint-disable-next-line architecture/feature-public-api, architecture/presentation-boundaries
+import { resolveDisplayRoomNightlyPrice } from "@/features/rooms/occupancy-pricing";
+// eslint-disable-next-line architecture/feature-public-api, architecture/presentation-boundaries
+import type { RoomOccupancyPrice } from "@/features/rooms/read-model";
+
+const selectableOccupancies = [1, 2] as const;
 
 export function RoomCard({
   image,
@@ -24,6 +32,8 @@ export function RoomCard({
   roomSlug,
   name,
   capacity,
+  capacityCount = 1,
+  occupancyPrices = [],
   beds,
   bathroom,
   amenities,
@@ -41,6 +51,9 @@ export function RoomCard({
   roomSlug?: string;
   name: string;
   capacity: string;
+  /** Raw guest capacity, used to decide whether the occupancy selector applies. Defaults to 1 (no selector) for callers that don't track it. */
+  capacityCount?: number;
+  occupancyPrices?: readonly RoomOccupancyPrice[];
   beds: string;
   bathroom?: string;
   amenities?: readonly string[];
@@ -58,8 +71,15 @@ export function RoomCard({
   const storedSelection = useSessionRoomSelection();
   const currentParams = new URLSearchParams(searchParams?.toString() ?? "");
   const selection = effectiveRoomSelection(currentParams, storedSelection);
-  const selectedRooms = new Set(selection?.rooms ?? []);
-  const selected = Boolean(roomSlug && selectedRooms.has(roomSlug));
+  const existingEntry = roomSlug
+    ? selection?.rooms.find((room) => room.roomId === roomSlug)
+    : undefined;
+  const selected = Boolean(existingEntry);
+  const hasOccupancyChoice = capacityCount > 1;
+  const [pendingOccupancy, setPendingOccupancy] = useState<number | null>(
+    hasOccupancyChoice ? null : 1
+  );
+  const occupancy = selected ? (existingEntry?.guestCount ?? 1) : pendingOccupancy;
   const [added, setAdded] = useState(false);
   const [travel, setTravel] = useState<{
     left: number;
@@ -80,6 +100,21 @@ export function RoomCard({
       gallery.registerRoom(roomSlug, images);
     }
   }, [gallery, images, roomSlug]);
+
+  const chooseOccupancy = (nextOccupancy: number) => {
+    if (!roomSlug) return;
+    if (selected && selection) {
+      const rooms = selection.rooms.map((room) =>
+        room.roomId === roomSlug
+          ? { ...room, guestCount: nextOccupancy }
+          : room
+      );
+      saveSessionRoomSelection({ ...selection, rooms });
+    } else {
+      setPendingOccupancy(nextOccupancy);
+    }
+  };
+
   const toggleSelection = (source: HTMLButtonElement) => {
     if (!roomSlug) return;
     const params = new URLSearchParams(window.location.search);
@@ -87,15 +122,30 @@ export function RoomCard({
     if (!effective) return;
     params.set("checkIn", effective.checkIn);
     params.set("checkOut", effective.checkOut);
-    const rooms = new Set(effective.rooms);
-    if (selected) rooms.delete(roomSlug);
-    else rooms.add(roomSlug);
-    if (rooms.size) params.set("rooms", [...rooms].sort().join(","));
-    else params.delete("rooms");
+    const rooms = selected
+      ? effective.rooms.filter((room) => room.roomId !== roomSlug)
+      : [
+          ...effective.rooms,
+          { guestCount: pendingOccupancy ?? 1, roomId: roomSlug },
+        ];
+    if (rooms.length) {
+      params.set(
+        "rooms",
+        [...rooms]
+          .sort((left, right) => left.roomId.localeCompare(right.roomId))
+          .map((room) => `${room.roomId}:${room.guestCount}`)
+          .join(",")
+      );
+    } else {
+      params.delete("rooms");
+    }
     saveSessionRoomSelection({
       checkIn: effective.checkIn,
       checkOut: effective.checkOut,
-      rooms: [...rooms].sort(),
+      guests: effective.guests,
+      rooms: [...rooms].sort((left, right) =>
+        left.roomId.localeCompare(right.roomId)
+      ),
     });
     router.push(`${window.location.pathname}?${params.toString()}`, {
       scroll: false,
@@ -125,11 +175,29 @@ export function RoomCard({
     }
   };
   const selectedDetailHref = (() => {
-    if (!roomSlug || selectedRooms.size === 0) return detailHref;
+    if (!roomSlug || !selection?.rooms.length) return detailHref;
     const url = new URL(detailHref, "http://vistavalle.local");
-    url.searchParams.set("rooms", [...selectedRooms].sort().join(","));
+    url.searchParams.set(
+      "rooms",
+      [...selection.rooms]
+        .sort((left, right) => left.roomId.localeCompare(right.roomId))
+        .map((room) => `${room.roomId}:${room.guestCount}`)
+        .join(",")
+    );
     return `${url.pathname}${url.search}`;
   })();
+  const displayedPrice =
+    occupancy !== null
+      ? resolveDisplayRoomNightlyPrice(
+          { capacity: capacityCount || 1, nightlyPriceClp: price },
+          occupancyPrices,
+          occupancy
+        )
+      : Math.min(
+          price,
+          ...occupancyPrices.map((entry) => entry.priceClp)
+        );
+  const canAddNow = !hasOccupancyChoice || occupancy !== null;
 
   return (
     <motion.article
@@ -224,7 +292,53 @@ export function RoomCard({
           </ul>
         ) : null}
         <div className="flex-grow" />
-        <Price amount={price} suffix={priceSuffix} />
+        {hasOccupancyChoice ? (
+          <div className="space-y-2">
+            <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+              Personas en esta habitación
+            </span>
+            <div
+              role="group"
+              aria-label="Cantidad de personas"
+              className="inline-flex rounded-full border border-border bg-muted p-1"
+            >
+              {selectableOccupancies
+                .filter((value) => value <= capacityCount)
+                .map((value) => {
+                  const disabled =
+                    roomSlug !== undefined &&
+                    selection !== null &&
+                    !isOccupancySelectable(
+                      selection.guests,
+                      selection.rooms,
+                      roomSlug,
+                      value
+                    );
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={occupancy === value}
+                      disabled={disabled}
+                      onClick={() => chooseOccupancy(value)}
+                      className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors ${
+                        occupancy === value
+                          ? "bg-foreground text-background"
+                          : "text-muted-foreground"
+                      } disabled:cursor-not-allowed disabled:opacity-40`}
+                    >
+                      {value} {value === 1 ? "persona" : "personas"}
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        ) : null}
+        <Price
+          amount={displayedPrice}
+          label={occupancy === null ? "Desde" : ""}
+          suffix={priceSuffix}
+        />
         <ActionLink
           href={selectedDetailHref}
           variant="action"
@@ -251,6 +365,7 @@ export function RoomCard({
           ) : (
             <Button
               type="button"
+              disabled={!canAddNow}
               onClick={(event: MouseEvent<HTMLButtonElement>) =>
                 toggleSelection(event.currentTarget)
               }

@@ -26,8 +26,22 @@ describe("RoomSelectionSummary", () => {
     render(
       <RoomSelectionSummary
         rooms={[
-          { id: "1", slug: "valle", name: "Valle", nightlyPriceClp: 50_000 },
-          { id: "2", slug: "andes", name: "Andes", nightlyPriceClp: 70_000 },
+          {
+            id: "1",
+            slug: "valle",
+            name: "Valle",
+            capacity: 2,
+            nightlyPriceClp: 50_000,
+            occupancyPrices: [],
+          },
+          {
+            id: "2",
+            slug: "andes",
+            name: "Andes",
+            capacity: 2,
+            nightlyPriceClp: 70_000,
+            occupancyPrices: [],
+          },
         ]}
       />
     );
@@ -55,7 +69,14 @@ describe("RoomSelectionSummary", () => {
     render(
       <RoomSelectionSummary
         rooms={[
-          { id: "1", slug: "valle", name: "Valle", nightlyPriceClp: 50_000 },
+          {
+            id: "1",
+            slug: "valle",
+            name: "Valle",
+            capacity: 2,
+            nightlyPriceClp: 50_000,
+            occupancyPrices: [],
+          },
         ]}
       />
     );
@@ -85,8 +106,22 @@ describe("RoomSelectionSummary", () => {
     render(
       <RoomSelectionSummary
         rooms={[
-          { id: "1", slug: "valle", name: "Valle", nightlyPriceClp: 50_000 },
-          { id: "2", slug: "andes", name: "Andes", nightlyPriceClp: 70_000 },
+          {
+            id: "1",
+            slug: "valle",
+            name: "Valle",
+            capacity: 2,
+            nightlyPriceClp: 50_000,
+            occupancyPrices: [],
+          },
+          {
+            id: "2",
+            slug: "andes",
+            name: "Andes",
+            capacity: 2,
+            nightlyPriceClp: 70_000,
+            occupancyPrices: [],
+          },
         ]}
       />
     );
@@ -113,8 +148,22 @@ describe("RoomSelectionSummary", () => {
     render(
       <RoomSelectionSummary
         rooms={[
-          { id: "1", slug: "valle", name: "Valle", nightlyPriceClp: 50_000 },
-          { id: "2", slug: "andes", name: "Andes", nightlyPriceClp: 70_000 },
+          {
+            id: "1",
+            slug: "valle",
+            name: "Valle",
+            capacity: 2,
+            nightlyPriceClp: 50_000,
+            occupancyPrices: [],
+          },
+          {
+            id: "2",
+            slug: "andes",
+            name: "Andes",
+            capacity: 2,
+            nightlyPriceClp: 70_000,
+            occupancyPrices: [],
+          },
         ]}
       />
     );
@@ -123,7 +172,7 @@ describe("RoomSelectionSummary", () => {
       screen.getByRole("button", { name: "Quitar Valle de la reserva" })
     );
     expect(router.replace).toHaveBeenCalledWith(
-      "/disponibilidad?checkIn=2026-10-05&checkOut=2026-10-08&rooms=andes",
+      "/disponibilidad?checkIn=2026-10-05&checkOut=2026-10-08&rooms=andes%3A1",
       { scroll: false }
     );
   });

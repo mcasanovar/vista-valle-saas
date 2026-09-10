@@ -83,14 +83,7 @@ export async function searchAvailability(
       "La habitación seleccionada no está disponible para reservar."
     );
   }
-  const candidates = (selectedRoom ? [selectedRoom] : rooms).filter(
-    (room) => room.capacity >= guests
-  );
-  if (selectedRoom && candidates.length === 0) {
-    throw new SelectedRoomUnavailableError(
-      "La habitación seleccionada no admite esa cantidad de huéspedes."
-    );
-  }
+  const candidates = selectedRoom ? [selectedRoom] : rooms;
   const available = await Promise.all(
     candidates.map(async (room) => ({
       room,

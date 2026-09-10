@@ -10,7 +10,9 @@ import {
 } from "./selection-session";
 export function RoomDetailSelectionButton({
   slug,
-}: Readonly<{ slug: string }>) {
+  guestCount = 1,
+  disabled = false,
+}: Readonly<{ slug: string; guestCount?: number; disabled?: boolean }>) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const storedSelection = useSessionRoomSelection();
@@ -32,16 +34,21 @@ export function RoomDetailSelectionButton({
     const params = new URLSearchParams(window.location.search);
     params.set("checkIn", selection.checkIn);
     params.set("checkOut", selection.checkOut);
-    const rooms = new Set(selection.rooms);
-    const isSelected = rooms.has(slug);
-    if (isSelected) rooms.delete(slug);
-    else rooms.add(slug);
-    if (rooms.size) params.set("rooms", [...rooms].sort().join(","));
+    const isSelected = selection.rooms.some((room) => room.roomId === slug);
+    const rooms = isSelected
+      ? selection.rooms.filter((room) => room.roomId !== slug)
+      : [...selection.rooms, { guestCount, roomId: slug }];
+    if (rooms.length)
+      params.set(
+        "rooms",
+        rooms.map((room) => `${room.roomId}:${room.guestCount}`).join(",")
+      );
     else params.delete("rooms");
     saveSessionRoomSelection({
       checkIn: selection.checkIn,
       checkOut: selection.checkOut,
-      rooms: [...rooms].sort(),
+      guests: selection.guests,
+      rooms,
     });
     router.replace(`${window.location.pathname}?${params}`, { scroll: false });
     setAdded(!isSelected);
@@ -69,7 +76,9 @@ export function RoomDetailSelectionButton({
       });
     }
   };
-  const isSelected = Boolean(selection?.rooms.includes(slug));
+  const isSelected = Boolean(
+    selection?.rooms.some((room) => room.roomId === slug)
+  );
   return (
     <div>
       {selection ? (
@@ -108,6 +117,7 @@ export function RoomDetailSelectionButton({
           ) : (
             <Button
               type="button"
+              disabled={disabled}
               onClick={(event: MouseEvent<HTMLButtonElement>) =>
                 updateSelection(event.currentTarget)
               }

@@ -43,7 +43,7 @@ describe("HomePage", () => {
     expect(screen.getByText("Habitación Individual")).toBeVisible();
     expect(screen.getByText("Habitación Matrimonial")).toBeVisible();
     expect(screen.getByText("Habitación Doble")).toBeVisible();
-    expect(screen.getByText(/55\.000/)).toBeVisible();
+    expect(screen.getAllByText(/55\.000/).length).toBeGreaterThan(0);
 
     for (const [label, href] of [
       ["Inicio", "#inicio"],

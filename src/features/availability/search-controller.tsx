@@ -88,6 +88,7 @@ export function AvailabilitySearchController({
     saveSessionRoomSelection({
       checkIn: validation.value.checkIn,
       checkOut: validation.value.checkOut,
+      guests: validation.value.guests,
       rooms,
     });
     startTransition(() => {
@@ -95,7 +96,11 @@ export function AvailabilitySearchController({
         serializeAvailabilityResultsQuery(validation.value),
         window.location.origin
       );
-      if (rooms.length) href.searchParams.set("rooms", rooms.join(","));
+      if (rooms.length)
+        href.searchParams.set(
+          "rooms",
+          rooms.map((room) => `${room.roomId}:${room.guestCount}`).join(",")
+        );
       router.push(`${href.pathname}${href.search}`, { scroll: false });
     });
   }

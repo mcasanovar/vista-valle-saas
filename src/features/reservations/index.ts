@@ -19,6 +19,10 @@ export { BookingSummaryController } from "@/features/reservations/booking-summar
 export { BookingConfirmationController } from "@/features/reservations/booking-confirmation-controller";
 export { BookingConfirmationView } from "@/features/reservations/booking-confirmation-view";
 export { PrebookingReviewController } from "@/features/reservations/prebooking-review-controller";
+export { RoomDetailPriceCard } from "@/features/reservations/room-detail-price-card";
 export { PrebookingSelectionRestore } from "@/features/reservations/prebooking-selection-restore";
 export * from "@/features/reservations/prebooking-review";
 export * from "@/features/reservations/selection-session";
+export * from "@/features/reservations/room-selection-codec";
+export * from "@/features/reservations/guest-allocation";
+export { GuestAllocationBanner } from "@/features/reservations/guest-allocation-banner";

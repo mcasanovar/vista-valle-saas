@@ -26,7 +26,7 @@ export type ReservationPricingResult = Readonly<{
 }>;
 
 export type ReservationItemPricingResult = ReservationPricingResult &
-  Readonly<{ roomId: string }>;
+  Readonly<{ guestCount: number; roomId: string }>;
 
 export type MultiRoomReservationPricingResult = Readonly<{
   items: readonly ReservationItemPricingResult[];
@@ -46,7 +46,11 @@ export class InvalidPricingInputError extends RangeError {
 /** Computes frozen, server-authoritative totals for a distinct room selection. */
 export function computeMultiRoomReservationPricing(
   interval: LodgingInterval,
-  rooms: readonly Readonly<{ id: string; nightlyPriceClp: number }>[],
+  rooms: readonly Readonly<{
+    guestCount?: number;
+    id: string;
+    nightlyPriceClp: number;
+  }>[],
   chargesByRoom: ReadonlyMap<string, readonly ReservationCharge[]> = new Map()
 ): MultiRoomReservationPricingResult {
   const ids = new Set<string>();
@@ -56,8 +60,14 @@ export function computeMultiRoomReservationPricing(
     .map((room) => {
       if (!room.id || ids.has(room.id))
         throw new InvalidPricingInputError("Rooms must be distinct");
+      const guestCount = room.guestCount ?? 1;
+      if (!Number.isSafeInteger(guestCount) || guestCount <= 0)
+        throw new InvalidPricingInputError(
+          "Guest count must be a positive safe integer"
+        );
       ids.add(room.id);
       return Object.freeze({
+        guestCount,
         roomId: room.id,
         ...computeReservationPricing(
           interval,

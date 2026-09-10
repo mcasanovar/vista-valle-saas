@@ -5,18 +5,48 @@
 // eslint-disable-next-line architecture/feature-public-api
 import { createLodgingInterval } from "@/features/availability/date-only";
 import { useSyncExternalStore } from "react";
+import {
+  parseRoomSelectionParam,
+  type RoomOccupancySelection,
+} from "./room-selection-codec";
 
 export type SessionRoomSelection = Readonly<{
   checkIn: string;
   checkOut: string;
-  rooms: readonly string[];
+  /** Total guests the visitor searched for - the target the cart's rooms should add up to. */
+  guests: number;
+  rooms: readonly RoomOccupancySelection[];
 }>;
 
-const storageKey = "vista-valle.public-room-selection.v1";
+const storageKey = "vista-valle.public-room-selection.v2";
 const changedEvent = "vista-valle:room-selection-change";
 let cachedRaw: string | null | undefined;
 let cachedSelection: SessionRoomSelection | null = null;
 const serverSelection: SessionRoomSelection | null = null;
+
+function normalizeRooms(value: unknown): readonly RoomOccupancySelection[] | null {
+  if (!Array.isArray(value)) return null;
+  const byRoomId = new Map<string, number>();
+  for (const entry of value) {
+    if (
+      !entry ||
+      typeof entry !== "object" ||
+      typeof (entry as { roomId?: unknown }).roomId !== "string" ||
+      !(entry as { roomId: string }).roomId.trim() ||
+      !Number.isSafeInteger((entry as { guestCount?: unknown }).guestCount) ||
+      ((entry as { guestCount: number }).guestCount as number) <= 0
+    ) {
+      return null;
+    }
+    const record = entry as { roomId: string; guestCount: number };
+    byRoomId.set(record.roomId.trim(), record.guestCount);
+  }
+  return Object.freeze(
+    [...byRoomId.entries()].map(([roomId, guestCount]) =>
+      Object.freeze({ roomId, guestCount })
+    )
+  );
+}
 
 function normalize(value: unknown): SessionRoomSelection | null {
   if (!value || typeof value !== "object") return null;
@@ -24,18 +54,19 @@ function normalize(value: unknown): SessionRoomSelection | null {
   if (
     typeof record.checkIn !== "string" ||
     typeof record.checkOut !== "string" ||
-    !Array.isArray(record.rooms) ||
-    record.rooms.some((room) => typeof room !== "string" || !room.trim())
+    !Number.isSafeInteger(record.guests) ||
+    (record.guests as number) <= 0
   )
     return null;
+  const rooms = normalizeRooms(record.rooms);
+  if (!rooms) return null;
   try {
     const interval = createLodgingInterval(record.checkIn, record.checkOut);
     return Object.freeze({
       checkIn: interval.checkIn,
       checkOut: interval.checkOut,
-      rooms: Object.freeze([
-        ...new Set(record.rooms.map((room) => room.trim())),
-      ]),
+      guests: record.guests as number,
+      rooms,
     });
   } catch {
     return null;
@@ -97,17 +128,22 @@ export function effectiveRoomSelection(
   if (!checkIn || !checkOut) return null;
   try {
     const interval = createLodgingInterval(checkIn, checkOut);
-    const urlRooms = (params.get("rooms") ?? "").split(",").filter(Boolean);
-    const rooms =
-      urlRooms.length > 0
-        ? urlRooms
-        : stored?.checkIn === interval.checkIn &&
-            stored.checkOut === interval.checkOut
-          ? [...stored.rooms]
-          : [];
+    const sameStay =
+      stored?.checkIn === interval.checkIn &&
+      stored?.checkOut === interval.checkOut;
+    const guestsParam = Number(params.get("guests"));
+    const guests =
+      Number.isSafeInteger(guestsParam) && guestsParam > 0
+        ? guestsParam
+        : sameStay
+          ? stored!.guests
+          : 1;
+    const urlRooms = parseRoomSelectionParam(params.get("rooms"));
+    const rooms = urlRooms.length > 0 ? urlRooms : sameStay ? stored!.rooms : [];
     return Object.freeze({
       checkIn: interval.checkIn,
       checkOut: interval.checkOut,
+      guests,
       rooms,
     });
   } catch {

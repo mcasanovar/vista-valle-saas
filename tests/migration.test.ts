@@ -21,7 +21,7 @@ describe("initial PostgreSQL migration", () => {
       )
     ).join("\n");
 
-    expect(migration.match(/CREATE TABLE/g) ?? []).toHaveLength(20);
+    expect(migration.match(/CREATE TABLE/g) ?? []).toHaveLength(21);
     expect(migration).toContain(
       'FOREIGN KEY ("assistant_interaction_id") REFERENCES "public"."assistant_interactions"("id")'
     );
