@@ -64,6 +64,13 @@
       "when": 1788788008141,
       "tag": "0008_brave_wolfsbane",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1789049404050,
+      "tag": "0009_jittery_kulan_gath",
+      "breakpoints": true
     }
   ]
 }

@@ -27,6 +27,7 @@ const reservation: ReservationRecord = Object.freeze({
   items: Object.freeze([
     Object.freeze({
       chargesClp: 0,
+      guestCount: 2,
       nightlyPriceClp: 60000,
       nights: 2,
       roomId: "demo-room-valle",

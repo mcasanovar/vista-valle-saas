@@ -10,6 +10,10 @@ import {
   clearSessionRoomSelection,
   saveSessionRoomSelection,
 } from "./selection-session";
+import {
+  parseRoomSelectionParam,
+  serializeRoomSelectionParam,
+} from "./room-selection-codec";
 
 export function PrebookingReviewController({
   review,
@@ -24,11 +28,12 @@ export function PrebookingReviewController({
   const updateQuery = (update: (params: URLSearchParams) => void) => {
     const params = new URLSearchParams(searchParams?.toString() ?? "");
     update(params);
-    const rooms = (params.get("rooms") ?? "").split(",").filter(Boolean);
+    const rooms = parseRoomSelectionParam(params.get("rooms"));
     if (rooms.length) {
       saveSessionRoomSelection({
         checkIn: params.get("checkIn") ?? review.checkIn,
         checkOut: params.get("checkOut") ?? review.checkOut,
+        guests: Number(params.get("guests")) || review.guests,
         rooms,
       });
     } else {
@@ -39,10 +44,11 @@ export function PrebookingReviewController({
 
   const removeRoom = (slug: string) => {
     updateQuery((params) => {
-      const rooms = (params.get("rooms") ?? "")
-        .split(",")
-        .filter((room) => room && room !== slug);
-      if (rooms.length) params.set("rooms", rooms.join(","));
+      const rooms = parseRoomSelectionParam(params.get("rooms")).filter(
+        (room) => room.roomId !== slug
+      );
+      if (rooms.length)
+        params.set("rooms", serializeRoomSelectionParam(rooms));
       else params.delete("rooms");
     });
   };
@@ -100,7 +106,14 @@ export function PrebookingReviewController({
                     <Icon decorative name="BedDouble" />
                   </span>
                   <div>
-                    <h3 className="font-heading text-lg">{room.name}</h3>
+                    <h3 className="font-heading text-lg">
+                      {room.name}
+                      <span className="ml-2 text-sm font-normal text-muted-foreground">
+                        {room.guestCount === 1
+                          ? "1 persona"
+                          : `${room.guestCount} personas`}
+                      </span>
+                    </h3>
                     <div className="text-sm text-muted-foreground">
                       <Price amount={room.nightlyPriceClp} /> por noche ·{" "}
                       {review.nights} noches

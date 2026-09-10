@@ -1,5 +1,5 @@
 import type { LodgingInterval } from "@/features/availability";
-import type { RoomReadModel } from "@/features/rooms";
+import { resolveRoomNightlyPrice, type RoomReadModel } from "@/features/rooms";
 
 import { assertGuestCountWithinCapacity } from "./capacity";
 import { type GuestBookingInput, parseGuestInput } from "./guest";
@@ -17,7 +17,11 @@ export type ReservationQuote = Readonly<{
 export type ReservationQuoteRoom = Pick<
   RoomReadModel,
   "capacity" | "nightlyPriceClp"
->;
+> &
+  Readonly<{
+    /** Defaults to `[]` (flat `nightlyPriceClp` for any occupancy) for callers with no occupancy pricing data. */
+    occupancyPrices?: RoomReadModel["occupancyPrices"];
+  }>;
 
 /**
  * Single composition point shared by every reservation-creation path
@@ -43,11 +47,13 @@ export function buildReservationQuote(
 
   assertGuestCountWithinCapacity(guest.guestCount, room.capacity);
 
-  const pricing = computeReservationPricing(
-    interval,
-    room.nightlyPriceClp,
-    charges
+  const nightlyPriceClp = resolveRoomNightlyPrice(
+    room,
+    room.occupancyPrices ?? [],
+    guest.guestCount
   );
+
+  const pricing = computeReservationPricing(interval, nightlyPriceClp, charges);
 
   return Object.freeze({ guest, pricing });
 }

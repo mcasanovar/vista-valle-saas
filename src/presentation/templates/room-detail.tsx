@@ -11,15 +11,16 @@ import {
   publicNavigationForRoute,
   publicSiteContent,
 } from "@/config/public-site-content";
-import { Amenities, Price } from "@/presentation/molecules";
+import { Amenities } from "@/presentation/molecules";
 import {
   PublicFooter,
   PublicHeader,
   RoomGallery,
   RoomPhotoGalleryProvider,
 } from "@/presentation/organisms";
-import { RoomDetailSelectionButton } from "@/features/reservations/room-detail-selection-button";
+import { RoomDetailPriceCard } from "@/features/reservations/room-detail-price-card";
 import { RoomSelectionSummary } from "@/features/reservations/room-selection-summary";
+import type { RoomOccupancyPrice } from "@/features/rooms/read-model";
 
 const navigation = publicNavigationForRoute(false);
 
@@ -34,6 +35,7 @@ type RoomPresentationModel = Readonly<{
   isDemonstration: boolean;
   name: string;
   nightlyPriceClp: number;
+  occupancyPrices: readonly RoomOccupancyPrice[];
   slug: string;
 }>;
 
@@ -46,7 +48,7 @@ export function RoomDetailTemplate({
   availabilityHref?: string;
   selectionRooms?: readonly Pick<
     RoomPresentationModel,
-    "id" | "name" | "slug" | "nightlyPriceClp"
+    "id" | "name" | "slug" | "capacity" | "nightlyPriceClp" | "occupancyPrices"
   >[];
 }>) {
   return (
@@ -147,10 +149,11 @@ export function RoomDetailTemplate({
               </div>
             </section>
             <div className="h-fit space-y-4 rounded-lg p-5 shadow-md bg-[#F7F2EC]/70">
-              <Price
-                amount={room.nightlyPriceClp}
-                label=""
-                suffix="CLP / noche"
+              <RoomDetailPriceCard
+                slug={room.slug}
+                capacity={room.capacity}
+                nightlyPriceClp={room.nightlyPriceClp}
+                occupancyPrices={room.occupancyPrices}
               />
               <ActionLink
                 href={
@@ -162,7 +165,6 @@ export function RoomDetailTemplate({
               >
                 Consultar disponibilidad
               </ActionLink>
-              <RoomDetailSelectionButton slug={room.slug} />
               <ActionLink
                 href="/habitaciones"
                 className="inline-flex w-full items-center justify-center gap-2"

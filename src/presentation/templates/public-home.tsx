@@ -35,6 +35,7 @@ type RoomPresentationModel = Readonly<{
   isDemonstration: boolean;
   name: string;
   nightlyPriceClp: number;
+  occupancyPrices: readonly Readonly<{ occupancy: number; priceClp: number }>[];
   slug: string;
 }>;
 
@@ -97,6 +98,8 @@ export function PublicHomeTemplate({
                     roomSlug={room.slug}
                     name={room.name}
                     capacity={`${room.capacity} huéspedes`}
+                    capacityCount={room.capacity}
+                    occupancyPrices={room.occupancyPrices}
                     beds={room.bedConfiguration}
                     bathroom={room.bathroom}
                     amenities={room.amenities}

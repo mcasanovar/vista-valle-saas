@@ -65,6 +65,7 @@ function domain(record: AdminReservation): ReservationRecord {
     items: Object.freeze([
       Object.freeze({
         chargesClp: 0,
+        guestCount: 1,
         nightlyPriceClp: 1,
         nights: 3,
         roomId: record.roomId,
