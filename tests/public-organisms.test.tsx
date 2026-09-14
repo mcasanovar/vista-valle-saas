@@ -31,11 +31,38 @@ describe("MobileNavigation", () => {
     const trigger = screen.getByRole("button", { name: "Abrir navegación" });
     await user.click(trigger);
     expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: "Enlace" })).toHaveFocus();
+    expect(document.body.style.overflow).toBe("hidden");
     await user.keyboard("{Escape}");
     expect(trigger).toHaveFocus();
+    expect(document.body.style.overflow).toBe("");
     await user.click(trigger);
     await user.click(screen.getByRole("link", { name: "Enlace" }));
     expect(trigger).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("keeps keyboard focus inside the mobile navigation controls", async () => {
+    const user = userEvent.setup();
+    render(
+      <MobileNavigation
+        items={[
+          { href: "/first", label: "Primero" },
+          { href: "/last", label: "Último" },
+        ]}
+      />
+    );
+
+    const trigger = screen.getByRole("button", { name: "Abrir navegación" });
+    await user.click(trigger);
+    const firstLink = screen.getByRole("link", { name: "Primero" });
+    const lastLink = screen.getByRole("link", { name: "Último" });
+
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    expect(trigger).toHaveFocus();
+    await user.keyboard("{Shift>}{Tab}{/Shift}");
+    expect(lastLink).toHaveFocus();
+    await user.keyboard("{Tab}");
+    expect([trigger, firstLink, lastLink]).toContain(document.activeElement);
   });
 });
 

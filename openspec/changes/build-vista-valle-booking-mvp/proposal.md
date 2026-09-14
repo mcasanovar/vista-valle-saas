@@ -21,6 +21,7 @@ Vista Valle necesita transformar su presencia digital en un canal de venta direc
 ### New Capabilities
 
 - `public-lodging-site`: Experiencia pública responsive, contenido institucional, catálogo y detalle de habitaciones, ubicación, contacto, captación de empresas y fundamentos de SEO y accesibilidad.
+- `mobile-navigation`: Navegación móvil pública contenida en el viewport, con controles accesibles, gestión de foco y comportamiento de cierre predecible.
 - `booking-engine`: Consulta de disponibilidad, cálculo de estadía, carrito de una o más habitaciones con fechas compartidas, captura de huésped y antecedentes tributarios condicionales, reservas, bloqueos y prevención de superposiciones. Conserva de forma genérica el concepto de retención temporal como base para una fase futura de pago online.
 - `payment-processing`: Seguimiento del estado de pago independiente del estado de la reserva y registro de pago presencial; la selección de modalidad de pago online mediante Checkout Pro queda fuera de este MVP.
 - `reservation-administration`: Autenticación y panel básico para calendario, reservas manuales multicanal, bloqueos, cancelaciones, pagos presenciales y control de sincronización iCal automática y manual.

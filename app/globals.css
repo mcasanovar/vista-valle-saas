@@ -280,7 +280,7 @@
   border-bottom: 1px solid var(--color-border);
 }
 
-.vv-header nav {
+.vv-header > nav {
   max-width: none;
   padding-left: max(1rem, calc((100vw - var(--container-content)) / 2));
   padding-right: max(1rem, calc((100vw - var(--container-content)) / 2));

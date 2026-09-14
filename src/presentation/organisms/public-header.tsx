@@ -28,7 +28,7 @@ export function PublicHeader({
       </a>
       <nav
         aria-label="Navegación principal"
-        className="mx-auto grid min-h-[4.5rem] max-w-content grid-cols-[1fr_auto_auto] items-center gap-3 px-4 phone:px-6 tablet:px-8 laptop:grid-cols-[1fr_auto_1fr]"
+        className="mx-auto grid min-h-[4.5rem] max-w-content grid-cols-[1fr_auto] items-center gap-3 px-4 phone:px-6 tablet:px-8 laptop:grid-cols-[1fr_auto_1fr]"
       >
         <Link
           href={homeHref}
@@ -44,13 +44,13 @@ export function PublicHeader({
             </li>
           ))}
         </ul>
-        <MobileNavigation items={items} />
         <div className="flex items-center gap-2 justify-self-end">
           <ThemeToggle />
+          <MobileNavigation items={items} />
           <ActionLink
             href={bookingHref}
             variant="action"
-            className="whitespace-nowrap"
+            className="hidden whitespace-nowrap laptop:inline-flex"
           >
             {bookingLabel}
           </ActionLink>
