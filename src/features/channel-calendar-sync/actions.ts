@@ -41,6 +41,31 @@ export async function saveChannelConnectionAction(data: FormData) {
   return enabled;
 }
 
+/**
+ * Booking-only: unlike Airbnb, Booking's own "Sync calendars" UI asks for
+ * our outbound link before it hands out its inbound one, so an admin needs
+ * a way to generate ours first, with no inbound URL yet. Deliberately not
+ * generalized to every platform — Airbnb hands out its export link without
+ * requiring ours first, so it never needs this and keeps using
+ * `saveChannelConnectionAction` as the only way to create its connection.
+ * The platform is hardcoded here, not read from the form, so this action
+ * can never be used to create an Airbnb connection.
+ */
+export async function createBookingChannelConnectionAction(data: FormData) {
+  await requireAdministrator();
+  const connections = getChannelConnectionStore();
+  if (!connections) throw new Error("Channel sync unavailable");
+  const roomId = String(data.get("roomId") ?? "");
+  if (!roomId) throw new Error("Indica la habitación.");
+  const created = await connections.createPendingConnection(
+    roomId,
+    "booking",
+    "pay_at_property"
+  );
+  revalidatePath("/admin/sincronizaciones");
+  return created;
+}
+
 export async function setChannelConnectionEnabledAction(data: FormData) {
   await requireAdministrator();
   const connections = getChannelConnectionStore();
