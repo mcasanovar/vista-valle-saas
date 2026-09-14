@@ -186,8 +186,8 @@ export const publicSiteContent = {
       },
       {
         id: "email",
-        href: "mailto:hola@vistavalle.cl",
-        label: "hola@vistavalle.cl",
+        href: "mailto:hola@vistavallehospedaje.com",
+        label: "hola@vistavallehospedaje.com",
         icon: "Mail",
       },
       {
