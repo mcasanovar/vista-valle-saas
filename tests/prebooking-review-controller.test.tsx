@@ -30,6 +30,7 @@ describe("PrebookingReviewController", () => {
           rooms: [
             {
               id: "1",
+              guestCount: 1,
               name: "Valle",
               nightlyPriceClp: 55_000,
               slug: "valle",
@@ -37,6 +38,7 @@ describe("PrebookingReviewController", () => {
             },
             {
               id: "2",
+              guestCount: 1,
               name: "Andes",
               nightlyPriceClp: 60_000,
               slug: "andes",
@@ -55,7 +57,7 @@ describe("PrebookingReviewController", () => {
       screen.getByRole("button", { name: "Quitar Andes de la reserva" })
     );
     expect(router.replace).toHaveBeenCalledWith(
-      "/pre-reserva?checkIn=2032-02-10&checkOut=2032-02-13&guests=1&rooms=valle",
+      "/pre-reserva?checkIn=2032-02-10&checkOut=2032-02-13&guests=1&rooms=valle%3A1",
       { scroll: false }
     );
   });
@@ -72,6 +74,7 @@ describe("PrebookingReviewController", () => {
           rooms: [
             {
               id: "1",
+              guestCount: 1,
               name: "Valle",
               nightlyPriceClp: 55_000,
               slug: "valle",

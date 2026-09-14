@@ -109,6 +109,7 @@ if (!enabled) {
         isDemonstration: false,
         name: `Room ${room.id}`,
         nightlyPriceClp: room.nightlyPriceClp,
+        occupancyPrices: [],
         slug: `room-${room.id}`,
       }));
       return Object.freeze({

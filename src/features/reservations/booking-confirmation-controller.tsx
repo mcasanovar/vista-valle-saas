@@ -42,6 +42,8 @@ export function BookingConfirmationController({
     setError(undefined);
     try {
       const query = new URLSearchParams(window.location.search);
+      if (!query.get("guestCount") && query.get("guests"))
+        query.set("guestCount", query.get("guests")!);
       const idempotencyKey =
         idempotencyKeyRef.current ?? `booking-${crypto.randomUUID()}`;
       idempotencyKeyRef.current = idempotencyKey;

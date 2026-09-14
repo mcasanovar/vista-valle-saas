@@ -20,7 +20,11 @@ import { parseGuestInput } from "./guest";
 export type CreatePayAtPropertyReservationRoom = Pick<
   RoomReadModel,
   "capacity" | "id" | "nightlyPriceClp"
->;
+> &
+  Readonly<{
+    /** Guests assigned to this specific room (see `room-occupancy-pricing` spec); its nightly price MUST already be resolved for this occupancy. Defaults to 1 for callers that don't track per-room occupancy (e.g. channel-sync imports). */
+    guestCount?: number;
+  }>;
 
 export type CreatePayAtPropertyReservationParams<TContext> = Readonly<{
   actorUserId?: string;
@@ -137,10 +141,9 @@ export async function createMultiRoomPayAtPropertyReservation<TContext>(
     externalRef,
   } = params;
   const guest = parseGuestInput(guestCandidate);
-  assertGuestCountWithinCapacity(
-    guest.guestCount,
-    rooms.reduce((capacity, room) => capacity + room.capacity, 0)
-  );
+  for (const room of rooms) {
+    assertGuestCountWithinCapacity(room.guestCount ?? 1, room.capacity);
+  }
   const pricing = computeMultiRoomReservationPricing(
     interval,
     rooms,

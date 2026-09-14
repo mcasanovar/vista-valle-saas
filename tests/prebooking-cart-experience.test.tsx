@@ -60,7 +60,7 @@ describe("prebooking cart add feedback", () => {
     );
 
     expect(router.push).toHaveBeenCalledWith(
-      "/disponibilidad?checkIn=2061-02-10&checkOut=2061-02-13&guests=1&rooms=valle",
+      "/disponibilidad?checkIn=2061-02-10&checkOut=2061-02-13&guests=1&rooms=valle%3A1",
       { scroll: false }
     );
     expect(screen.getByRole("status")).toHaveTextContent(
@@ -107,7 +107,7 @@ describe("prebooking cart add feedback", () => {
     );
 
     expect(router.replace).toHaveBeenCalledWith(
-      "/disponibilidad?checkIn=2026-10-05&checkOut=2026-10-07&rooms=valle",
+      "/disponibilidad?checkIn=2026-10-05&checkOut=2026-10-07&rooms=valle%3A1",
       { scroll: false }
     );
     expect(screen.getByRole("status")).toHaveTextContent(
@@ -121,11 +121,12 @@ describe("prebooking cart add feedback", () => {
 
   it("shows the selected detail state and restores add after removing", () => {
     window.sessionStorage.setItem(
-      "vista-valle.public-room-selection.v1",
+      "vista-valle.public-room-selection.v2",
       JSON.stringify({
         checkIn: "2026-10-05",
         checkOut: "2026-10-07",
-        rooms: ["valle"],
+        guests: 1,
+        rooms: [{ guestCount: 1, roomId: "valle" }],
       })
     );
     render(<RoomDetailSelectionButton slug="valle" />);

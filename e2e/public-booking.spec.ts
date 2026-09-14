@@ -25,7 +25,9 @@ test("searches from the home, reviews results, and preserves criteria in room de
   await expect(
     page.getByRole("heading", { level: 1, name: "Disponibilidad" })
   ).toBeVisible();
-  await expect(page.getByText("1 habitación disponible")).toBeVisible();
+  // guests=2 no longer excludes single-capacity rooms - all 3 demo rooms
+  // remain candidates so the party can split across them.
+  await expect(page.getByText("3 habitaciones disponibles")).toBeVisible();
   await page.getByRole("link", { name: "Ver habitación" }).first().click();
   await expect(page).toHaveURL(/\/habitaciones\/[^?]+\?checkIn=2027-01-01/);
   await expect(page).toHaveURL(/checkOut=2027-01-03/);
@@ -61,15 +63,18 @@ test("keeps invalid direct URLs recoverable and does not show results", async ({
   ).not.toBeVisible();
 });
 
-test("shows no availability and unavailable preselection as distinct states", async ({
+test("lists every room for a party larger than any single room's capacity, and treats an unresolvable preselection as unavailable", async ({
   page,
 }) => {
+  // No single demo room admits 20 guests, but the search no longer filters
+  // by total party capacity: all 3 remain candidates for the visitor to
+  // split the party across.
   await page.goto(
     "/disponibilidad?checkIn=2055-01-01&checkOut=2055-01-03&guests=20"
   );
-  await expect(page.getByText("Sin disponibilidad")).toBeVisible();
+  await expect(page.getByText("3 habitaciones disponibles")).toBeVisible();
   await page.goto(
-    "/disponibilidad?checkIn=2055-01-01&checkOut=2055-01-03&guests=3&room=habitacion-valle-demo"
+    "/disponibilidad?checkIn=2055-01-01&checkOut=2055-01-03&guests=1&room=habitacion-inexistente"
   );
   await expect(
     page.getByText("Habitación no disponible").first()
@@ -77,6 +82,45 @@ test("shows no availability and unavailable preselection as distinct states", as
   await expect(
     page.getByRole("link", { name: "Quitar preselección" })
   ).toBeVisible();
+});
+
+test("splits a 2-guest search across two rooms and prices each by its own occupancy", async ({
+  page,
+}) => {
+  await page.goto(
+    "/disponibilidad?checkIn=2055-03-01&checkOut=2055-03-03&guests=2"
+  );
+  const dobleCard = page
+    .locator(".vv-room-card")
+    .filter({ hasText: "Habitación Doble" });
+  await dobleCard
+    .getByRole("group", { name: "Cantidad de personas" })
+    .getByRole("button", { name: "1 persona" })
+    .click();
+  await dobleCard.getByRole("button", { name: "Agregar a la reserva" }).click();
+  const allocationBanner = page.locator("p", {
+    hasText: "Huéspedes asignados:",
+  });
+  await expect(allocationBanner).toHaveText(
+    "Huéspedes asignados: 1 de 2. Falta 1 por asignar."
+  );
+
+  const matrimonialCard = page
+    .locator(".vv-room-card")
+    .filter({ hasText: "Habitación Matrimonial" });
+  await matrimonialCard
+    .getByRole("button", { name: "Agregar a la reserva" })
+    .click();
+  await expect(allocationBanner).toHaveText(
+    "Huéspedes asignados: 2 de 2. Reparto completo."
+  );
+
+  await page.getByRole("link", { name: /Ver carrito/ }).click();
+  await expect(page).toHaveURL(/\/pre-reserva/);
+  // Doble priced at its 1-guest tariff (55.000, not the base/2-guest
+  // 70.000) plus Matrimonial's flat price (60.000, no tariff configured
+  // yet) — 2 nights each: (55.000 + 60.000) * 2 = 230.000.
+  await expect(page.getByText("$230.000")).toBeVisible();
 });
 
 test("restores previous valid search with browser history", async ({
@@ -108,7 +152,7 @@ test("announces in-page loading and keeps the search shell visible", async ({
   await expect(
     page.getByRole("button", { name: "Consultar disponibilidad" })
   ).toHaveAttribute("aria-busy", "true");
-  await expect(page.getByText("1 habitación disponible")).toBeVisible();
+  await expect(page.getByText("3 habitaciones disponibles")).toBeVisible();
 });
 
 test("shows a recoverable error when a results navigation fails", async ({

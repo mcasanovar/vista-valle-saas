@@ -31,6 +31,7 @@ const trustedRoomSource = {
       isDemonstration: false,
       name: "Habitación autorizada",
       nightlyPriceClp: 99_999,
+      occupancyPrices: [],
       slug: "habitacion-autorizada",
     },
   ],

@@ -69,6 +69,7 @@ export async function confirmPayNowReservationFromHold<TContext>(
         guestId: hold.guestId,
         item: {
           chargesClp: hold.chargesClp,
+          guestCount: hold.guestCount,
           nightlyPriceClp: hold.nightlyPriceClp,
           nights: nights(hold.checkIn, hold.checkOut),
           roomId: hold.roomId,

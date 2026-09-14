@@ -12,6 +12,7 @@ import {
 } from "@/config/public-site-content";
 import type { ReactNode } from "react";
 import { RoomSelectionSummary } from "@/features/reservations/room-selection-summary";
+import { GuestAllocationBanner } from "@/features/reservations/guest-allocation-banner";
 
 const navigation = publicNavigationForRoute(false);
 
@@ -25,6 +26,7 @@ type Room = Readonly<{
   amenities: readonly string[];
   images: readonly Readonly<{ src: string; alt: string }>[];
   nightlyPriceClp: number;
+  occupancyPrices: readonly Readonly<{ occupancy: number; priceClp: number }>[];
   isDemonstration: boolean;
 }>;
 
@@ -135,6 +137,7 @@ export function AvailabilityResultsTemplate({
                     ? "habitación disponible"
                     : "habitaciones disponibles"}
                 </p>
+                <GuestAllocationBanner />
                 <RoomSelectionSummary rooms={rooms} />
                 {rooms.length ? (
                   <div className="grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3">
@@ -147,6 +150,8 @@ export function AvailabilityResultsTemplate({
                         roomSlug={availableRoom.slug}
                         name={availableRoom.name}
                         capacity={`${availableRoom.capacity} huéspedes`}
+                        capacityCount={availableRoom.capacity}
+                        occupancyPrices={availableRoom.occupancyPrices}
                         beds={availableRoom.bedConfiguration}
                         bathroom={availableRoom.bathroom}
                         amenities={availableRoom.amenities}
@@ -237,6 +242,7 @@ export function AvailabilityResultsRegion({
           ? "habitación disponible"
           : "habitaciones disponibles"}
       </p>
+      <GuestAllocationBanner />
       {rooms ? <RoomSelectionSummary rooms={rooms} /> : null}
       {rooms?.length ? (
         <div className="grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3">
@@ -249,6 +255,8 @@ export function AvailabilityResultsRegion({
               roomSlug={availableRoom.slug}
               name={availableRoom.name}
               capacity={`${availableRoom.capacity} huéspedes`}
+              capacityCount={availableRoom.capacity}
+              occupancyPrices={availableRoom.occupancyPrices}
               beds={availableRoom.bedConfiguration}
               bathroom={availableRoom.bathroom}
               amenities={availableRoom.amenities}

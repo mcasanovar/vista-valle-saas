@@ -78,6 +78,7 @@ export type ReservationRecord = Readonly<{
 
 export type ReservationItemRecord = Readonly<{
   chargesClp: number;
+  guestCount: number;
   nightlyPriceClp: number;
   nights: number;
   roomId: string;
@@ -281,6 +282,7 @@ export function createMockReservationRepository(
         input.items.map((item) =>
           Object.freeze({
             chargesClp: item.chargesClp,
+            guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
             nights: item.nights,
             roomId: item.roomId,
@@ -348,6 +350,7 @@ export function createMockReservationRepository(
       const createdAt = new Date();
       const item = Object.freeze({
         chargesClp: input.item.chargesClp,
+        guestCount: input.item.guestCount,
         nightlyPriceClp: input.item.nightlyPriceClp,
         nights: input.item.nights,
         roomId: input.item.roomId,

@@ -6,6 +6,8 @@ export type RoomImage = Readonly<{
   src: string;
 }>;
 
+export type RoomOccupancyPrice = Readonly<{ occupancy: number; priceClp: number }>;
+
 export type RoomReadModel = Readonly<{
   active: boolean;
   amenities: readonly string[];
@@ -18,6 +20,8 @@ export type RoomReadModel = Readonly<{
   isDemonstration: boolean;
   name: string;
   nightlyPriceClp: number;
+  /** Per-occupancy tariffs (1 or 2 guests). Empty when the room has no differentiated pricing configured - see `resolveRoomNightlyPrice`. */
+  occupancyPrices: readonly RoomOccupancyPrice[];
   slug: string;
 }>;
 

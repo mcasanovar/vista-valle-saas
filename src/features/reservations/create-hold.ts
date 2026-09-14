@@ -13,7 +13,8 @@ import { buildReservationQuote } from "./quote";
 export type CreatePaymentHoldRoom = Pick<
   RoomReadModel,
   "capacity" | "id" | "nightlyPriceClp"
->;
+> &
+  Readonly<{ occupancyPrices?: RoomReadModel["occupancyPrices"] }>;
 
 /**
  * Everything `createPaymentHold` needs. `TContext` is inferred from

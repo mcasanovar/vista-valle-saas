@@ -1,8 +1,21 @@
 import { ActionLink, Heading } from "@/presentation/atoms";
-import { getRoomReadSource } from "@/features/rooms";
+import {
+  getRoomReadSource,
+  resolveRoomPricingRecord,
+  type RoomReadModel,
+} from "@/features/rooms";
 import { listRoomImages } from "@/features/room-images";
 
 export const dynamic = "force-dynamic";
+
+function pricingStatusLabel(room: RoomReadModel) {
+  if (room.capacity === 1) return "precio único";
+  if (room.occupancyPrices.length === 0) return "tarifa por configurar";
+  const { priceOneGuestClp, priceTwoGuestsClp } = resolveRoomPricingRecord(room);
+  return priceOneGuestClp === priceTwoGuestsClp
+    ? "precio fijo"
+    : "dos tarifas";
+}
 
 export default async function RoomsPage() {
   const source = await getRoomReadSource();
@@ -34,12 +47,18 @@ export default async function RoomsPage() {
                 <p className="font-semibold">{room.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {room.managedPhotoCount}{" "}
-                  {room.managedPhotoCount === 1 ? "foto" : "fotos"}
+                  {room.managedPhotoCount === 1 ? "foto" : "fotos"} ·{" "}
+                  {pricingStatusLabel(room)}
                 </p>
               </div>
-              <ActionLink href={`/admin/habitaciones/${room.id}/fotos`}>
-                Gestionar fotos
-              </ActionLink>
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                <ActionLink href={`/admin/habitaciones/${room.id}/fotos`}>
+                  Gestionar fotos
+                </ActionLink>
+                <ActionLink href={`/admin/habitaciones/${room.id}/tarifas`}>
+                  Editar tarifas
+                </ActionLink>
+              </div>
             </li>
           ))}
         </ul>

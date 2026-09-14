@@ -9,7 +9,12 @@ import {
   type RoomLockGateway,
 } from "@/features/availability";
 import { getServerEnvironment } from "@/config/server";
-import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
+import {
+  getRoomReadSource,
+  resolveRoomNightlyPrice,
+  type RoomReadModel,
+  type RoomReadSource,
+} from "@/features/rooms";
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
 import { createProductionDatabase } from "@/infrastructure/database/client";
 import {
@@ -23,7 +28,9 @@ import { getProductionPublicBookingConfirmation } from "@/infrastructure/databas
 import {
   createMultiRoomPayAtPropertyReservation,
   isPublicReservationId,
+  type CreatePayAtPropertyReservationRoom,
 } from "./create-pay-at-property-reservation";
+import { parseRoomSelectionParam } from "./room-selection-codec";
 import {
   createCanonicalMockGuestRepository,
   type GuestRepository,
@@ -185,18 +192,46 @@ export async function listMockReservationPaymentAdminViews() {
   );
 }
 
+type SelectedRoom = Readonly<{ guestCount: number; room: RoomReadModel }>;
+
+/**
+ * Resolves the untrusted `rooms` (or single `room`) form field into
+ * authoritative rooms paired with the occupancy the visitor chose for each
+ * one - see `room-occupancy-pricing` spec. A bare room key (no
+ * `:<guestCount>`, the pre-occupancy shape, or the single-room `room`
+ * field) defaults to 1 guest. An out-of-range guest count for a room's
+ * capacity drops that room, surfacing as "unavailable" like any other
+ * invalid selection.
+ */
 function selectedRooms(
   candidate: Record<string, unknown>,
   source: RoomReadSource
-) {
-  const keys = String(candidate.rooms ?? candidate.room ?? "")
-    .split(",")
-    .filter(Boolean);
-  return keys
-    .map((key) =>
-      source.listActive().find((room) => room.id === key || room.slug === key)
-    )
-    .filter((room): room is NonNullable<typeof room> => Boolean(room));
+): readonly SelectedRoom[] {
+  const raw = candidate.rooms ?? candidate.room ?? "";
+  const entries = parseRoomSelectionParam(String(raw));
+  return entries
+    .map((entry) => {
+      const room = source
+        .listActive()
+        .find((candidateRoom) => candidateRoom.id === entry.roomId || candidateRoom.slug === entry.roomId);
+      if (!room) return null;
+      if (entry.guestCount < 1 || entry.guestCount > room.capacity) return null;
+      return Object.freeze({ guestCount: entry.guestCount, room });
+    })
+    .filter((entry): entry is SelectedRoom => entry !== null);
+}
+
+function toReservationRoom(entry: SelectedRoom): CreatePayAtPropertyReservationRoom {
+  return Object.freeze({
+    capacity: entry.room.capacity,
+    guestCount: entry.guestCount,
+    id: entry.room.id,
+    nightlyPriceClp: resolveRoomNightlyPrice(
+      entry.room,
+      entry.room.occupancyPrices,
+      entry.guestCount
+    ),
+  });
 }
 
 export type PayAtPropertyBookingDependencies<TContext> = Readonly<{
@@ -220,15 +255,16 @@ async function confirmPayAtPropertyBookingWith<TContext>(
   roomSource: RoomReadSource,
   dependencies: PayAtPropertyBookingDependencies<TContext>
 ): Promise<PublicBookingConfirmation> {
-  const rooms = selectedRooms(candidate, roomSource);
+  const selected = selectedRooms(candidate, roomSource);
   if (
-    !rooms.length ||
-    rooms.length !== new Set(rooms.map((room) => room.id)).size
+    !selected.length ||
+    selected.length !== new Set(selected.map((entry) => entry.room.id)).size
   ) {
     throw new BookingConfirmationInputError(
       "La habitación seleccionada ya no está disponible."
     );
   }
+  const rooms = selected.map(toReservationRoom);
 
   try {
     const interval = createLodgingInterval(
@@ -267,7 +303,7 @@ async function confirmPayAtPropertyBookingWith<TContext>(
       nights: nights(created.reservation.checkIn, created.reservation.checkOut),
       paymentMode: "PAY_AT_PROPERTY",
       publicId: created.reservation.publicId,
-      room: Object.freeze({ name: rooms[0]!.name }),
+      room: Object.freeze({ name: selected[0]!.room.name }),
       totalClp: created.reservation.totalClp,
     });
     createWebsiteChannelSyncTasks(

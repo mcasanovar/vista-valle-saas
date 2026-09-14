@@ -118,6 +118,34 @@ export const rooms = pgTable(
   ]
 );
 
+export const roomOccupancyPrices = pgTable(
+  "room_occupancy_prices",
+  {
+    id: id(),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "restrict" }),
+    occupancy: integer("occupancy").notNull(),
+    priceClp: integer("price_clp").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    uniqueIndex("room_occupancy_prices_room_occupancy_unique").on(
+      table.roomId,
+      table.occupancy
+    ),
+    check(
+      "room_occupancy_prices_occupancy_positive",
+      sql`${table.occupancy} > 0`
+    ),
+    check(
+      "room_occupancy_prices_price_positive",
+      sql`${table.priceClp} > 0`
+    ),
+  ]
+);
+
 export const roomImages = pgTable(
   "room_images",
   {
@@ -250,6 +278,7 @@ export const reservationItems = pgTable(
       .notNull()
       .references(() => rooms.id, { onDelete: "restrict" }),
     nights: integer("nights").notNull(),
+    guestCount: integer("guest_count").default(1).notNull(),
     nightlyPriceClp: integer("nightly_price_clp").notNull(),
     chargesClp: integer("charges_clp").default(0).notNull(),
     subtotalClp: integer("subtotal_clp").notNull(),
@@ -265,6 +294,10 @@ export const reservationItems = pgTable(
       table.reservationId
     ),
     check("reservation_items_nights_positive", sql`${table.nights} > 0`),
+    check(
+      "reservation_items_guest_count_positive",
+      sql`${table.guestCount} > 0`
+    ),
     check(
       "reservation_items_nightly_price_positive",
       sql`${table.nightlyPriceClp} > 0`

@@ -147,7 +147,11 @@ describe("server-only availability results composition", () => {
     });
     expect(result).toMatchObject({ kind: "results" });
     if (result.kind !== "results") throw new Error("Expected results");
+    // demo-room-valle is reserved and excluded; demo-room-andes still
+    // appears even though its capacity (1) is below the 2 guests searched -
+    // the visitor can pair it with another room to complete the party.
     expect(result.rooms.map((room) => room.slug)).toEqual([
+      "habitacion-andes-demo",
       "habitacion-terra-demo",
     ]);
     expect(result.rooms[0]).toMatchObject({
@@ -159,7 +163,7 @@ describe("server-only availability results composition", () => {
     });
   });
 
-  it("filters by capacity, represents no results, and distinguishes an unavailable preselection", async () => {
+  it("never filters by total party capacity, represents no results only when nothing is available, and distinguishes an unavailable preselection", async () => {
     const dependencies = {
       availabilityRepository: createMockAvailabilityRepository({
         blocks: [],
@@ -168,19 +172,51 @@ describe("server-only availability results composition", () => {
       }),
       roomSource,
     };
-    const capacity = await composeAvailabilityResults(
+    // No single demo room has capacity 3, yet all remain candidates: the
+    // visitor is expected to split a 3-guest party across several rooms.
+    const largerParty = await composeAvailabilityResults(
       validQuery({ guests: "3" }),
       dependencies
     );
-    expect(capacity).toMatchObject({ kind: "results" });
-    if (capacity.kind !== "results") throw new Error("Expected results");
-    expect(capacity.rooms.map((room) => room.slug)).toEqual([]);
+    expect(largerParty).toMatchObject({ kind: "results" });
+    if (largerParty.kind !== "results") throw new Error("Expected results");
+    expect(largerParty.rooms.map((room) => room.slug).sort()).toEqual([
+      "habitacion-andes-demo",
+      "habitacion-terra-demo",
+      "habitacion-valle-demo",
+    ]);
 
-    const none = await composeAvailabilityResults(
-      validQuery({ guests: "20" }),
-      dependencies
-    );
-    expect(none).toMatchObject({ kind: "results", rooms: [] });
+    const noResults = await composeAvailabilityResults(validQuery(), {
+      ...dependencies,
+      availabilityRepository: createMockAvailabilityRepository({
+        blocks: [],
+        holds: [],
+        reservations: [
+          {
+            checkIn: "2026-10-05",
+            checkOut: "2026-10-08",
+            id: "reservation-3",
+            roomId: "demo-room-valle",
+            status: "confirmed",
+          },
+          {
+            checkIn: "2026-10-05",
+            checkOut: "2026-10-08",
+            id: "reservation-4",
+            roomId: "demo-room-andes",
+            status: "confirmed",
+          },
+          {
+            checkIn: "2026-10-05",
+            checkOut: "2026-10-08",
+            id: "reservation-5",
+            roomId: "demo-room-terra",
+            status: "confirmed",
+          },
+        ],
+      }),
+    });
+    expect(noResults).toMatchObject({ kind: "results", rooms: [] });
 
     const unavailable = await composeAvailabilityResults(
       validQuery({ guests: "1", room: "habitacion-valle-demo" }),
@@ -219,7 +255,9 @@ describe("server-only availability results composition", () => {
     });
 
     expect(result).toMatchObject({ kind: "results" });
-    expect(listOccupyingIntervals).toHaveBeenCalledTimes(1);
+    // One call per candidate room - all 3 demo rooms, since availability is
+    // no longer pre-filtered by total party capacity.
+    expect(listOccupyingIntervals).toHaveBeenCalledTimes(3);
     expect(listActive).toHaveBeenCalled();
   });
 });

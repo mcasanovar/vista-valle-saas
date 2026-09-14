@@ -7,6 +7,7 @@ import {
   effectiveRoomSelection,
   getSessionRoomSelection,
 } from "./selection-session";
+import { serializeRoomSelectionParam } from "./room-selection-codec";
 
 /** Restores only the non-personal, session-scoped selection before server revalidation. */
 export function PrebookingSelectionRestore() {
@@ -22,10 +23,8 @@ export function PrebookingSelectionRestore() {
 
     params.set("checkIn", selection.checkIn);
     params.set("checkOut", selection.checkOut);
-    params.set("rooms", selection.rooms.join(","));
-    // Guests are not part of the persisted selection and the authoritative
-    // command does not use them for multi-room public bookings.
-    if (!params.get("guests")) params.set("guests", "1");
+    params.set("rooms", serializeRoomSelectionParam(selection.rooms));
+    if (!params.get("guests")) params.set("guests", String(selection.guests));
     router.replace(`/pre-reserva?${params.toString()}`, { scroll: false });
   }, [query, router]);
 

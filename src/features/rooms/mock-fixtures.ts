@@ -30,6 +30,7 @@ export const mockDemoRooms: readonly RoomReadModel[] = Object.freeze([
     isDemonstration: true,
     name: "Habitación Individual",
     nightlyPriceClp: 55000,
+    occupancyPrices: [],
     slug: "habitacion-valle-demo",
   }),
   Object.freeze({
@@ -51,6 +52,7 @@ export const mockDemoRooms: readonly RoomReadModel[] = Object.freeze([
     isDemonstration: true,
     name: "Habitación Matrimonial",
     nightlyPriceClp: 60000,
+    occupancyPrices: [],
     slug: "habitacion-andes-demo",
   }),
   Object.freeze({
@@ -72,6 +74,10 @@ export const mockDemoRooms: readonly RoomReadModel[] = Object.freeze([
     isDemonstration: true,
     name: "Habitación Doble",
     nightlyPriceClp: 70000,
+    occupancyPrices: [
+      { occupancy: 1, priceClp: 55000 },
+      { occupancy: 2, priceClp: 70000 },
+    ],
     slug: "habitacion-terra-demo",
   }),
 ]);

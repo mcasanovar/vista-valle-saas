@@ -218,7 +218,9 @@ test("availability results remain usable from 320px through desktop", async ({
     await expect(
       page.getByRole("form", { name: "Consulta de disponibilidad" })
     ).toBeVisible();
-    await expect(page.getByText("1 habitación disponible")).toBeVisible();
+    // guests=2 no longer excludes single-capacity rooms - all 3 demo rooms
+    // remain candidates so the party can split across them.
+    await expect(page.getByText("3 habitaciones disponibles")).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth

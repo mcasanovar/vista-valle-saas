@@ -32,6 +32,7 @@ function toReservationRecord(
     items.map((item) =>
       Object.freeze({
         chargesClp: item.chargesClp,
+        guestCount: item.guestCount,
         nightlyPriceClp: item.nightlyPriceClp,
         nights: item.nights,
         roomId: item.roomId,
@@ -57,7 +58,7 @@ function toReservationRecord(
     roomId: first.roomId,
     nightlyPriceClp: first.nightlyPriceClp,
     chargesClp: first.chargesClp,
-    guestCount: 1,
+    guestCount: mappedItems.reduce((sum, item) => sum + item.guestCount, 0),
     origin: row.origin as ReservationRecord["origin"],
     paymentMode: row.paymentMode as ReservationRecord["paymentMode"],
     status: row.status as ReservationRecord["status"],
@@ -107,6 +108,7 @@ export function createDrizzleReservationRepository(
         .values(
           input.items.map((item) => ({
             chargesClp: item.chargesClp,
+            guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
             nights: item.nights,
             reservationId: reservationRow.id,
@@ -182,6 +184,7 @@ export function createDrizzleReservationRepository(
         .values([
           {
             chargesClp: input.item.chargesClp,
+            guestCount: input.item.guestCount,
             nightlyPriceClp: input.item.nightlyPriceClp,
             nights: input.item.nights,
             reservationId: reservationRow.id,

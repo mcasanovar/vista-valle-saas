@@ -19,7 +19,7 @@ describe("authoritative availability search", () => {
     expect(createAvailabilitySearchRepository("mock")).toBeDefined();
   });
 
-  it("filters publishable rooms by capacity and availability", async () => {
+  it("filters publishable rooms by availability only, never by total party capacity", async () => {
     const result = await searchAvailability(
       { checkIn: "2026-10-05", checkOut: "2026-10-08", guests: "2" },
       {
@@ -39,7 +39,12 @@ describe("authoritative availability search", () => {
         roomSource,
       }
     );
+    // demo-room-valle (capacity 1) is reserved, so it's excluded; both
+    // demo-room-andes (capacity 1) and demo-room-terra (capacity 2) appear
+    // even though neither, alone, has capacity >= the 2 guests searched -
+    // the visitor is expected to split the party across them.
     expect(result.rooms.map((room) => room.slug)).toEqual([
+      "habitacion-andes-demo",
       "habitacion-terra-demo",
     ]);
   });

@@ -3,8 +3,14 @@ import "server-only";
 import { asc, eq, inArray } from "drizzle-orm";
 import type { RoomReadModel } from "@/features/rooms";
 import { createRoomImageStorage } from "@/infrastructure/storage/server";
-import { amenities, roomAmenities, roomImages, rooms } from "@/persistence/schema";
-import { createProductionDatabase } from "./client";
+import {
+  amenities,
+  roomAmenities,
+  roomImages,
+  roomOccupancyPrices,
+  rooms,
+} from "@/persistence/schema";
+import { createProductionDatabase, type ProductionDatabase } from "./client";
 import { createDatabaseBoundary } from "./server";
 
 /**
@@ -24,7 +30,19 @@ export async function queryProductionRooms(): Promise<
     return [];
   }
 
-  const db = createProductionDatabase(boundary);
+  return loadProductionRoomReadModels(createProductionDatabase(boundary));
+}
+
+/**
+ * The `db`-injectable core of `queryProductionRooms`, split out so
+ * PostgreSQL integration tests can exercise the real join (including
+ * `room_occupancy_prices`) against a live database without going through
+ * the `VISTA_VALLE_CONFIG_CONTEXT=production` env gate - see
+ * `createDrizzleRoomImageRepository` for the same pattern.
+ */
+export async function loadProductionRoomReadModels(
+  db: ProductionDatabase
+): Promise<readonly RoomReadModel[]> {
   const imageStorage = createRoomImageStorage();
   const roomRows = await db.select().from(rooms).where(eq(rooms.active, true));
   if (roomRows.length === 0) {
@@ -32,7 +50,7 @@ export async function queryProductionRooms(): Promise<
   }
 
   const roomIds = roomRows.map((room) => room.id);
-  const [imageRows, amenityRows] = await Promise.all([
+  const [imageRows, amenityRows, occupancyPriceRows] = await Promise.all([
     db
       .select()
       .from(roomImages)
@@ -43,6 +61,14 @@ export async function queryProductionRooms(): Promise<
       .from(roomAmenities)
       .innerJoin(amenities, eq(roomAmenities.amenityId, amenities.id))
       .where(inArray(roomAmenities.roomId, roomIds)),
+    db
+      .select({
+        occupancy: roomOccupancyPrices.occupancy,
+        priceClp: roomOccupancyPrices.priceClp,
+        roomId: roomOccupancyPrices.roomId,
+      })
+      .from(roomOccupancyPrices)
+      .where(inArray(roomOccupancyPrices.roomId, roomIds)),
   ]);
 
   return roomRows.map(
@@ -66,6 +92,12 @@ export async function queryProductionRooms(): Promise<
       isDemonstration: false,
       name: room.name ?? "",
       nightlyPriceClp: room.baseNightlyPriceClp ?? 0,
+      occupancyPrices: occupancyPriceRows
+        .filter((entry) => entry.roomId === room.id)
+        .map((entry) => ({
+          occupancy: entry.occupancy,
+          priceClp: entry.priceClp,
+        })),
       slug: room.slug ?? "",
     })
   );

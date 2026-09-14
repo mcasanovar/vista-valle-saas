@@ -11,12 +11,22 @@ import {
   saveSessionRoomSelection,
   useSessionRoomSelection,
 } from "./selection-session";
+import { serializeRoomSelectionParam } from "./room-selection-codec";
+import { computeGuestAllocation, describeGuestAllocation } from "./guest-allocation";
+// Deep import (not the `@/features/rooms` barrel) so this client component
+// never pulls in `source.ts`'s `import "server-only"` guard.
+// eslint-disable-next-line architecture/feature-public-api
+import { resolveDisplayRoomNightlyPrice } from "@/features/rooms/occupancy-pricing";
+// eslint-disable-next-line architecture/feature-public-api
+import type { RoomOccupancyPrice } from "@/features/rooms/read-model";
 
 type Room = Readonly<{
   id: string;
   name: string;
   slug: string;
+  capacity: number;
   nightlyPriceClp: number;
+  occupancyPrices: readonly RoomOccupancyPrice[];
 }>;
 
 export function RoomSelectionSummary({
@@ -33,7 +43,7 @@ export function RoomSelectionSummary({
     );
   const storedSelection = useSessionRoomSelection();
   const selection = effectiveRoomSelection(query, storedSelection);
-  const sessionSignature = `${selection?.checkIn ?? ""}:${selection?.checkOut ?? ""}:${selection?.rooms.join(",") ?? ""}`;
+  const sessionSignature = `${selection?.checkIn ?? ""}:${selection?.checkOut ?? ""}:${selection?.guests ?? ""}:${serializeRoomSelectionParam(selection?.rooms ?? [])}`;
   const reducedMotion = useReducedMotion();
   const [expandedFor, setExpandedFor] = useState<string>();
   const panelId = "reservation-cart-items";
@@ -58,10 +68,24 @@ export function RoomSelectionSummary({
       document.removeEventListener("keydown", close);
     };
   }, []);
-  const ids = new Set(selection?.rooms ?? []);
-  const selected = rooms.filter(
-    (room) => ids.has(room.slug) || ids.has(room.id)
+  const entriesByRoom = new Map(
+    (selection?.rooms ?? []).map((entry) => [entry.roomId, entry.guestCount])
   );
+  const selected = rooms
+    .map((room) => {
+      const guestCount = entriesByRoom.get(room.slug) ?? entriesByRoom.get(room.id);
+      if (guestCount === undefined) return null;
+      return {
+        ...room,
+        guestCount,
+        resolvedNightlyPriceClp: resolveDisplayRoomNightlyPrice(
+          room,
+          room.occupancyPrices,
+          guestCount
+        ),
+      };
+    })
+    .filter((room): room is NonNullable<typeof room> => room !== null);
   const selectionKey = selected.map((room) => room.id).join(",");
   const expanded = expandedFor === selectionKey;
   const start = new Date(`${selection?.checkIn}T00:00:00Z`).getTime();
@@ -72,8 +96,12 @@ export function RoomSelectionSummary({
       : 0;
   if (!selected.length) return null;
   const total = selected.reduce(
-    (sum, room) => sum + room.nightlyPriceClp * nights,
+    (sum, room) => sum + room.resolvedNightlyPriceClp * nights,
     0
+  );
+  const allocation = computeGuestAllocation(
+    selection?.guests ?? 1,
+    selected.map((room) => ({ guestCount: room.guestCount, roomId: room.id }))
   );
   const itemLabel = selected.length === 1 ? "ítem agregado" : "ítems agregados";
   const removeRoom = (room: Room) => {
@@ -81,15 +109,16 @@ export function RoomSelectionSummary({
     const params = new URLSearchParams(window.location.search);
     params.set("checkIn", selection.checkIn);
     params.set("checkOut", selection.checkOut);
-    const rooms = selection.rooms.filter(
-      (id) => id !== room.slug && id !== room.id
+    const nextRooms = selection.rooms.filter(
+      (entry) => entry.roomId !== room.slug && entry.roomId !== room.id
     );
-    if (rooms.length) {
-      params.set("rooms", rooms.join(","));
+    if (nextRooms.length) {
+      params.set("rooms", serializeRoomSelectionParam(nextRooms));
       saveSessionRoomSelection({
         checkIn: selection.checkIn,
         checkOut: selection.checkOut,
-        rooms,
+        guests: selection.guests,
+        rooms: nextRooms,
       });
     } else {
       params.delete("rooms");
@@ -147,6 +176,12 @@ export function RoomSelectionSummary({
                   ? "1 habitación"
                   : `${selected.length} habitaciones`}
               </span>
+              <span
+                role="status"
+                className="block truncate text-xs text-muted-foreground"
+              >
+                {describeGuestAllocation(allocation)}
+              </span>
             </span>
             <span
               data-cart-expand-indicator
@@ -176,8 +211,13 @@ export function RoomSelectionSummary({
             href={`/pre-reserva?${new URLSearchParams({
               checkIn: selection?.checkIn ?? "",
               checkOut: selection?.checkOut ?? "",
-              rooms: selected.map((room) => room.slug).join(","),
-              guests: query.get("guests") ?? "1",
+              rooms: serializeRoomSelectionParam(
+                selected.map((room) => ({
+                  guestCount: room.guestCount,
+                  roomId: room.slug,
+                }))
+              ),
+              guests: String(selection?.guests ?? 1),
             }).toString()}`}
           >
             Ver carrito
@@ -200,10 +240,17 @@ export function RoomSelectionSummary({
                 key={room.id}
                 className="flex items-center justify-between gap-3 py-2 text-sm"
               >
-                <span>{room.name}</span>
+                <span>
+                  {room.name}
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {room.guestCount === 1
+                      ? "1 persona"
+                      : `${room.guestCount} personas`}
+                  </span>
+                </span>
                 <div className="flex items-center gap-1 whitespace-nowrap">
                   <span>{nights} noches ·</span>
-                  <Price amount={room.nightlyPriceClp} />
+                  <Price amount={room.resolvedNightlyPriceClp} />
                 </div>
                 <button
                   type="button"

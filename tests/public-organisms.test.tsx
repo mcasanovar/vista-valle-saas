@@ -203,6 +203,42 @@ it("renders catalogue organisms with articles and lists", () => {
   expect(screen.getAllByRole("list").length).toBeGreaterThan(1);
 });
 
+it("offers an occupancy option per guest up to the room's real capacity", () => {
+  render(
+    <RoomCard
+      image={{ src: "/room.jpg", alt: "Habitación" }}
+      name="Habitación Triple"
+      capacity="Hasta 3 personas"
+      capacityCount={3}
+      beds="Camas"
+      price={90000}
+      detailHref="/detalle"
+    />
+  );
+  const group = screen.getByRole("group", { name: "Cantidad de personas" });
+  expect(group).toHaveTextContent("1 persona");
+  expect(group).toHaveTextContent("2 personas");
+  expect(group).toHaveTextContent("3 personas");
+});
+
+it("does not offer an occupancy beyond the room's capacity", () => {
+  render(
+    <RoomCard
+      image={{ src: "/room.jpg", alt: "Habitación" }}
+      name="Habitación Doble"
+      capacity="Hasta 2 personas"
+      capacityCount={2}
+      beds="Camas"
+      price={70000}
+      detailHref="/detalle"
+    />
+  );
+  const group = screen.getByRole("group", { name: "Cantidad de personas" });
+  expect(group).toHaveTextContent("1 persona");
+  expect(group).toHaveTextContent("2 personas");
+  expect(screen.queryByText("3 personas")).not.toBeInTheDocument();
+});
+
 it("renders configured public static organisms", () => {
   render(
     <>
