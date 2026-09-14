@@ -46,6 +46,8 @@ La dirección de dependencias será atoms → molecules → organisms → templa
 
 Tailwind CSS proporcionará estilos, con primitivas accesibles compatibles con shadcn/ui para el panel y componentes propios para la identidad pública. Colores, tipografías, espaciado, radios y elevaciones se centralizarán como tokens. La interfaz pública evitará que la estética por defecto del panel determine la identidad boutique.
 
+La navegación móvil pública se tratará como una capacidad propia de presentación: la cabecera mostrará la marca, el control de tema y la hamburguesa como acción más a la derecha; el CTA de reserva se ocultará en la cabecera móvil porque permanece disponible en el contenido principal. El panel abierto se anclará al borde derecho del viewport, se mantendrá contenido dentro de él, sin overflow horizontal, con cierre explícito, foco visible y scroll del documento bloqueado mientras corresponda.
+
 ### 4. PostgreSQL administrado por Supabase
 
 PostgreSQL será la fuente de verdad. Supabase aportará la base gestionada, autenticación del administrador y almacenamiento de imágenes. Drizzle ORM definirá el esquema, migraciones y consultas desde el servidor; las migraciones versionadas serán la autoridad y no se modificarán tablas manualmente en producción.
