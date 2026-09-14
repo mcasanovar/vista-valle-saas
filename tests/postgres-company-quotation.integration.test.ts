@@ -138,6 +138,7 @@ if (!enabled) {
           },
           writePaymentCollected: async () => undefined,
           writeReservationConfirmed: async () => undefined,
+          writeReservationDatesChanged: async () => undefined,
         };
       const service = createDrizzleCompanyQuotationCreationService(
         db,

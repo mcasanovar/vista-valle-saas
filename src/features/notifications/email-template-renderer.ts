@@ -67,6 +67,14 @@ export function renderNewReservationAdminAlertEmail(
   );
 }
 
+export function renderReservationDatesChangedAdminEmail(
+  data: PayAtPropertyConfirmationEmailData
+) {
+  return document(
+    `<h1>Fechas de reserva actualizadas</h1><p>Se modificaron las fechas de una reserva. El resumen refleja el estado actual.</p>${reservationDetails(data)}<p>Contacto: ${escapeHtml(data.contactEmail)}</p>`
+  );
+}
+
 export function renderPaymentCollectedAdminEmail(reservationId: string) {
   return document(
     `<p>Se registró un cobro presencial para la reserva ${escapeHtml(reservationId)}.</p>`

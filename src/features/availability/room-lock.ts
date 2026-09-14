@@ -54,11 +54,19 @@ export type RoomLockGateway<TContext> = Readonly<{
     roomIds: readonly string[],
     operation: (context: TContext) => Promise<TResult>
   ) => Promise<TResult>;
-  /** Locks distinct room ids in lexical order, checks every room, then runs one all-or-nothing operation. */
+  /**
+   * Locks distinct room ids in lexical order, checks every room, then runs
+   * one all-or-nothing operation. `options.excludeReservationId`, when set,
+   * ignores that reservation's own occupying interval(s) during the
+   * overlap check - used when editing a reservation's own dates, so its
+   * current stay never conflicts with itself (see `reservation-date-editing`
+   * design.md decision 1).
+   */
   runExclusiveMany: <TResult>(
     roomIds: readonly string[],
     requestedInterval: LodgingInterval,
-    operation: (context: TContext) => Promise<TResult>
+    operation: (context: TContext) => Promise<TResult>,
+    options?: Readonly<{ excludeReservationId?: string }>
   ) => Promise<TResult>;
   /**
    * Runs an operation while serializing changes for a room without treating
@@ -276,7 +284,7 @@ export function createMockRoomLockGateway(
         });
       return acquire(0) as never;
     },
-    runExclusiveMany: async (roomIds, requestedInterval, operation) => {
+    runExclusiveMany: async (roomIds, requestedInterval, operation, options) => {
       const ordered = [...new Set(roomIds)].sort();
       if (ordered.length !== roomIds.length || ordered.length === 0)
         throw new Error("Reservation requires distinct rooms");
@@ -291,6 +299,14 @@ export function createMockRoomLockGateway(
             const result = checkRoomAvailability(
               cached
                 .filter((entry) => isCurrentlyOccupying(entry, now()))
+                .filter(
+                  (entry) =>
+                    !(
+                      options?.excludeReservationId &&
+                      entry.occupying.source === "reservation" &&
+                      entry.occupying.sourceId === options.excludeReservationId
+                    )
+                )
                 .map((entry) => entry.occupying),
               requestedInterval
             );

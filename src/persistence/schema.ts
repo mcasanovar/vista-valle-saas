@@ -430,6 +430,17 @@ export const payments = pgTable(
       table.reservationId,
       table.status
     ),
+    /**
+     * At most one open pending pay-at-property balance per reservation, so a
+     * date edit (`reservation-date-editing`, design.md decision 3) always
+     * has a single row to update or cancel instead of risking a duplicate
+     * charge for the same debt.
+     */
+    uniqueIndex("payments_reservation_pending_pay_at_property_unique")
+      .on(table.reservationId, table.provider)
+      .where(
+        sql`${table.status} = 'pending' AND ${table.provider} = 'pay_at_property'`
+      ),
     check("payments_amount_positive", sql`${table.amountClp} > 0`),
     check(
       "payments_reference_target",

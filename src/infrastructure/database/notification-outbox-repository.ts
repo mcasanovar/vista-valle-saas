@@ -69,6 +69,18 @@ export function createDrizzleNotificationOutboxWriter(
         },
       ]);
     },
+    writeReservationDatesChanged: async (tx, input) => {
+      const reservationId = input.reservation.id;
+      await writeIntents(tx, [
+        {
+          idempotencyKey: `reservation:${reservationId}:dates_changed:${input.reservation.updatedAt.getTime()}`,
+          payload: { reservationId },
+          recipient: adminRecipient,
+          reservationId,
+          type: "reservation_dates_changed_admin",
+        },
+      ]);
+    },
     writePaymentCollected: async (tx, input) => {
       await writeIntents(tx, [
         {
