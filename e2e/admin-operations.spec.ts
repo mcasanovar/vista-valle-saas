@@ -72,21 +72,26 @@ test("mock administrator operates external reservations, blocks, collection, and
   await manualReservation.getByLabel("Origen").selectOption("booking");
   await manualReservation.getByLabel("Entrada").fill("2056-06-10");
   await manualReservation.getByLabel("Salida").fill("2056-06-12");
-  await manualReservation.getByRole("checkbox", { name: /valle/i }).check();
+  await manualReservation
+    .getByRole("checkbox", { name: /individual/i })
+    .check();
   await manualReservation.getByLabel("Nombre").fill("Operación");
   await manualReservation.getByLabel("Apellido").fill("E2E");
   await manualReservation.getByLabel("Correo").fill("manual-e2e@example.test");
-  await manualReservation.getByLabel("Teléfono").fill("123");
+  await manualReservation.getByRole("textbox", { name: "Teléfono" }).fill("123");
   await manualReservation.getByLabel("Huéspedes").fill("1");
   await manualReservation
     .getByRole("button", { name: "Crear reserva" })
     .click();
-  await expect(page.getByRole("status")).toHaveText("Reserva creada.");
+  await expect(manualReservation.getByRole("status")).toContainText(
+    "Reserva creada."
+  );
 
   await page.goto("/admin/reservas");
   const reservationRow = page
     .locator("tbody tr")
-    .filter({ hasText: "2056-06-10 a 2056-06-12" });
+    .filter({ hasText: "2056-06-10" })
+    .filter({ hasText: "2056-06-12" });
   await expect(reservationRow).toHaveCount(1);
   await expect(reservationRow).toContainText("booking");
   await reservationRow.getByRole("link", { name: /Ver reserva/ }).click();

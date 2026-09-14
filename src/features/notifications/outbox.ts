@@ -24,6 +24,7 @@ export type NotificationOutboxIntent = Readonly<{
     | "payment_collected_admin"
     | "reservation_confirmed_admin"
     | "reservation_confirmed_guest"
+    | "reservation_dates_changed_admin"
     | "company_quotation_customer"
     | "company_quotation_admin";
 }>;
@@ -83,6 +84,17 @@ export type NotificationOutboxWriter<TContext> = Readonly<{
   writeCompanyQuotationRequested: (
     context: TContext,
     input: Readonly<{ quotation: CompanyQuotationRecord }>
+  ) => Promise<void>;
+  /**
+   * Enqueues an idempotent operational alert once a reservation's dates are
+   * modified (`reservation-date-editing` design.md decision 5). The
+   * idempotency key includes the reservation's `updatedAt` so a retried
+   * edit of the exact same mutation dedupes, while a later, distinct edit
+   * still notifies.
+   */
+  writeReservationDatesChanged: (
+    context: TContext,
+    input: Readonly<{ reservation: ReservationRecord }>
   ) => Promise<void>;
 }>;
 
@@ -178,6 +190,18 @@ export function createMockNotificationOutbox<TContext = unknown>(
             recipient: adminRecipient,
             reservationId: input.reservation.id,
             type: "reservation_confirmed_admin",
+          }),
+        },
+      ]);
+    },
+    writeReservationDatesChanged: async (_context, input) => {
+      addBatch([
+        {
+          key: `reservation:${input.reservation.id}:dates_changed:${input.reservation.updatedAt.getTime()}`,
+          intent: createIntent({
+            recipient: getServerEnvironment().ADMIN_NOTIFICATION_EMAIL,
+            reservationId: input.reservation.id,
+            type: "reservation_dates_changed_admin",
           }),
         },
       ]);

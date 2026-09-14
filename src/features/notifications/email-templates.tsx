@@ -116,6 +116,25 @@ export function NewReservationAdminAlertEmail(
   );
 }
 
+/** Server-only operational alert once a reservation's dates are modified. */
+export function ReservationDatesChangedAdminEmail(
+  props: PayAtPropertyConfirmationEmailData
+) {
+  return (
+    <html lang="es">
+      <body>
+        <h1>Fechas de reserva actualizadas</h1>
+        <p>
+          Se modificaron las fechas de una reserva. El resumen refleja el
+          estado actual.
+        </p>
+        <ReservationDetails {...props} />
+        <p>Contacto: {props.contactEmail}</p>
+      </body>
+    </html>
+  );
+}
+
 function CompanyQuotationCoverageNotice({
   capacity,
   guestCount,

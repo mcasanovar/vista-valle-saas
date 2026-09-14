@@ -1,10 +1,12 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
+import { nights as calculateNights } from "@/features/availability";
 import type {
   ApprovedPayNowPayment,
   PayAtPropertyPayment,
+  PendingPayAtPropertyPayment,
   ReservationRecord,
   ReservationRepository,
 } from "@/features/reservations";
@@ -237,6 +239,131 @@ export function createDrizzleReservationRepository(
         .from(reservationItems)
         .where(eq(reservationItems.reservationId, row.id));
       return toReservationRecord(row, itemRows);
+    },
+    getApprovedPaymentsTotalClp: async (reservationId) => {
+      const [row] = await db
+        .select({ total: sql<string>`COALESCE(SUM(${payments.amountClp}), 0)` })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.reservationId, reservationId),
+            eq(payments.status, "approved")
+          )
+        );
+      return Number(row?.total ?? 0);
+    },
+    getPendingPayAtPropertyPaymentByReservationId: async (reservationId) => {
+      const [row] = await db
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.reservationId, reservationId),
+            eq(payments.provider, "pay_at_property"),
+            eq(payments.status, "pending")
+          )
+        );
+      return row
+        ? (Object.freeze(row) as unknown as PendingPayAtPropertyPayment)
+        : null;
+    },
+    editReservationDates: async (tx, input) => {
+      const [current] = await tx
+        .select()
+        .from(reservations)
+        .where(eq(reservations.id, input.reservationId));
+      if (!current) throw new ReservationNotFoundError(input.reservationId);
+
+      const totalClp = input.items.reduce(
+        (total, item) => total + item.totalClp,
+        0
+      );
+      const [updated] = await tx
+        .update(reservations)
+        .set({
+          checkIn: input.checkIn,
+          checkOut: input.checkOut,
+          totalClp,
+          updatedAt: new Date(),
+        })
+        .where(eq(reservations.id, input.reservationId))
+        .returning();
+      if (!updated) throw new ReservationNotFoundError(input.reservationId);
+
+      for (const item of input.items) {
+        await tx
+          .update(reservationItems)
+          .set({
+            chargesClp: item.chargesClp,
+            nightlyPriceClp: item.nightlyPriceClp,
+            nights: item.nights,
+            subtotalClp: item.totalClp,
+          })
+          .where(
+            and(
+              eq(reservationItems.reservationId, updated.id),
+              eq(reservationItems.roomId, item.roomId)
+            )
+          );
+      }
+
+      if (input.paymentAction.type === "set_pending") {
+        const amountClp = input.paymentAction.amountClp;
+        if (input.pendingPayAtPropertyPaymentId) {
+          await tx
+            .update(payments)
+            .set({ amountClp })
+            .where(eq(payments.id, input.pendingPayAtPropertyPaymentId));
+        } else {
+          await tx.insert(payments).values({
+            amountClp,
+            externalReference: `${paymentReference(updated.publicId)}:edit:${crypto.randomUUID()}`,
+            mode: "pay_at_property",
+            provider: "pay_at_property",
+            reservationId: updated.id,
+            status: "pending",
+          });
+        }
+      } else if (
+        input.paymentAction.type === "cancel_pending" &&
+        input.pendingPayAtPropertyPaymentId
+      ) {
+        await tx
+          .update(payments)
+          .set({ status: "cancelled" })
+          .where(eq(payments.id, input.pendingPayAtPropertyPaymentId));
+      }
+
+      await tx.insert(auditEvents).values({
+        action: "reservation.dates_changed",
+        actorUserId: input.actorUserId,
+        after: {
+          approvedPaymentsClp: input.approvedPaymentsClp,
+          checkIn: input.checkIn,
+          checkOut: input.checkOut,
+          nights: calculateNights(input.checkIn, input.checkOut),
+          overpaymentClp: input.overpaymentClp,
+          pendingBalanceClp:
+            input.paymentAction.type === "set_pending"
+              ? input.paymentAction.amountClp
+              : 0,
+          totalClp,
+        },
+        before: {
+          checkIn: current.checkIn,
+          checkOut: current.checkOut,
+          nights: calculateNights(current.checkIn, current.checkOut),
+          totalClp: current.totalClp,
+        },
+        entityId: updated.id,
+        entityType: "reservation",
+      });
+
+      const itemRows = await tx
+        .select()
+        .from(reservationItems)
+        .where(eq(reservationItems.reservationId, updated.id));
+      return toReservationRecord(updated, itemRows);
     },
     transitionReservationState: async (tx, transition) => {
       const [current] = await tx

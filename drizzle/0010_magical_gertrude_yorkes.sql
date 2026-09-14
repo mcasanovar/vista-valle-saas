@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "payments_reservation_pending_pay_at_property_unique" ON "payments" USING btree ("reservation_id","provider") WHERE "payments"."status" = 'pending' AND "payments"."provider" = 'pay_at_property';

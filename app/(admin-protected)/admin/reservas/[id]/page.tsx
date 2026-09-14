@@ -5,6 +5,8 @@ import { createProductionDatabase } from "@/infrastructure/database/client";
 import { getAdminReservationDetail } from "@/infrastructure/database/admin-reservation-source";
 import { transitionAdminReservation } from "@/features/admin/reservation-actions";
 import { ReservationTransitionControls } from "@/features/admin/reservation-transition-controls";
+import { editAdminReservationDatesAction } from "@/features/admin/edit-reservation-dates-action";
+import { EditReservationDatesForm } from "@/features/admin/edit-reservation-dates-form";
 import { collectPayAtPropertyAdminAction } from "@/features/admin/pay-at-property-admin-collect-action";
 import { refundFintocPaymentAction } from "@/features/admin/fintoc-refund-action";
 import { markPaymentPaidAdminAction } from "@/features/admin/mark-payment-paid-action";
@@ -12,6 +14,7 @@ import { PayAtPropertyCollectionForm } from "@/features/payments/pay-at-property
 import { FintocRefundForm } from "@/features/payments/fintoc-refund-form";
 import { MarkPaymentPaidForm } from "@/features/payments/mark-payment-paid-form";
 import { AdminBackLink } from "@/features/admin/admin-back-link";
+import { EDITABLE_RESERVATION_ORIGINS } from "@/features/reservations";
 
 const currency = new Intl.NumberFormat("es-CL", {
   currency: "CLP",
@@ -66,6 +69,17 @@ export default async function ReservationDetail({
         payment.refundedAmountClp < payment.amountClp
     );
 
+  const approvedPaymentsClp = reservation.payments
+    .filter((payment) => payment.status === "approved")
+    .reduce((total, payment) => total + payment.amountClp, 0);
+  const overpaymentClp = Math.max(
+    approvedPaymentsClp - reservation.totalClp,
+    0
+  );
+  const canEditDates = (
+    EDITABLE_RESERVATION_ORIGINS as readonly string[]
+  ).includes(reservation.origin);
+
   return (
     <section className="space-y-5">
       <AdminBackLink fallbackHref="/admin/reservas" label="Volver a reservas" />
@@ -93,6 +107,17 @@ export default async function ReservationDetail({
         >
           Esta reserva está cancelada pero tiene un pago aprobado sin
           reembolsar. Requiere resolución financiera manual.
+        </p>
+      ) : null}
+
+      {overpaymentClp > 0 ? (
+        <p
+          role="alert"
+          className="rounded-lg border border-destructive bg-[var(--admin-reservation-cancelled-background)] p-3 text-sm text-destructive"
+        >
+          Esta reserva tiene un sobrepago de {currency.format(overpaymentClp)}{" "}
+          tras una modificación de fechas. Requiere resolución financiera
+          manual; no se genera una devolución automática.
         </p>
       ) : null}
 
@@ -164,6 +189,16 @@ export default async function ReservationDetail({
           <span>Total</span>
           <span>{currency.format(reservation.totalClp)}</span>
         </p>
+        {canEditDates ? (
+          <div className="mt-4">
+            <EditReservationDatesForm
+              action={editAdminReservationDatesAction}
+              checkIn={reservation.checkIn}
+              checkOut={reservation.checkOut}
+              reservationId={reservation.id}
+            />
+          </div>
+        ) : null}
       </section>
 
       {reservation.guestComment ? (
