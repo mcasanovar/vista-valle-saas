@@ -51,7 +51,7 @@ export function generateOutboundIcalDocument(
     .map((entry) =>
       [
         "BEGIN:VEVENT",
-        `UID:${entry.source}-${entry.sourceId}@vistavalle.cl`,
+        `UID:${entry.source}-${entry.sourceId}@vistavallehospedaje.com`,
         `DTSTAMP:${dtstamp}`,
         `DTSTART;VALUE=DATE:${toCompactDate(entry.interval.checkIn)}`,
         `DTEND;VALUE=DATE:${toCompactDate(entry.interval.checkOut)}`,
