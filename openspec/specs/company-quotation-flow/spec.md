@@ -175,7 +175,7 @@ El sistema SHALL generar un correo de confirmación para el cliente con el resum
 
 #### Scenario: Identidad del remitente
 - **WHEN** el sistema prepara cualquiera de los correos
-- **THEN** usa la identidad configurada del remitente (`RESEND_FROM_NAME <RESEND_FROM_EMAIL>`, con `Vista Valle SpA <reservas@vistavalle.cl>` como valor de producción) o una dirección de respuesta operativa equivalente
+- **THEN** usa la identidad configurada del remitente (`RESEND_FROM_NAME <RESEND_FROM_EMAIL>`, con `Vista Valle SpA <reservas@vistavallehospedaje.com>` como valor de producción) o una dirección de respuesta operativa equivalente
 
 #### Scenario: Dominio aún no verificado
 - **WHEN** el entorno no tiene un dominio habilitado para envío real
