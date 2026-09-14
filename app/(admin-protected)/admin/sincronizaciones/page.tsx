@@ -4,6 +4,7 @@ import { completeChannelSyncTaskAction } from "@/features/channel-sync/actions";
 import { ChannelSyncChecklist } from "@/features/channel-sync/checklist";
 import { getChannelSyncTasks } from "@/features/channel-sync/tasks";
 import {
+  createBookingChannelConnectionAction,
   regenerateChannelConnectionTokenAction,
   saveChannelConnectionAction,
 } from "@/features/channel-calendar-sync/actions";
@@ -43,6 +44,7 @@ export default async function SyncPage({
                   id: connection.id,
                   outboundToken: connection.outboundToken,
                   paymentBehavior: connection.paymentBehavior,
+                  hasInboundFeedUrl: connection.hasInboundFeedUrl,
                   lastPolledAt: connection.lastPolledAt,
                   lastPollStatus: connection.lastPollStatus,
                   lastPollEventCount: connection.lastPollEventCount,
@@ -99,6 +101,7 @@ export default async function SyncPage({
             rooms={roomCards}
             save={saveChannelConnectionAction}
             regenerate={regenerateChannelConnectionTokenAction}
+            createPendingConnection={createBookingChannelConnectionAction}
           />
         )}
       </div>

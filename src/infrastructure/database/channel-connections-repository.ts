@@ -100,6 +100,27 @@ export function createDrizzleChannelConnectionRepository(
       if (!row) throw new Error("Failed to save channel connection");
       return toConnection(row);
     },
+    createPendingConnection: async (
+      roomId: string,
+      platform: ChannelPlatform,
+      paymentBehavior: SetInboundFeedUrlInput["paymentBehavior"]
+    ) => {
+      const [row] = await db
+        .insert(channelConnections)
+        .values({
+          roomId,
+          platform,
+          paymentBehavior,
+          outboundToken: crypto.randomUUID().replaceAll("-", ""),
+          enabled: false,
+        })
+        .onConflictDoNothing({
+          target: [channelConnections.roomId, channelConnections.platform],
+        })
+        .returning();
+      if (!row) throw new Error("Channel connection already exists");
+      return toConnection(row);
+    },
     setEnabled: async (id: string, enabled: boolean) => {
       const [row] = await db
         .update(channelConnections)

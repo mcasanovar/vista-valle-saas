@@ -18,6 +18,8 @@ export function getChannelConnectionStore(): AsyncChannelConnectionStore | null 
         mock.getByRoomAndPlatform(roomId, platform),
       getByOutboundToken: async (token) => mock.getByOutboundToken(token),
       setInboundFeedUrl: async (input) => mock.setInboundFeedUrl(input),
+      createPendingConnection: async (roomId, platform, paymentBehavior) =>
+        mock.createPendingConnection(roomId, platform, paymentBehavior),
       setEnabled: async (id, enabled) => mock.setEnabled(id, enabled),
       regenerateOutboundToken: async (id) => mock.regenerateOutboundToken(id),
       recordPollResult: async (input) => mock.recordPollResult(input),

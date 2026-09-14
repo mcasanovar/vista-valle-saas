@@ -15,6 +15,7 @@ vi.mock("@/features/channel-sync/tasks", () => ({
 vi.mock("@/features/channel-calendar-sync/actions", () => ({
   saveChannelConnectionAction: vi.fn(),
   regenerateChannelConnectionTokenAction: vi.fn(),
+  createBookingChannelConnectionAction: vi.fn(),
 }));
 vi.mock("@/features/channel-calendar-sync/connections", () => ({
   getChannelConnections: mocks.connections,

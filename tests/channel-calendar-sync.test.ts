@@ -35,6 +35,55 @@ describe("channel connections (mock adapter)", () => {
     );
   });
 
+  it("creates a Booking connection with an outbound token but no inbound feed URL yet", () => {
+    const connections = getChannelConnections()!;
+    const pending = connections.createPendingConnection(
+      mockDemoRooms[0]!.id,
+      "booking",
+      "pay_at_property"
+    );
+    expect(pending.hasInboundFeedUrl).toBe(false);
+    expect(pending.outboundToken).toBeTruthy();
+    expect(pending.enabled).toBe(false);
+    expect(
+      connections.getByOutboundToken(pending.outboundToken)
+    ).toEqual(pending);
+  });
+
+  it("preserves the outbound token generated for a pending connection once the inbound feed URL is saved", () => {
+    const connections = getChannelConnections()!;
+    const pending = connections.createPendingConnection(
+      mockDemoRooms[2]!.id,
+      "booking",
+      "pay_at_property"
+    );
+    const completed = connections.setInboundFeedUrl({
+      roomId: mockDemoRooms[2]!.id,
+      platform: "booking",
+      inboundFeedUrl: "https://admin.booking.com/ical/completed.ics",
+      paymentBehavior: "pay_at_property",
+    });
+    expect(completed.id).toBe(pending.id);
+    expect(completed.outboundToken).toBe(pending.outboundToken);
+    expect(completed.hasInboundFeedUrl).toBe(true);
+  });
+
+  it("refuses to create a pending connection when one already exists for the room and platform", () => {
+    const connections = getChannelConnections()!;
+    connections.createPendingConnection(
+      mockDemoRooms[1]!.id,
+      "airbnb",
+      "auto_approved"
+    );
+    expect(() =>
+      connections.createPendingConnection(
+        mockDemoRooms[1]!.id,
+        "airbnb",
+        "auto_approved"
+      )
+    ).toThrow();
+  });
+
   it("records poll results without opening any network connection", () => {
     const connections = getChannelConnections()!;
     const created = connections.setInboundFeedUrl({
