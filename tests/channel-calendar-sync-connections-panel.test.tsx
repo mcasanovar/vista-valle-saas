@@ -104,6 +104,81 @@ describe("ChannelConnectionsPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("offers to generate our link first for a disconnected Booking card, but not for Airbnb", () => {
+    render(
+      <ChannelConnectionsPanel
+        rooms={[
+          roomWith([
+            { roomId: "room-1", platform: "airbnb", connection: null, outboundUrl: null },
+            { roomId: "room-1", platform: "booking", connection: null, outboundUrl: null },
+          ]),
+        ]}
+        save={vi.fn()}
+        regenerate={vi.fn()}
+        createPendingConnection={vi.fn()}
+      />
+    );
+    expect(
+      screen.getAllByRole("button", { name: "Generar nuestro link para Booking" })
+    ).toHaveLength(1);
+  });
+
+  it("does not offer to generate a link when createPendingConnection is not provided", () => {
+    render(
+      <ChannelConnectionsPanel
+        rooms={[
+          roomWith([
+            { roomId: "room-1", platform: "booking", connection: null, outboundUrl: null },
+          ]),
+        ]}
+        save={vi.fn()}
+        regenerate={vi.fn()}
+      />
+    );
+    expect(
+      screen.queryByRole("button", { name: "Generar nuestro link para Booking" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows the outbound link and the pending hint, and hides the generate button, for a Booking connection with no inbound feed URL saved yet", () => {
+    render(
+      <ChannelConnectionsPanel
+        rooms={[
+          roomWith([
+            {
+              roomId: "room-1",
+              platform: "booking",
+              connection: {
+                id: "conn-3",
+                outboundToken: "token-pending",
+                paymentBehavior: "pay_at_property",
+                hasInboundFeedUrl: false,
+              },
+              outboundUrl: "https://vistavalle.cl/api/ical/token-pending",
+            },
+          ]),
+        ]}
+        save={vi.fn()}
+        regenerate={vi.fn()}
+        createPendingConnection={vi.fn()}
+      />
+    );
+    expect(screen.getByText("○ Sin conectar")).toBeInTheDocument();
+    expect(
+      screen.getByText("https://vistavalle.cl/api/ical/token-pending")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Pega ese link en Booking/)
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Generar nuestro link para Booking" })
+    ).not.toBeInTheDocument();
+    // The inbound-URL form is already open, ready to receive Booking's link.
+    expect(
+      screen.getByLabelText("URL del feed de Booking")
+    ).toBeInTheDocument();
+  });
+
   it("lets the admin reopen the form via Reemplazar without exposing the previous URL", async () => {
     const user = userEvent.setup();
     render(

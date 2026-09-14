@@ -24,6 +24,8 @@ export type ConnectionCardView = Readonly<{
     id: string;
     outboundToken: string;
     paymentBehavior: ChannelPaymentBehavior;
+    /** Absent/undefined is treated as "has one" (existing connections predate this field); only an explicit `false` (a Booking pending connection with no inbound URL saved yet) counts as not configured. */
+    hasInboundFeedUrl?: boolean;
     lastPolledAt?: Date;
     lastPollStatus?: "ok" | "error";
     lastPollEventCount?: number;
@@ -41,7 +43,8 @@ export type RoomConnectionCards = Readonly<{
 function statusOf(
   card: ConnectionCardView
 ): "not_connected" | "active" | "error" {
-  if (!card.connection) return "not_connected";
+  if (!card.connection || card.connection.hasInboundFeedUrl === false)
+    return "not_connected";
   return card.connection.lastPollStatus === "error" ? "error" : "active";
 }
 
@@ -49,14 +52,17 @@ function ConnectionRow({
   card,
   save,
   regenerate,
+  createPendingConnection,
 }: Readonly<{
   card: ConnectionCardView;
   save: (data: FormData) => Promise<unknown>;
   regenerate: (data: FormData) => Promise<unknown>;
+  createPendingConnection?: (data: FormData) => Promise<unknown>;
 }>) {
   const status = statusOf(card);
   const [editing, setEditing] = useState(status === "not_connected");
   const [pending, setPending] = useState(false);
+  const [generatingLink, setGeneratingLink] = useState(false);
   const [message, setMessage] = useState<string>();
   const [copied, setCopied] = useState(false);
 
@@ -89,6 +95,35 @@ function ConnectionRow({
         </p>
       )}
 
+      {card.outboundUrl && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+          Feed saliente:{" "}
+          <code className="rounded bg-muted px-2 py-1 text-xs">
+            {card.outboundUrl}
+          </code>
+          <Button
+            type="button"
+            size="icon"
+            variant="secondary"
+            aria-label="Copiar link del feed saliente"
+            onClick={async () => {
+              await navigator.clipboard.writeText(card.outboundUrl!);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+          >
+            {copied ? "✓" : "📋"}
+          </Button>
+        </p>
+      )}
+
+      {card.connection?.hasInboundFeedUrl === false && (
+        <p className="text-sm text-muted-foreground">
+          Pega ese link en {platformLabel[card.platform]} y, cuando te
+          entreguen el suyo, pégalo abajo para completar la conexión.
+        </p>
+      )}
+
       {status !== "not_connected" && card.connection && !editing && (
         <div className="space-y-2 text-sm text-foreground">
           <p>
@@ -104,27 +139,6 @@ function ConnectionRow({
               Reemplazar
             </button>
           </p>
-          {card.outboundUrl && (
-            <p className="flex flex-wrap items-center gap-2">
-              Feed saliente:{" "}
-              <code className="rounded bg-muted px-2 py-1 text-xs">
-                {card.outboundUrl}
-              </code>
-              <Button
-                type="button"
-                size="icon"
-                variant="secondary"
-                aria-label="Copiar link del feed saliente"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(card.outboundUrl!);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-              >
-                {copied ? "✓" : "📋"}
-              </Button>
-            </p>
-          )}
           <form
             action={async (data) => {
               if (
@@ -166,6 +180,35 @@ function ConnectionRow({
           </p>
         </div>
       )}
+
+      {card.platform === "booking" &&
+        !card.connection &&
+        createPendingConnection && (
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">
+              Booking pide primero nuestro link, antes de darte el suyo.
+            </p>
+            <form
+              action={async (data) => {
+                setGeneratingLink(true);
+                setMessage(undefined);
+                try {
+                  await createPendingConnection(data);
+                  setMessage("Link generado. Cópialo y pégalo en Booking.");
+                } catch {
+                  setMessage("No pudimos generar el link.");
+                } finally {
+                  setGeneratingLink(false);
+                }
+              }}
+            >
+              <input type="hidden" name="roomId" value={card.roomId} />
+              <Button type="submit" variant="secondary" loading={generatingLink}>
+                Generar nuestro link para Booking
+              </Button>
+            </form>
+          </div>
+        )}
 
       {editing && (
         <form
@@ -239,10 +282,12 @@ export function ChannelConnectionsPanel({
   rooms,
   save,
   regenerate,
+  createPendingConnection,
 }: Readonly<{
   rooms: readonly RoomConnectionCards[];
   save: (data: FormData) => Promise<unknown>;
   regenerate: (data: FormData) => Promise<unknown>;
+  createPendingConnection?: (data: FormData) => Promise<unknown>;
 }>) {
   return (
     <section aria-labelledby="channel-connections-title" className="space-y-4">
@@ -268,6 +313,7 @@ export function ChannelConnectionsPanel({
               card={card}
               save={save}
               regenerate={regenerate}
+              createPendingConnection={createPendingConnection}
             />
           ))}
         </div>

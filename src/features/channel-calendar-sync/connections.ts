@@ -29,6 +29,18 @@ export type ChannelConnectionStore = Readonly<{
   ) => ChannelConnection | null;
   getByOutboundToken: (token: string) => ChannelConnection | null;
   setInboundFeedUrl: (input: SetInboundFeedUrlInput) => ChannelConnection;
+  /**
+   * Creates a connection with no inbound feed URL yet, only an outbound
+   * token — Booking-only escape hatch (see `createBookingChannelConnectionAction`
+   * in `actions.ts`): unlike Airbnb, Booking's own UI requires our outbound
+   * link before it hands out its inbound one, so an admin needs to generate
+   * ours first. Throws if a connection already exists for this room+platform.
+   */
+  createPendingConnection: (
+    roomId: string,
+    platform: ChannelPlatform,
+    paymentBehavior: ChannelPaymentBehavior
+  ) => ChannelConnection;
   setEnabled: (id: string, enabled: boolean) => ChannelConnection;
   regenerateOutboundToken: (id: string) => ChannelConnection;
   recordPollResult: (input: RecordPollResultInput) => ChannelConnection;
@@ -45,6 +57,11 @@ export type AsyncChannelConnectionStore = Readonly<{
   getByOutboundToken: (token: string) => Promise<ChannelConnection | null>;
   setInboundFeedUrl: (
     input: SetInboundFeedUrlInput
+  ) => Promise<ChannelConnection>;
+  createPendingConnection: (
+    roomId: string,
+    platform: ChannelPlatform,
+    paymentBehavior: ChannelPaymentBehavior
   ) => Promise<ChannelConnection>;
   setEnabled: (id: string, enabled: boolean) => Promise<ChannelConnection>;
   regenerateOutboundToken: (id: string) => Promise<ChannelConnection>;
@@ -146,6 +163,27 @@ export function getChannelConnections() {
         paymentBehavior: input.paymentBehavior,
         inboundFeedUrl: input.inboundFeedUrl,
         hasInboundFeedUrl: true,
+        outboundToken: generateOutboundToken(),
+        enabled: false,
+      });
+      store.push(created);
+      return toPublic(created);
+    },
+    createPendingConnection: (
+      roomId: string,
+      platform: ChannelPlatform,
+      paymentBehavior: ChannelPaymentBehavior
+    ): ChannelConnection => {
+      const existing = store.find(
+        (c) => c.roomId === roomId && c.platform === platform
+      );
+      if (existing) throw new Error("Channel connection already exists");
+      const created: InternalChannelConnection = Object.freeze({
+        id: crypto.randomUUID(),
+        roomId,
+        platform,
+        paymentBehavior,
+        hasInboundFeedUrl: false,
         outboundToken: generateOutboundToken(),
         enabled: false,
       });
