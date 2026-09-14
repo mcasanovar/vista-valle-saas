@@ -168,4 +168,59 @@ describe("prebooking cart add feedback", () => {
       screen.queryByRole("button", { name: "Agregar a la reserva" })
     ).toBeNull();
   });
+
+  it("blocks adding a room once its occupancy would exceed the searched guest total", () => {
+    window.history.replaceState(
+      {},
+      "",
+      "/disponibilidad?checkIn=2026-10-05&checkOut=2026-10-07&guests=3"
+    );
+    render(
+      <>
+        <RoomCard
+          roomSlug="individual"
+          name="Individual"
+          capacity="2 huéspedes"
+          capacityCount={2}
+          beds="1 cama"
+          price={50_000}
+          detailHref="/habitaciones/individual"
+          selectable
+        />
+        <RoomCard
+          roomSlug="matrimonial"
+          name="Matrimonial"
+          capacity="2 huéspedes"
+          capacityCount={2}
+          beds="1 cama"
+          price={60_000}
+          detailHref="/habitaciones/matrimonial"
+          selectable
+        />
+      </>
+    );
+
+    // The visitor picks "2 personas" for both rooms before adding either one.
+    fireEvent.click(screen.getAllByRole("button", { name: "2 personas" })[0]);
+    fireEvent.click(screen.getAllByRole("button", { name: "2 personas" })[1]);
+
+    // Adds Matrimonial first: 2 of 3 guests now assigned.
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Agregar a la reserva" })[1]
+    );
+
+    // Individual is still pending at "2 personas", but only 1 guest remains -
+    // adding it would total 4 for a search of 3, so it must stay blocked.
+    expect(
+      screen.getByRole("button", { name: "Agregar a la reserva" })
+    ).toBeDisabled();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Agregar a la reserva" })
+    );
+    expect(router.push).not.toHaveBeenCalledWith(
+      expect.stringContaining("individual"),
+      expect.anything()
+    );
+  });
 });

@@ -120,7 +120,12 @@ export function RoomDetailPriceCard({
       <RoomDetailSelectionButton
         slug={slug}
         guestCount={occupancy ?? 1}
-        disabled={hasOccupancyChoice && occupancy === null}
+        disabled={
+          occupancy === null ||
+          (!existingEntry &&
+            selection !== null &&
+            !isOccupancySelectable(selection.guests, selection.rooms, slug, occupancy))
+        }
       />
     </div>
   );
