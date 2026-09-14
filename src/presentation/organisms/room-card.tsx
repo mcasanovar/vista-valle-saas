@@ -199,7 +199,12 @@ export function RoomCard({
           price,
           ...occupancyPrices.map((entry) => entry.priceClp)
         );
-  const canAddNow = !hasOccupancyChoice || occupancy !== null;
+  const canAddNow =
+    occupancy !== null &&
+    (selected ||
+      !roomSlug ||
+      selection === null ||
+      isOccupancySelectable(selection.guests, selection.rooms, roomSlug, occupancy));
 
   return (
     <motion.article
