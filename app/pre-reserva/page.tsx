@@ -6,6 +6,7 @@ import {
   PrebookingReviewController,
   PrebookingSelectionRestore,
 } from "@/features/reservations";
+import { getServerPaymentMethodSettingsRepository } from "@/infrastructure/database/payment-method-settings-source";
 
 export const metadata: Metadata = {
   title: "Revisa tu reserva",
@@ -25,10 +26,17 @@ export default async function PrebookingPage({
   }));
 
   if (review.kind === "ready") {
+    const paymentMethodSettings =
+      (await getServerPaymentMethodSettingsRepository()?.get()) ?? {
+        payAtPropertyEnabled: true,
+        payOnlineEnabled: true,
+      };
     return (
       <PrebookingReviewController
         review={review}
         bookingEnabled={isBookingAcceptanceEnabled()}
+        payAtPropertyEnabled={paymentMethodSettings.payAtPropertyEnabled}
+        payOnlineEnabled={paymentMethodSettings.payOnlineEnabled}
       />
     );
   }
