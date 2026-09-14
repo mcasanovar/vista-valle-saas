@@ -21,21 +21,34 @@ type FintocCheckoutResponse = Readonly<{
  * value. `roomCount` gates the online-payment option: Fintoc checkout is
  * single-room only for this change (see design.md non-goals in
  * `add-fintoc-online-payment`), so with more than one room selected only
- * pago al llegar is offered.
+ * pago al llegar is offered. `payAtPropertyEnabled`/`payOnlineEnabled`
+ * reflect the admin's payment-method toggle (see
+ * `admin-manage-payment-methods`): a disabled method is hidden from
+ * selection here, and independently rejected server-side by the
+ * confirmation endpoints if requested directly.
  */
 export function BookingConfirmationController({
   bookingEnabled,
+  payAtPropertyEnabled = true,
+  payOnlineEnabled = true,
   roomCount = 1,
-}: Readonly<{ bookingEnabled: boolean; roomCount?: number }>) {
+}: Readonly<{
+  bookingEnabled: boolean;
+  payAtPropertyEnabled?: boolean;
+  payOnlineEnabled?: boolean;
+  roomCount?: number;
+}>) {
   const router = useRouter();
   const idempotencyKeyRef = useRef<string | undefined>(undefined);
   const [error, setError] = useState<string>();
   const [pendingMode, setPendingMode] = useState<
     "pay_at_property" | "pay_now"
   >();
+  const showPayAtProperty = payAtPropertyEnabled;
+  const showPayNow = payOnlineEnabled && roomCount === 1;
   const [selectedMode, setSelectedMode] = useState<
-    "pay_at_property" | "pay_now"
-  >("pay_at_property");
+    "pay_at_property" | "pay_now" | undefined
+  >(showPayAtProperty ? "pay_at_property" : showPayNow ? "pay_now" : undefined);
 
   const confirmPayAtProperty = async () => {
     setPendingMode("pay_at_property");
@@ -124,8 +137,22 @@ export function BookingConfirmationController({
 
   const confirm = () => {
     if (selectedMode === "pay_now") return void confirmPayNow();
-    return void confirmPayAtProperty();
+    if (selectedMode === "pay_at_property") return void confirmPayAtProperty();
   };
+
+  if (!showPayAtProperty && !showPayNow) {
+    return (
+      <div className="space-y-4 border-t border-border pt-4">
+        <div aria-live="assertive">
+          {error ? (
+            <Feedback variant="error" title="No pudimos confirmar la reserva">
+              {error}
+            </Feedback>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 border-t border-border pt-4">
@@ -137,30 +164,32 @@ export function BookingConfirmationController({
         aria-label="Modalidad de pago"
         className="grid gap-3 tablet:grid-cols-2"
       >
-        <label
-          className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 shadow-md transition-colors ${
-            selectedMode === "pay_at_property"
-              ? "border-accent bg-accent/10"
-              : "border-transparent bg-card hover:border-border"
-          }`}
-        >
-          <input
-            type="radio"
-            name="paymentMode"
-            value="pay_at_property"
-            checked={selectedMode === "pay_at_property"}
-            onChange={() => setSelectedMode("pay_at_property")}
-            className="mt-1 size-4 shrink-0"
-            style={{ accentColor: "var(--color-accent)" }}
-          />
-          <span>
-            <span className="block font-semibold">Pagar al llegar</span>
-            <span className="block text-sm text-muted-foreground">
-              Reserva ahora y paga al llegar a Vista Valle.
+        {showPayAtProperty ? (
+          <label
+            className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 shadow-md transition-colors ${
+              selectedMode === "pay_at_property"
+                ? "border-accent bg-accent/10"
+                : "border-transparent bg-card hover:border-border"
+            }`}
+          >
+            <input
+              type="radio"
+              name="paymentMode"
+              value="pay_at_property"
+              checked={selectedMode === "pay_at_property"}
+              onChange={() => setSelectedMode("pay_at_property")}
+              className="mt-1 size-4 shrink-0"
+              style={{ accentColor: "var(--color-accent)" }}
+            />
+            <span>
+              <span className="block font-semibold">Pagar al llegar</span>
+              <span className="block text-sm text-muted-foreground">
+                Reserva ahora y paga al llegar a Vista Valle.
+              </span>
             </span>
-          </span>
-        </label>
-        {roomCount === 1 ? (
+          </label>
+        ) : null}
+        {showPayNow ? (
           <label
             className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 shadow-md transition-colors ${
               selectedMode === "pay_now"

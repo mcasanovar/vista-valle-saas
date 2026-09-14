@@ -7,6 +7,7 @@ import {
 } from "@/features/payments/fintoc-checkout-service";
 import { FintocCheckoutUnavailableError } from "@/features/payments/fintoc-checkout";
 import { getPublicBookingRequestLimiter } from "@/infrastructure/security/request-limiter";
+import { getServerPaymentMethodSettingsRepository } from "@/infrastructure/database/payment-method-settings-source";
 
 const maxCheckoutRequestBytes = 16 * 1024;
 
@@ -46,6 +47,17 @@ export async function POST(request: Request) {
           status: 429,
           headers: { "Retry-After": String(limit.retryAfterSeconds) },
         }
+      );
+    }
+    const paymentMethodSettings =
+      await getServerPaymentMethodSettingsRepository()?.get();
+    if (paymentMethodSettings?.payOnlineEnabled === false) {
+      return Response.json(
+        {
+          message:
+            "Pagar online no está disponible en este momento. Escríbenos por WhatsApp para reservar.",
+        },
+        { status: 503 }
       );
     }
     const result = await initiatePublicFintocCheckout(

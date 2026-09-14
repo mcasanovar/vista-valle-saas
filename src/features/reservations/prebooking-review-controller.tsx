@@ -18,9 +18,13 @@ import {
 export function PrebookingReviewController({
   review,
   bookingEnabled,
+  payAtPropertyEnabled = true,
+  payOnlineEnabled = true,
 }: Readonly<{
   review: Extract<PrebookingReview, { kind: "ready" }>;
   bookingEnabled: boolean;
+  payAtPropertyEnabled?: boolean;
+  payOnlineEnabled?: boolean;
 }>) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -144,6 +148,8 @@ export function PrebookingReviewController({
         <GuestInformationForm />
         <BookingConfirmationController
           bookingEnabled={bookingEnabled}
+          payAtPropertyEnabled={payAtPropertyEnabled}
+          payOnlineEnabled={payOnlineEnabled}
           roomCount={review.rooms.length}
         />
       </div>

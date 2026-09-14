@@ -93,6 +93,53 @@ describe("BookingConfirmationController", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("hides pagar al llegar when the admin disabled it", () => {
+    render(
+      <BookingConfirmationController
+        bookingEnabled
+        payAtPropertyEnabled={false}
+        roomCount={1}
+      />
+    );
+    expect(
+      screen.queryByRole("radio", { name: /Pagar al llegar/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: /Pagar online/ })
+    ).toBeChecked();
+  });
+
+  it("hides pagar online when the admin disabled it, even for a single room", () => {
+    render(
+      <BookingConfirmationController
+        bookingEnabled
+        payOnlineEnabled={false}
+        roomCount={1}
+      />
+    );
+    expect(
+      screen.queryByRole("radio", { name: /Pagar online/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: /Pagar al llegar/ })
+    ).toBeChecked();
+  });
+
+  it("shows no payment option and no confirm button when both methods are disabled", () => {
+    render(
+      <BookingConfirmationController
+        bookingEnabled
+        payAtPropertyEnabled={false}
+        payOnlineEnabled={false}
+        roomCount={1}
+      />
+    );
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Confirmar reserva" })
+    ).not.toBeInTheDocument();
+  });
+
   it("redirects to the Fintoc checkout URL when pago online is selected and confirmed", async () => {
     const originalLocation = window.location;
     Object.defineProperty(window, "location", {
