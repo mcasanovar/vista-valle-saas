@@ -652,6 +652,16 @@ export const companyQuotationBreakfastCatalog = pgTable(
   ]
 );
 
+export const paymentMethodSettings = pgTable("payment_method_settings", {
+  id: id(),
+  payAtPropertyEnabled: boolean("pay_at_property_enabled")
+    .notNull()
+    .default(true),
+  payOnlineEnabled: boolean("pay_online_enabled").notNull().default(true),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
 export const companyQuotationLines = pgTable(
   "company_quotation_lines",
   {

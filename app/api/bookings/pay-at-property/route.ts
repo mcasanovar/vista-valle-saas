@@ -12,6 +12,7 @@ import {
   ReusedBookingIdempotencyKeyError,
 } from "@/features/reservations/booking-idempotency";
 import { getPublicBookingRequestLimiter } from "@/infrastructure/security/request-limiter";
+import { getServerPaymentMethodSettingsRepository } from "@/infrastructure/database/payment-method-settings-source";
 
 const maxBookingRequestBytes = 16 * 1024;
 
@@ -51,6 +52,17 @@ export async function POST(request: Request) {
           status: 429,
           headers: { "Retry-After": String(limit.retryAfterSeconds) },
         }
+      );
+    }
+    const paymentMethodSettings =
+      await getServerPaymentMethodSettingsRepository()?.get();
+    if (paymentMethodSettings?.payAtPropertyEnabled === false) {
+      return Response.json(
+        {
+          message:
+            "Pagar al llegar no está disponible en este momento. Escríbenos por WhatsApp para reservar.",
+        },
+        { status: 503 }
       );
     }
     const command = getPayAtPropertyBookingConfirmationService();
