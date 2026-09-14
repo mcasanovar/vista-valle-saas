@@ -17,7 +17,9 @@ import { resolveDisplayRoomNightlyPrice } from "@/features/rooms/occupancy-prici
 // eslint-disable-next-line architecture/feature-public-api
 import type { RoomOccupancyPrice } from "@/features/rooms/read-model";
 
-const selectableOccupancies = [1, 2] as const;
+function selectableOccupanciesUpTo(capacity: number) {
+  return Array.from({ length: Math.max(0, capacity) }, (_, index) => index + 1);
+}
 
 export function RoomDetailPriceCard({
   slug,
@@ -81,34 +83,32 @@ export function RoomDetailPriceCard({
             aria-label="Cantidad de personas"
             className="inline-flex rounded-full border border-border bg-muted p-1"
           >
-            {selectableOccupancies
-              .filter((value) => value <= capacity)
-              .map((value) => {
-                const disabled =
-                  selection !== null &&
-                  !isOccupancySelectable(
-                    selection.guests,
-                    selection.rooms,
-                    slug,
-                    value
-                  );
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={occupancy === value}
-                    disabled={disabled}
-                    onClick={() => chooseOccupancy(value)}
-                    className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors ${
-                      occupancy === value
-                        ? "bg-foreground text-background"
-                        : "text-muted-foreground"
-                    } disabled:cursor-not-allowed disabled:opacity-40`}
-                  >
-                    {value} {value === 1 ? "persona" : "personas"}
-                  </button>
+            {selectableOccupanciesUpTo(capacity).map((value) => {
+              const disabled =
+                selection !== null &&
+                !isOccupancySelectable(
+                  selection.guests,
+                  selection.rooms,
+                  slug,
+                  value
                 );
-              })}
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={occupancy === value}
+                  disabled={disabled}
+                  onClick={() => chooseOccupancy(value)}
+                  className={`inline-flex min-h-11 min-w-11 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors ${
+                    occupancy === value
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground"
+                  } disabled:cursor-not-allowed disabled:opacity-40`}
+                >
+                  {value} {value === 1 ? "persona" : "personas"}
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}
