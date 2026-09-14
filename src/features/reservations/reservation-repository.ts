@@ -29,7 +29,8 @@ export type PayAtPropertyPayment = Readonly<{
   /** `"pay_at_property"` for a guest-collected payment; the connection's platform (e.g. `"airbnb"`) for a channel-sync reservation whose payment was already approved by that platform (see `channel-calendar-sync` design.md decision 2). */
   provider: string;
   reservationId: string;
-  status: "pending" | "approved";
+  /** `"cancelled"` only arises for a pending balance a date edit reconciled away (design.md decision 3); it is never re-approved. */
+  status: "pending" | "approved" | "cancelled";
 }>;
 export type PendingPayAtPropertyPayment = PayAtPropertyPayment &
   Readonly<{ status: "pending" }>;
@@ -145,6 +146,43 @@ export type ReservationStateTransition = Readonly<{
   to: Exclude<ReservationStatus, "confirmed">;
 }>;
 
+/**
+ * The single pending `pay_at_property` balance a date edit must reconcile
+ * (design.md decision 3): `"set_pending"` creates it (if none exists) or
+ * updates its amount to `amountClp`; `"cancel_pending"` cancels the
+ * existing row because the recalculated balance dropped to zero or below
+ * (a payment's `amountClp` must stay positive, so a zero balance is
+ * represented by cancelling, not zeroing, the row); `"none"` leaves
+ * payments untouched. Approved payments are never mutated in any case.
+ */
+export type ReservationDateEditPaymentAction =
+  | Readonly<{ type: "none" }>
+  | Readonly<{ type: "set_pending"; amountClp: number }>
+  | Readonly<{ type: "cancel_pending" }>;
+
+/**
+ * Recalculated, server-authoritative pricing and financial action to
+ * persist for a date edit (see
+ * `@/features/reservations/edit-reservation-dates`). `items` mirrors every
+ * existing room line with its recalculated `nightlyPriceClp`, `nights`,
+ * `chargesClp`, and `totalClp` for the new interval - the repository never
+ * receives (or trusts) a caller-supplied total or payment amount.
+ */
+export type EditReservationDatesTransactionInput = Readonly<{
+  actorUserId?: string;
+  /** Persisted sum of approved payments used to compute `paymentAction` - recorded verbatim in the audit event (task 2.4), never re-derived by the repository. */
+  approvedPaymentsClp: number;
+  checkIn: string;
+  checkOut: string;
+  items: readonly ReservationItemPricingResult[];
+  /** `max(approvedPaymentsClp - newTotalClp, 0)`, for the audit event only; never mutates a payment. */
+  overpaymentClp: number;
+  paymentAction: ReservationDateEditPaymentAction;
+  /** The reservation's single open `pay_at_property` pending payment, if any (see `getPendingPayAtPropertyPaymentByReservationId`). Required to target `"set_pending"`/`"cancel_pending"` at the right row. */
+  pendingPayAtPropertyPaymentId?: string;
+  reservationId: string;
+}>;
+
 export class ReservationStateTransitionError extends Error {
   readonly code = "INVALID_RESERVATION_STATE_TRANSITION" as const;
 
@@ -196,6 +234,8 @@ export type ReservationRepository<TContext> = Readonly<{
   getPendingPayAtPropertyPaymentByReservationId?: (
     reservationId: string
   ) => Promise<PendingPayAtPropertyPayment | null>;
+  /** Sum of every `approved` payment (pay-at-property or pay-now) recorded for the reservation; the immutable base a date edit's balance is computed against (design.md decision 3). */
+  getApprovedPaymentsTotalClp?: (reservationId: string) => Promise<number>;
   approvePayAtPropertyPayment?: (
     reservationId: string
   ) => Promise<PayAtPropertyPayment>;
@@ -213,10 +253,21 @@ export type ReservationRepository<TContext> = Readonly<{
     context: TContext,
     transition: ReservationStateTransition
   ) => Promise<ReservationRecord>;
+  /**
+   * Atomically updates a reservation's header and every room item to a
+   * recalculated interval/pricing (task 2.1 implements the Drizzle
+   * adapter; task 1.4 implements the mock double). Optional until both
+   * adapters land.
+   */
+  editReservationDates?: (
+    context: TContext,
+    input: EditReservationDatesTransactionInput
+  ) => Promise<ReservationRecord>;
 }>;
 
 type MockReservationStorage = Readonly<{
-  paymentsByReservationId: Map<string, PayAtPropertyPayment>;
+  /** Every pay-at-property payment row for a reservation - normally one, but a date edit may add a second (a new pending balance) alongside an already-approved payment (design.md decision 3). */
+  paymentsByReservationId: Map<string, PayAtPropertyPayment[]>;
   payNowPaymentsByReservationId: Map<string, ApprovedPayNowPayment>;
   publicIds: Set<string>;
   /** Keys are `${externalPlatform}:${externalRef}`; mirrors the `reservations_external_platform_ref_unique` DB constraint (task 1.2). */
@@ -230,7 +281,7 @@ const canonicalReservationStorageKey = Symbol.for(
 
 function createReservationStorage(): MockReservationStorage {
   return {
-    paymentsByReservationId: new Map<string, PayAtPropertyPayment>(),
+    paymentsByReservationId: new Map<string, PayAtPropertyPayment[]>(),
     payNowPaymentsByReservationId: new Map<string, ApprovedPayNowPayment>(),
     publicIds: new Set<string>(),
     externalRefs: new Set<string>(),
@@ -327,7 +378,7 @@ export function createMockReservationRepository(
       });
 
       storage.reservationsById.set(reservation.id, reservation);
-      storage.paymentsByReservationId.set(reservation.id, payment);
+      storage.paymentsByReservationId.set(reservation.id, [payment]);
       storage.publicIds.add(reservation.publicId);
       if (externalKey) storage.externalRefs.add(externalKey);
       for (const item of items)
@@ -403,29 +454,54 @@ export function createMockReservationRepository(
       Promise.resolve(Object.freeze([...storage.reservationsById.values()])),
     getPendingPayAtPropertyPaymentByReservationId: (reservationId) =>
       Promise.resolve(
-        storage.paymentsByReservationId.get(reservationId)?.status === "pending"
-          ? (storage.paymentsByReservationId.get(
-              reservationId
-            ) as PendingPayAtPropertyPayment)
-          : null
+        (storage.paymentsByReservationId.get(reservationId) ?? []).find(
+          (payment): payment is PendingPayAtPropertyPayment =>
+            payment.status === "pending"
+        ) ?? null
       ),
+    getApprovedPaymentsTotalClp: async (reservationId) => {
+      const payAtPropertyTotal = (
+        storage.paymentsByReservationId.get(reservationId) ?? []
+      )
+        .filter((payment) => payment.status === "approved")
+        .reduce((sum, payment) => sum + payment.amountClp, 0);
+      const payNowAmount =
+        storage.payNowPaymentsByReservationId.get(reservationId)?.amountClp ??
+        0;
+      return payAtPropertyTotal + payNowAmount;
+    },
     approvePayAtPropertyPayment: async (reservationId) => {
-      const payment = storage.paymentsByReservationId.get(reservationId);
-      if (!payment || payment.status !== "pending")
-        throw new Error("Pending payment not found");
+      const payments = storage.paymentsByReservationId.get(reservationId) ?? [];
+      const index = payments.findIndex(
+        (payment) => payment.status === "pending"
+      );
+      if (index < 0) throw new Error("Pending payment not found");
       const approved = Object.freeze({
-        ...payment,
+        ...payments[index]!,
         status: "approved" as const,
       });
-      storage.paymentsByReservationId.set(reservationId, approved);
+      storage.paymentsByReservationId.set(reservationId, [
+        ...payments.slice(0, index),
+        approved,
+        ...payments.slice(index + 1),
+      ]);
       return approved;
     },
     restorePendingPayAtPropertyPayment: async (reservationId) => {
-      const payment = storage.paymentsByReservationId.get(reservationId);
-      if (!payment || payment.status !== "approved")
-        throw new Error("Approved payment not found");
-      const pending = Object.freeze({ ...payment, status: "pending" as const });
-      storage.paymentsByReservationId.set(reservationId, pending);
+      const payments = storage.paymentsByReservationId.get(reservationId) ?? [];
+      const index = payments.findIndex(
+        (payment) => payment.status === "approved"
+      );
+      if (index < 0) throw new Error("Approved payment not found");
+      const pending = Object.freeze({
+        ...payments[index]!,
+        status: "pending" as const,
+      });
+      storage.paymentsByReservationId.set(reservationId, [
+        ...payments.slice(0, index),
+        pending,
+        ...payments.slice(index + 1),
+      ]);
       return pending;
     },
     rollbackConfirmedPayAtPropertyReservation: async (context, created) => {
@@ -453,6 +529,102 @@ export function createMockReservationRepository(
       storage.reservationsById.set(updated.id, updated);
       for (const item of updated.items)
         context.removeOccupancy("reservation", updated.id, item.roomId);
+      return updated;
+    },
+    editReservationDates: async (context, input) => {
+      const current = storage.reservationsById.get(input.reservationId);
+      if (!current) throw new ReservationNotFoundError(input.reservationId);
+
+      const items = Object.freeze(
+        input.items.map((item) =>
+          Object.freeze({
+            chargesClp: item.chargesClp,
+            guestCount: item.guestCount,
+            nightlyPriceClp: item.nightlyPriceClp,
+            nights: item.nights,
+            roomId: item.roomId,
+            subtotalClp: item.totalClp,
+          })
+        )
+      );
+      const firstItem = items[0];
+      if (!firstItem) throw new Error("Reservation requires room items");
+
+      const updated: ReservationRecord = Object.freeze({
+        ...current,
+        chargesClp: firstItem.chargesClp,
+        checkIn: input.checkIn,
+        checkOut: input.checkOut,
+        items,
+        nightlyPriceClp: firstItem.nightlyPriceClp,
+        roomId: firstItem.roomId,
+        totalClp: items.reduce((total, item) => total + item.subtotalClp, 0),
+        updatedAt: new Date(),
+      });
+      storage.reservationsById.set(updated.id, updated);
+
+      for (const item of current.items)
+        context.removeOccupancy("reservation", updated.id, item.roomId);
+      for (const item of updated.items)
+        context.recordOccupancy({
+          interval: createLodgingInterval(updated.checkIn, updated.checkOut),
+          roomId: item.roomId,
+          source: "reservation",
+          sourceId: updated.id,
+        });
+
+      if (input.paymentAction.type !== "none") {
+        const payments = storage.paymentsByReservationId.get(updated.id) ?? [];
+        const pendingIndex = payments.findIndex(
+          (payment) =>
+            input.pendingPayAtPropertyPaymentId
+              ? payment.id === input.pendingPayAtPropertyPaymentId
+              : payment.status === "pending"
+        );
+        if (input.paymentAction.type === "set_pending") {
+          const amountClp = input.paymentAction.amountClp;
+          if (pendingIndex >= 0) {
+            const adjusted = Object.freeze({
+              ...payments[pendingIndex]!,
+              amountClp,
+            });
+            storage.paymentsByReservationId.set(updated.id, [
+              ...payments.slice(0, pendingIndex),
+              adjusted,
+              ...payments.slice(pendingIndex + 1),
+            ]);
+          } else {
+            const created: PayAtPropertyPayment = Object.freeze({
+              amountClp,
+              currency: "CLP",
+              externalReference: `${paymentReference(updated.publicId)}:edit:${crypto.randomUUID()}`,
+              id: crypto.randomUUID(),
+              mode: "pay_at_property",
+              provider: "pay_at_property",
+              reservationId: updated.id,
+              status: "pending",
+            });
+            storage.paymentsByReservationId.set(updated.id, [
+              ...payments,
+              created,
+            ]);
+          }
+        } else if (
+          input.paymentAction.type === "cancel_pending" &&
+          pendingIndex >= 0
+        ) {
+          const cancelled = Object.freeze({
+            ...payments[pendingIndex]!,
+            status: "cancelled" as const,
+          });
+          storage.paymentsByReservationId.set(updated.id, [
+            ...payments.slice(0, pendingIndex),
+            cancelled,
+            ...payments.slice(pendingIndex + 1),
+          ]);
+        }
+      }
+
       return updated;
     },
   });

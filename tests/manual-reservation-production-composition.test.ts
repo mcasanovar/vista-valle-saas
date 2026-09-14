@@ -63,6 +63,8 @@ function productionContextAdapter() {
         repository.createConfirmedPayNowReservation(mockGuestContext, input),
       transitionReservationState: (_transaction, transition) =>
         repository.transitionReservationState(mockGuestContext, transition),
+      editReservationDates: (_transaction, input) =>
+        repository.editReservationDates!(mockGuestContext, input),
       rollbackConfirmedPayAtPropertyReservation:
         rollbackConfirmedPayAtPropertyReservation
           ? (_transaction, created) =>

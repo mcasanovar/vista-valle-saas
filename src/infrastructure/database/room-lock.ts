@@ -167,7 +167,7 @@ export function createDrizzleRoomLockGateway(
           throw new RoomLockRoomNotFoundError(ordered[0]!);
         return operation(tx);
       }),
-    runExclusiveMany: (roomIds, requestedInterval, operation) =>
+    runExclusiveMany: (roomIds, requestedInterval, operation, options) =>
       db.transaction(async (tx) => {
         const ordered = [...new Set(roomIds)].sort();
         if (ordered.length !== roomIds.length || ordered.length === 0)
@@ -181,10 +181,17 @@ export function createDrizzleRoomLockGateway(
         if (locked.length !== ordered.length)
           throw new RoomLockRoomNotFoundError(ordered[0]!);
         for (const roomId of ordered) {
-          const result = checkRoomAvailability(
-            await listOccupyingIntervals(tx, roomId, now()),
-            requestedInterval
+          const occupying = (
+            await listOccupyingIntervals(tx, roomId, now())
+          ).filter(
+            (entry) =>
+              !(
+                options?.excludeReservationId &&
+                entry.source === "reservation" &&
+                entry.sourceId === options.excludeReservationId
+              )
           );
+          const result = checkRoomAvailability(occupying, requestedInterval);
           if (!result.available)
             throw new RoomLockConflictError(result.conflicts, roomId);
         }

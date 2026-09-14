@@ -1,10 +1,4 @@
-# reservation-administration Specification
-
-## Purpose
-
-Darle una visual amigable y funcional a la seccion de administracion de reservas en el dashboard de administrador
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Gestión de reservas
 
@@ -147,4 +141,3 @@ El sistema SHALL permitir a un administrador autorizado crear y retirar bloqueos
 
 - **WHEN** el administrador elige un motivo sugerido o escribe un motivo libre no vacío
 - **THEN** el sistema conserva el texto elegido como motivo del bloqueo y lo muestra en su detalle y listado
-

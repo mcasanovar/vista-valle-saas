@@ -241,6 +241,7 @@ if (!enabled) {
         {
           writeCompanyQuotationRequested: async () => undefined,
           writePaymentCollected: async () => undefined,
+          writeReservationDatesChanged: async () => undefined,
           writeReservationConfirmed: async () => {
             throw new Error("outbox write failed");
           },

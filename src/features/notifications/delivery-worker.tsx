@@ -6,6 +6,7 @@ import {
   renderNewReservationAdminAlertEmail,
   renderPayAtPropertyConfirmationEmail,
   renderPaymentCollectedAdminEmail,
+  renderReservationDatesChangedAdminEmail,
   renderCompanyQuotationAdminEmail,
   renderCompanyQuotationCustomerEmail,
 } from "./email-template-renderer";
@@ -85,6 +86,12 @@ async function renderEmail(
     return {
       html: renderPayAtPropertyConfirmationEmail(data),
       subject: "Tu reserva en Vista Valle está confirmada",
+    };
+  }
+  if (intent.type === "reservation_dates_changed_admin") {
+    return {
+      html: renderReservationDatesChangedAdminEmail(data),
+      subject: "Fechas de reserva actualizadas",
     };
   }
   return {
