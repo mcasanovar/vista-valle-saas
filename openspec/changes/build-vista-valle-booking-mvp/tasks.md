@@ -25,6 +25,8 @@
 - [x] 3.6 Implement the company enquiry path using the configured contact channel without routing it through individual checkout, with a labelled no-send demonstration form allowed only under the mock context until an approved channel is configured
 - [x] 3.7 Add metadata, canonical URLs, Open Graph, sitemap, robots, structured lodging data, semantic markup, keyboard support, and image optimization
 - [x] 3.8 Verify public pages across mobile, tablet, notebook, and desktop accessibility breakpoints
+- [x] 3.9 Correct and verify the mobile navigation viewport containment, accessible open/close behavior, keyboard focus, Escape handling, scroll locking, and narrow-screen overflow
+- [x] 3.10 Recompose the mobile public header so the theme and hamburger controls occupy the right edge, hide the duplicate header booking CTA below the laptop breakpoint, anchor the open menu to the viewport right edge, and verify narrow-screen visual behavior
 
 ## 4. Availability and reservation domain
 

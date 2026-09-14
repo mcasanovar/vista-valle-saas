@@ -41,9 +41,15 @@ test.describe("public responsive pages", () => {
           name: "Descansa con una experiencia para recordar",
         })
       ).toBeVisible();
-      await expect(
-        page.getByRole("link", { name: "Reservar", exact: true })
-      ).toBeVisible();
+      if (viewport.width < 1024) {
+        await expect(
+          page.getByRole("link", { name: "Reservar ahora", exact: true })
+        ).toBeVisible();
+      } else {
+        await expect(
+          page.getByRole("link", { name: "Reservar", exact: true })
+        ).toBeVisible();
+      }
       await expect(
         page.getByRole("link", { name: "Ver habitación" }).first()
       ).toBeVisible();
@@ -147,6 +153,17 @@ test.describe("public responsive pages", () => {
     await expect(
       page.getByRole("link", { name: "Habitaciones" }).last()
     ).toBeVisible();
+    const menu = page.getByRole("navigation", { name: "Navegación móvil" });
+    const menuBox = await menu.boundingBox();
+    expect(menuBox).not.toBeNull();
+    expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+    expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(375);
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth
+      )
+    ).toBe(true);
+    await expect(page.locator("body")).toHaveCSS("overflow", "hidden");
 
     await page.keyboard.press("Escape");
     await expect(
