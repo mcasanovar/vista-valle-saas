@@ -32,8 +32,8 @@
 
 ## 5. Variables de entorno y despliegue
 
-- [ ] 5.1 Confirmar que `MERCADO_PAGO_ACCESS_TOKEN`/`MERCADO_PAGO_WEBHOOK_SECRET` ya declaradas en `src/config/server.ts` reciben las credenciales reales (usar `get_credentials`/`create_application` del MCP de Mercado Pago) y cargarlas en Vercel (proyecto `vista-valle`, producción)
-- [ ] 5.2 Registrar la URL del webhook de producción (`https://vistavallehospedaje.com/api/webhooks/mercadopago`) en el panel de Mercado Pago y confirmar el secreto configurado coincide con `MERCADO_PAGO_WEBHOOK_SECRET`
+- [x] 5.1 Confirmar que `MERCADO_PAGO_ACCESS_TOKEN`/`MERCADO_PAGO_WEBHOOK_SECRET` ya declaradas en `src/config/server.ts` reciben las credenciales reales (usar `get_credentials`/`create_application` del MCP de Mercado Pago) y cargarlas en Vercel (proyecto `vista-valle`, producción)
+- [x] 5.2 Registrar la URL del webhook de producción (`https://vistavallehospedaje.com/api/webhooks/mercadopago`) en el panel de Mercado Pago y confirmar el secreto configurado coincide con `MERCADO_PAGO_WEBHOOK_SECRET`
 - [ ] 5.3 Verificar en el panel de Mercado Pago que la liquidación de fondos está configurada a plazo (no inmediata), según lo decidido con el usuario
 - [ ] 5.4 Ejecutar el checklist de calidad del MCP de Mercado Pago (`quality_checklist`/`quality_evaluation`) contra la integración antes de solicitar la homologación (`form_homologation`)
 
