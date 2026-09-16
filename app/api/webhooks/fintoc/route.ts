@@ -107,7 +107,9 @@ async function handleEvent<TContext>(
   const result = await processFintocWebhookEvent<TContext>({
     event,
     fintocPaymentRepository: dependencies.fintocPaymentRepository,
+    guestRepository: dependencies.guestRepository,
     holdRepository: dependencies.holdRepository,
+    notificationOutboxWriter: dependencies.notificationOutboxWriter,
     reservationRepository: dependencies.reservationRepository,
     roomLockGateway: dependencies.roomLockGateway,
   });

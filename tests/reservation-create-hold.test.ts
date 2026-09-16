@@ -108,6 +108,7 @@ describe("createPaymentHold", () => {
     let holdRepositoryCalls = 0;
 
     const spiedGuestRepository = Object.freeze({
+      ...guestRepository,
       createGuest: (
         ...args: Parameters<typeof guestRepository.createGuest>
       ) => {
@@ -145,6 +146,7 @@ describe("createPaymentHold", () => {
     let guestRepositoryCalls = 0;
 
     const spiedGuestRepository = Object.freeze({
+      ...guestRepository,
       createGuest: (
         ...args: Parameters<typeof guestRepository.createGuest>
       ) => {
@@ -177,6 +179,7 @@ describe("createPaymentHold", () => {
     // to simulate real work happening before the hold is actually
     // persisted (mirroring tests/availability-room-lock.test.ts).
     const delayedGuestRepository = Object.freeze({
+      ...guestRepository,
       createGuest: async (
         ...args: Parameters<typeof guestRepository.createGuest>
       ) => {

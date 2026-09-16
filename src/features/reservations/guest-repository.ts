@@ -32,6 +32,13 @@ export type GuestRepository<TContext> = Readonly<{
     guest: GuestContactDetails
   ) => Promise<GuestRecord>;
   /**
+   * Non-transactional read, used later once a guest already exists (e.g.
+   * resolving the email address for a confirmation notification from a
+   * hold's `guestId` — see `confirm-pay-now-reservation.ts`), matching
+   * `HoldRepository.getHoldById`'s read semantics.
+   */
+  getGuestById: (id: string) => Promise<GuestRecord | null>;
+  /**
    * Mock persistence has no database transaction to unwind. Implementations
    * that need compensation may expose this hook; production relies on the
    * surrounding room-lock transaction instead.
@@ -39,10 +46,7 @@ export type GuestRepository<TContext> = Readonly<{
   rollbackGuest?: (context: TContext, guest: GuestRecord) => Promise<void>;
 }>;
 
-export type MockGuestRepository<TContext> = GuestRepository<TContext> &
-  Readonly<{
-    getGuestById: (id: string) => Promise<GuestRecord | null>;
-  }>;
+export type MockGuestRepository<TContext> = GuestRepository<TContext>;
 
 type MockGuestStorage = Readonly<{ guestsById: Map<string, GuestRecord> }>;
 

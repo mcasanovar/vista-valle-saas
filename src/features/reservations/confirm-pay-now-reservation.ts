@@ -1,6 +1,8 @@
 import { nights, type RoomLockGateway } from "@/features/availability";
+import type { NotificationOutboxWriter } from "@/features/notifications";
 
 import { generateReservationPublicId } from "./create-pay-at-property-reservation";
+import type { GuestRepository } from "./guest-repository";
 import { isHoldExpired, type HoldRepository, type ReservationHoldRecord } from "./hold-repository";
 import type {
   ApprovedPayNowPayment,
@@ -19,8 +21,11 @@ export class HoldExpiredError extends Error {
 
 export type ConfirmPayNowReservationFromHoldParams<TContext> = Readonly<{
   generatePublicId?: () => string;
+  guestRepository: GuestRepository<TContext>;
   hold: ReservationHoldRecord;
   holdRepository: HoldRepository<TContext>;
+  /** Optional so tests/callers that don't care about notifications can omit it, matching `createMultiRoomPayAtPropertyReservation`'s pattern. */
+  notificationOutboxWriter?: NotificationOutboxWriter<TContext> | null;
   now?: () => Date;
   /** e.g. `"fintoc"` or `"mercado_pago"` — the provider whose webhook confirmed this payment. */
   paymentProvider: string;
@@ -49,8 +54,10 @@ export async function confirmPayNowReservationFromHold<TContext>(
 > {
   const {
     generatePublicId = generateReservationPublicId,
+    guestRepository,
     hold,
     holdRepository,
+    notificationOutboxWriter,
     now = () => new Date(),
     paymentProvider,
     paymentExternalReference,
@@ -92,6 +99,19 @@ export async function confirmPayNowReservationFromHold<TContext>(
         }
       );
       await holdRepository.deleteHold(context, hold);
+
+      if (notificationOutboxWriter) {
+        const guest = await guestRepository.getGuestById(hold.guestId);
+        if (!guest) {
+          throw new Error(`Guest not found for hold ${hold.id}`);
+        }
+        await notificationOutboxWriter.writeReservationConfirmed(context, {
+          guest,
+          payment: created.payment,
+          reservation: created.reservation,
+        });
+      }
+
       return created;
     }
   );

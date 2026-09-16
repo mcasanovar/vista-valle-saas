@@ -107,7 +107,9 @@ async function handleEvent<TContext>(
   >,
   dependencies: Readonly<{
     fintocPaymentRepository: ProcessOnlinePaymentWebhookEventParams<TContext>["paymentRepository"];
+    guestRepository: ProcessOnlinePaymentWebhookEventParams<TContext>["guestRepository"];
     holdRepository: ProcessOnlinePaymentWebhookEventParams<TContext>["holdRepository"];
+    notificationOutboxWriter: ProcessOnlinePaymentWebhookEventParams<TContext>["notificationOutboxWriter"];
     reservationRepository: ProcessOnlinePaymentWebhookEventParams<TContext>["reservationRepository"];
     roomLockGateway: ProcessOnlinePaymentWebhookEventParams<TContext>["roomLockGateway"];
   }>
@@ -125,6 +127,8 @@ async function handleEvent<TContext>(
 
   const result = await processOnlinePaymentWebhookEvent<TContext>({
     event,
+    guestRepository: dependencies.guestRepository,
+    notificationOutboxWriter: dependencies.notificationOutboxWriter,
     paymentProvider: "mercado_pago",
     paymentRepository: dependencies.fintocPaymentRepository,
     holdRepository: dependencies.holdRepository,

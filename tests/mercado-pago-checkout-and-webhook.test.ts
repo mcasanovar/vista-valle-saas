@@ -11,6 +11,7 @@ import {
   createMockHoldRepository,
   createMockReservationRepository,
 } from "@/features/reservations";
+import { createMockNotificationOutbox } from "@/features/notifications";
 import { createMockFintocPaymentRepository } from "@/features/payments/fintoc-payment-repository";
 import { createMockMercadoPagoClient } from "@/features/payments/mercado-pago-client";
 import { createMercadoPagoOnlinePaymentProvider } from "@/features/payments/mercado-pago-provider";
@@ -170,6 +171,7 @@ describe("mercado-pago webhook processing", () => {
     ))!;
     const result = await processOnlinePaymentWebhookEvent({
       event,
+      guestRepository: setup.guestRepository,
       paymentProvider: "mercado_pago",
       paymentRepository: setup.paymentRepository,
       holdRepository: setup.holdRepository,
@@ -182,6 +184,41 @@ describe("mercado-pago webhook processing", () => {
     const reservations = await setup.reservationRepository.listReservations!();
     expect(reservations).toHaveLength(1);
     expect(reservations[0]!.paymentMode).toBe("pay_now");
+  });
+
+  it("queues the guest confirmation email when a notification outbox writer is supplied", async () => {
+    const setup = setUp();
+    const outbox =
+      createMockNotificationOutbox<MockRoomLockOperationContext>();
+    const { hold } = await initiate(setup);
+    const payment = (await setup.paymentRepository.getPaymentByExternalReference(
+      hold.id
+    ))!;
+
+    setup.mercadoPagoClient.seedPayment({
+      id: "pay_outbox",
+      status: "approved",
+      externalReference: payment.externalReference,
+    });
+
+    const event = (await setup.provider.parseAndVerifyWebhookEvent(
+      webhookRequest("pay_outbox")
+    ))!;
+    const result = await processOnlinePaymentWebhookEvent({
+      event,
+      guestRepository: setup.guestRepository,
+      notificationOutboxWriter: outbox,
+      paymentProvider: "mercado_pago",
+      paymentRepository: setup.paymentRepository,
+      holdRepository: setup.holdRepository,
+      reservationRepository: setup.reservationRepository,
+      roomLockGateway: setup.roomLockGateway,
+    });
+
+    expect(result).toEqual({ outcome: "reservation_confirmed" });
+    const intents = outbox.list();
+    expect(intents.some((intent) => intent.type === "reservation_confirmed_guest")).toBe(true);
+    expect(intents.some((intent) => intent.type === "reservation_confirmed_admin")).toBe(true);
   });
 
   it("marks the payment rejected and releases the hold when Mercado Pago reports it rejected", async () => {
@@ -202,6 +239,7 @@ describe("mercado-pago webhook processing", () => {
     ))!;
     const result = await processOnlinePaymentWebhookEvent({
       event,
+      guestRepository: setup.guestRepository,
       paymentProvider: "mercado_pago",
       paymentRepository: setup.paymentRepository,
       holdRepository: setup.holdRepository,
@@ -233,6 +271,7 @@ describe("mercado-pago webhook processing", () => {
     ))!;
     const result = await processOnlinePaymentWebhookEvent({
       event,
+      guestRepository: setup.guestRepository,
       paymentProvider: "mercado_pago",
       paymentRepository: setup.paymentRepository,
       holdRepository: setup.holdRepository,
@@ -261,6 +300,7 @@ describe("mercado-pago webhook processing", () => {
     ))!;
     const confirmed = await processOnlinePaymentWebhookEvent({
       event: approvedEvent,
+      guestRepository: setup.guestRepository,
       paymentProvider: "mercado_pago",
       paymentRepository: setup.paymentRepository,
       holdRepository: setup.holdRepository,
@@ -281,6 +321,7 @@ describe("mercado-pago webhook processing", () => {
     ))!;
     const result = await processOnlinePaymentWebhookEvent({
       event: chargebackEvent,
+      guestRepository: setup.guestRepository,
       paymentProvider: "mercado_pago",
       paymentRepository: setup.paymentRepository,
       holdRepository: setup.holdRepository,

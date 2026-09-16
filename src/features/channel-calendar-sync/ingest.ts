@@ -72,7 +72,7 @@ async function createReservationFromEvent(
     ? createDrizzleReservationRepository(db!)
     : mockReservationRepository;
   const guestRepository = production
-    ? createDrizzleGuestRepository()
+    ? createDrizzleGuestRepository(db!)
     : mockGuestRepository;
   const roomLockGateway = production
     ? createDrizzleRoomLockGateway(db!)
