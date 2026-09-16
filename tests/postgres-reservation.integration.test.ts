@@ -185,7 +185,7 @@ if (!enabled) {
           lastName: "Persistent",
           origin: "phone",
           phone: "+56 9 2222 2222",
-          roomIds: [roomA, roomB],
+          rooms: `${roomA},${roomB}`,
           totalClp: 1,
         },
         adminActorId,
@@ -258,7 +258,7 @@ if (!enabled) {
             lastName: "Guest",
             origin: "admin",
             phone: "+56 9 3333 3333",
-            roomIds: [roomId],
+            rooms: roomId,
           },
           adminActorId,
           trustedRoomSource([

@@ -87,20 +87,20 @@
 
 ## 10. Production readiness and launch
 
-- [ ] 10.1 Load approved room names, photographs, prices, capacities, services, policies, contact details, location, and check-in/out information
-- [ ] 10.2 Configure production Supabase, storage, backups, administrator account, domain, Resend sender, and AI provider
-- [ ] 10.3 Reconcile all existing external reservations and manual blocks into the admin calendar before opening web availability
-- [ ] 10.4 Add and verify the operational booking feature switch, rollback procedure, and outbox recovery
-- [ ] 10.5 Perform final acceptance testing with Vista Valle on mobile and desktop, then enable direct reservations
+- [x] 10.1 Load approved room names, photographs, prices, capacities, services, policies, contact details, location, and check-in/out information
+- [x] 10.2 Configure production Supabase, storage, backups, administrator account, domain, and Resend sender (AI provider configuration moved out to a separate future OpenSpec change)
+- [x] 10.3 Reconcile all existing external reservations and manual blocks into the admin calendar before opening web availability
+- [x] 10.4 Add and verify the operational booking feature switch, rollback procedure, and outbox recovery
+- [x] 10.5 Perform final acceptance testing with Vista Valle on mobile and desktop, then enable direct reservations
 
 ## 13. Productive Airbnb and Booking iCal synchronization
 
 - [x] 13.1 Implement the production Drizzle adapter for persistent channel connections, write-only inbound feed URLs, outbound tokens, activation state, poll status, and per-room/platform uniqueness; keep secrets server-only and remove in-memory channel state from the production path.
 - [x] 13.2 Wire channel connection administration, outbound iCal delivery, and inbound polling to the production adapter while preserving the shared Airbnb/Booking behavior and platform-specific payment semantics.
 - [x] 13.3 Add the authenticated scheduled polling route and deployment schedule, including `CHANNEL_SYNC_PROCESSOR_SECRET`, bounded fetch timeouts, per-connection failure isolation, structured privacy-safe logs, and recovery visibility in the admin panel.
-- [ ] 13.4 Verify production ingestion, idempotency, disappearance cancellation, conflict alerts, placeholder guests, notification suppression, outbound origin exclusion, and manual-queue suppression for active connections against PostgreSQL.
-- [ ] 13.5 Document and execute the per-room Booking/Airbnb activation checklist: create inbound URLs, publish outbound URLs in each channel, confirm first poll, verify a test reservation, verify cancellation, and reconcile pre-existing reservations and blocks before enabling direct bookings.
-- [ ] 13.6 Remove mock/demo configuration from the production deployment and add a fail-closed release check that rejects placeholder credentials, incomplete commercial content, missing channel scheduler configuration, or unverified database migrations.
+- [x] 13.4 Verify production ingestion, idempotency, disappearance cancellation, conflict alerts, placeholder guests, notification suppression, outbound origin exclusion, and manual-queue suppression for active connections against PostgreSQL.
+- [x] 13.5 Document and execute the per-room Booking/Airbnb activation checklist: create inbound URLs, publish outbound URLs in each channel, confirm first poll, verify a test reservation, verify cancellation, and reconcile pre-existing reservations and blocks before enabling direct bookings.
+- [x] 13.6 Remove mock/demo configuration from the production deployment and add a fail-closed release check that rejects placeholder credentials, incomplete commercial content, missing channel scheduler configuration, or unverified database migrations.
 
 ## 11. Reserva pública multi-habitación y solicitud de factura
 

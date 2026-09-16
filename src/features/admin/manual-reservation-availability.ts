@@ -6,7 +6,11 @@ import {
   getAvailabilitySearchRepository,
   type AvailabilityRepository,
 } from "@/features/availability";
-import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
+import {
+  getRoomReadSource,
+  type RoomOccupancyPrice,
+  type RoomReadSource,
+} from "@/features/rooms";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
 import { validateManualReservationDateRange } from "./manual-reservation-contract";
 
@@ -18,6 +22,7 @@ export type ManualReservationAvailability = Readonly<{
     id: string;
     name: string;
     nightlyPriceClp: number;
+    occupancyPrices: readonly RoomOccupancyPrice[];
   }>[];
 }>;
 
@@ -68,6 +73,7 @@ export async function resolveManualReservationAvailability(
             id: room.id,
             name: room.name,
             nightlyPriceClp: room.nightlyPriceClp,
+            occupancyPrices: room.occupancyPrices,
           })
         : null;
     })

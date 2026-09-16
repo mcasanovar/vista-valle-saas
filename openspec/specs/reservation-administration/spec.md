@@ -148,3 +148,53 @@ El sistema SHALL permitir a un administrador autorizado crear y retirar bloqueos
 - **WHEN** el administrador elige un motivo sugerido o escribe un motivo libre no vacío
 - **THEN** el sistema conserva el texto elegido como motivo del bloqueo y lo muestra en su detalle y listado
 
+### Requirement: Acceso administrativo protegido
+El sistema SHALL exigir autenticación a una cuenta administrativa autorizada para acceder a datos de huéspedes y ejecutar operaciones del panel, sin ofrecer registro público de administradores.
+
+#### Scenario: Visitante no autenticado
+- **WHEN** una persona no autenticada solicita una ruta administrativa
+- **THEN** el sistema impide el acceso y solicita autenticación
+
+### Requirement: Calendario operativo
+El sistema SHALL presentar por habitación las reservas, retenciones relevantes y bloqueos en una vista de calendario que permita identificar disponibilidad y origen.
+
+#### Scenario: Revisión de una fecha
+- **WHEN** el administrador consulta una fecha del calendario
+- **THEN** puede distinguir disponibilidad, reserva, retención o bloqueo y abrir su detalle
+
+### Requirement: Reservas manuales multicanal
+El sistema SHALL permitir crear reservas manuales indicando como origen Airbnb, Booking, teléfono, WhatsApp o administración, aplicando las mismas validaciones de disponibilidad que una reserva web.
+
+#### Scenario: Ingreso de reserva de Booking
+- **WHEN** el administrador ingresa una reserva de Booking para una habitación disponible
+- **THEN** el sistema la confirma y bloquea esas fechas para nuevas reservas web
+
+#### Scenario: Reserva externa superpuesta
+- **WHEN** el administrador intenta ingresar una reserva externa que se superpone con otra ocupación
+- **THEN** el sistema rechaza la creación y muestra el conflicto existente
+
+### Requirement: Control de sincronización manual
+El sistema SHALL marcar cada reserva web confirmada como pendiente de bloqueo externo y permitir registrar por separado que Airbnb y Booking fueron bloqueados.
+
+#### Scenario: Nueva reserva web
+- **WHEN** se confirma una reserva originada en el sitio
+- **THEN** el panel la muestra en una cola visible con Airbnb y Booking pendientes
+
+#### Scenario: Bloqueos externos completados
+- **WHEN** el administrador confirma que bloqueó ambas plataformas
+- **THEN** la reserva deja de aparecer como pendiente de sincronización manual y conserva quién y cuándo completó la tarea
+
+### Requirement: Auditoría administrativa
+El sistema SHALL registrar actor, fecha y cambio para operaciones sensibles sobre reservas, pagos, bloqueos y sincronización manual.
+
+#### Scenario: Cancelación administrativa
+- **WHEN** un administrador cancela una reserva
+- **THEN** el sistema conserva un evento de auditoría con el estado anterior, el nuevo estado y el responsable
+
+### Requirement: Autenticación administrativa aislada en contexto mock
+El sistema SHALL ofrecer sesiones administrativas simuladas y persistencia controlada bajo un contexto mock explícito para validar el panel sin conectarse a Supabase Auth ni a una base externa, sin permitir que esas identidades sean aceptadas en producción.
+
+#### Scenario: Validación local del panel
+- **WHEN** se prueba una ruta administrativa bajo el contexto mock
+- **THEN** el sistema utiliza una identidad controlada y adaptadores locales, aplica las mismas fronteras de autorización configuradas y no realiza solicitudes de red
+

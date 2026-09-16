@@ -26,6 +26,7 @@ function availableResponse() {
           id: "available-room",
           name: "Habitación Valle",
           nightlyPriceClp: 60000,
+          occupancyPrices: [],
         },
       ],
     }),
@@ -95,9 +96,6 @@ describe("manual reservation form", () => {
     );
 
     await loadAvailability();
-    expect(
-      screen.getByRole("checkbox", { name: /habitación valle/i })
-    ).toHaveAttribute("name", "roomIds");
     await user.click(
       screen.getByRole("checkbox", { name: /solicitar factura/i })
     );
@@ -256,7 +254,7 @@ describe("manual reservation form", () => {
         code: "availability_conflict",
         fieldErrors: [
           {
-            field: "roomIds",
+            field: "rooms",
             message:
               "Una o más habitaciones ya no están disponibles para estas fechas.",
           },

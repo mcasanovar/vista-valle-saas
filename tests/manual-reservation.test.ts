@@ -47,7 +47,7 @@ describe("manual reservation", () => {
         invoiceBusinessActivity: "Hospedaje",
         invoiceEmail: "facturas@example.test",
         origin: "booking",
-        roomIds: ["demo-room-andes", "demo-room-valle"],
+        rooms: "demo-room-andes,demo-room-valle",
       },
       "admin-1"
     );
@@ -65,7 +65,7 @@ describe("manual reservation", () => {
         checkIn: "2030-02-01",
         checkOut: "2030-02-03",
         origin: "admin",
-        roomIds: ["demo-room-andes", "demo-room-valle"],
+        rooms: "demo-room-andes,demo-room-valle",
         availability: false,
         paymentStatus: "approved",
         price: 1,
@@ -77,6 +77,72 @@ describe("manual reservation", () => {
     expect(result.reservation.status).toBe("confirmed");
     expect(result.payment.status).toBe("pending");
     expect(result.reservation.totalClp).toBeGreaterThan(1);
+  });
+  it("resolves the nightly price by occupancy, same as the public booking flow", async () => {
+    const result = await createManualReservation(
+      {
+        ...guest,
+        checkIn: "2030-03-01",
+        checkOut: "2030-03-03",
+        origin: "admin",
+        rooms: "demo-room-terra:1",
+      },
+      "admin-1"
+    );
+    // demo-room-terra has occupancyPrices [1 -> 55000, 2 -> 70000]; the base
+    // nightlyPriceClp (70000) must NOT be used for a 1-guest occupancy.
+    expect(result.reservation.totalClp).toBe(110000);
+  });
+  it("falls back to the base price for a room without occupancy pricing configured", async () => {
+    const result = await createManualReservation(
+      {
+        ...guest,
+        checkIn: "2030-04-01",
+        checkOut: "2030-04-03",
+        origin: "admin",
+        rooms: "demo-room-andes:1",
+      },
+      "admin-1"
+    );
+    expect(result.reservation.totalClp).toBe(120000);
+  });
+  it("prices a multi-room manual reservation with mixed occupancy tiers, matching the public flow's per-room resolution", async () => {
+    const result = await createManualReservation(
+      {
+        ...guest,
+        checkIn: "2030-06-01",
+        checkOut: "2030-06-03",
+        origin: "admin",
+        // demo-room-terra:1 -> 55000/night (differentiated tier);
+        // demo-room-andes:1 -> 60000/night (base fallback, no tiers configured).
+        rooms: "demo-room-terra:1,demo-room-andes:1",
+      },
+      "admin-1"
+    );
+    expect(result.reservation.items).toHaveLength(2);
+    const terraItem = result.reservation.items.find(
+      (item) => item.roomId === "demo-room-terra"
+    );
+    const andesItem = result.reservation.items.find(
+      (item) => item.roomId === "demo-room-andes"
+    );
+    expect(terraItem?.nightlyPriceClp).toBe(55000);
+    expect(andesItem?.nightlyPriceClp).toBe(60000);
+    expect(result.reservation.totalClp).toBe((55000 + 60000) * 2);
+  });
+  it("rejects a reservation whose only room has an out-of-range guest count", async () => {
+    await expect(
+      createManualReservation(
+        {
+          ...guest,
+          checkIn: "2030-05-01",
+          checkOut: "2030-05-03",
+          origin: "admin",
+          rooms: "demo-room-terra:5",
+        },
+        "admin-1"
+      )
+    ).rejects.toThrow("Unknown room");
   });
   it("rejects an overlapping manual reservation", async () => {
     const input = {

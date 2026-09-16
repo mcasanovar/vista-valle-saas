@@ -2,9 +2,23 @@
 
 ## Purpose
 
-TBD - Update Purpose after archive. (A fuller draft of this capability's Purpose exists in the delta at `openspec/changes/build-vista-valle-booking-mvp/specs/payment-processing/spec.md`, which has not yet been synced.)
+Mantener el estado financiero de una reserva —pago al llegar en este MVP— separado del estado de la reserva, de forma auditable. El pago online mediante Mercado Pago Checkout Pro queda fuera de alcance de este MVP (ver design.md, decisión 7); el modelo de datos conserva los campos necesarios para incorporarlo en una fase posterior sin cambiar las reglas descritas aquí.
 
 ## Requirements
+
+### Requirement: Estados independientes de pago
+El sistema SHALL mantener estados de pago pendiente, aprobado, rechazado, cancelado y reembolsado sin inferirlos exclusivamente desde el estado de la reserva.
+
+#### Scenario: Reserva pagar al llegar
+- **WHEN** se confirma una reserva bajo esa modalidad
+- **THEN** la reserva queda confirmada y el pago permanece pendiente
+
+### Requirement: Cancelaciones con pago aprobado
+El sistema SHALL preservar el pago aprobado al cancelar una reserva y SHALL indicar que cualquier devolución debe gestionarse y registrarse explícitamente según la política comercial vigente.
+
+#### Scenario: Cancelación pagada sin devolución registrada
+- **WHEN** se cancela una reserva con pago aprobado
+- **THEN** el pago continúa aprobado y el panel advierte que requiere resolución financiera
 
 ### Requirement: Selección de modalidad de pago al confirmar reserva
 El sistema SHALL permitir al huésped elegir entre pago al llegar y pago en línea al confirmar una reserva de una o más habitaciones, restringido a los métodos que el administrador tenga habilitados en la configuración de métodos de pago. Cuando más de un método de pago en línea esté habilitado, SHALL permitir al huésped elegir entre ellos. El sistema SHALL registrar la modalidad elegida (`pay_at_property` o `pay_now`) junto con el proveedor de pago usado cuando la modalidad sea pago en línea. El sistema SHALL validar en el servidor, al recibir la solicitud de confirmación, que el método solicitado esté habilitado, además de ocultarlo en la interfaz cuando esté deshabilitado.
