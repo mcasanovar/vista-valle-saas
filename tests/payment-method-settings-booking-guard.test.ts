@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { POST as payAtPropertyPOST } from "../app/api/bookings/pay-at-property/route";
 import { POST as fintocCheckoutPOST } from "../app/api/bookings/fintoc-checkout/route";
+import { POST as mercadoPagoCheckoutPOST } from "../app/api/bookings/mercadopago-checkout/route";
 import { getPaymentMethodSettingsRepository } from "@/features/payments";
 
 const booking = {
@@ -27,8 +28,8 @@ function payAtPropertyRequest(idempotencyKey: string) {
   });
 }
 
-function fintocCheckoutRequest() {
-  return new Request("http://localhost/api/bookings/fintoc-checkout", {
+function onlineCheckoutRequest(path: string) {
+  return new Request(`http://localhost${path}`, {
     body: JSON.stringify({ ...booking, guests: "1" }),
     headers: { "Content-Type": "application/json" },
     method: "POST",
@@ -40,6 +41,7 @@ describe("payment method toggle guards booking confirmation endpoints", () => {
     await getPaymentMethodSettingsRepository("mock")!.update({
       payAtPropertyEnabled: true,
       payOnlineEnabled: true,
+      payByCardEnabled: true,
     });
   });
 
@@ -47,6 +49,7 @@ describe("payment method toggle guards booking confirmation endpoints", () => {
     await getPaymentMethodSettingsRepository("mock")!.update({
       payAtPropertyEnabled: false,
       payOnlineEnabled: true,
+      payByCardEnabled: true,
     });
 
     const response = await payAtPropertyPOST(
@@ -56,13 +59,30 @@ describe("payment method toggle guards booking confirmation endpoints", () => {
     expect(response.status).toBe(503);
   });
 
-  it("rejects Fintoc checkout when the admin disabled pago online", async () => {
+  it("rejects Fintoc checkout when the admin disabled la transferencia bancaria", async () => {
     await getPaymentMethodSettingsRepository("mock")!.update({
       payAtPropertyEnabled: true,
       payOnlineEnabled: false,
+      payByCardEnabled: true,
     });
 
-    const response = await fintocCheckoutPOST(fintocCheckoutRequest());
+    const response = await fintocCheckoutPOST(
+      onlineCheckoutRequest("/api/bookings/fintoc-checkout")
+    );
+
+    expect(response.status).toBe(503);
+  });
+
+  it("rejects Mercado Pago checkout when the admin disabled el pago con tarjeta", async () => {
+    await getPaymentMethodSettingsRepository("mock")!.update({
+      payAtPropertyEnabled: true,
+      payOnlineEnabled: true,
+      payByCardEnabled: false,
+    });
+
+    const response = await mercadoPagoCheckoutPOST(
+      onlineCheckoutRequest("/api/bookings/mercadopago-checkout")
+    );
 
     expect(response.status).toBe(503);
   });

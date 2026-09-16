@@ -22,6 +22,7 @@ describe("admin payment methods API route", () => {
     getPaymentMethodSettingsRepository("mock")!.update({
       payAtPropertyEnabled: true,
       payOnlineEnabled: true,
+      payByCardEnabled: true,
     });
   });
 
@@ -41,6 +42,7 @@ describe("admin payment methods API route", () => {
         body: JSON.stringify({
           payAtPropertyEnabled: false,
           payOnlineEnabled: false,
+          payByCardEnabled: false,
         }),
         method: "PUT",
       })
@@ -49,7 +51,11 @@ describe("admin payment methods API route", () => {
     expect(response.status).toBe(401);
     await expect(
       getPaymentMethodSettingsRepository("mock")!.get()
-    ).resolves.toEqual({ payAtPropertyEnabled: true, payOnlineEnabled: true });
+    ).resolves.toEqual({
+      payAtPropertyEnabled: true,
+      payOnlineEnabled: true,
+      payByCardEnabled: true,
+    });
   });
 
   it("returns the current settings for an authenticated GET", async () => {
@@ -59,15 +65,17 @@ describe("admin payment methods API route", () => {
     expect(await response.json()).toEqual({
       payAtPropertyEnabled: true,
       payOnlineEnabled: true,
+      payByCardEnabled: true,
     });
   });
 
-  it("persists a valid authenticated update, including both methods disabled", async () => {
+  it("persists a valid authenticated update, including all three methods disabled", async () => {
     const response = await PUT(
       new Request("http://localhost/api/admin/payment-methods", {
         body: JSON.stringify({
           payAtPropertyEnabled: false,
           payOnlineEnabled: false,
+          payByCardEnabled: false,
         }),
         method: "PUT",
       })
@@ -77,12 +85,14 @@ describe("admin payment methods API route", () => {
     expect(await response.json()).toEqual({
       payAtPropertyEnabled: false,
       payOnlineEnabled: false,
+      payByCardEnabled: false,
     });
     await expect(
       getPaymentMethodSettingsRepository("mock")!.get()
     ).resolves.toEqual({
       payAtPropertyEnabled: false,
       payOnlineEnabled: false,
+      payByCardEnabled: false,
     });
   });
 
@@ -97,6 +107,10 @@ describe("admin payment methods API route", () => {
     expect(response.status).toBe(400);
     await expect(
       getPaymentMethodSettingsRepository("mock")!.get()
-    ).resolves.toEqual({ payAtPropertyEnabled: true, payOnlineEnabled: true });
+    ).resolves.toEqual({
+      payAtPropertyEnabled: true,
+      payOnlineEnabled: true,
+      payByCardEnabled: true,
+    });
   });
 });

@@ -11,6 +11,7 @@ import {
   type RoomLockGateway,
 } from "@/features/availability";
 import {
+  reservationHoldItems,
   reservationHolds,
   reservationItems,
   reservations,
@@ -89,9 +90,13 @@ export async function listOccupyingIntervals(
         id: reservationHolds.id,
       })
       .from(reservationHolds)
+      .innerJoin(
+        reservationHoldItems,
+        eq(reservationHoldItems.holdId, reservationHolds.id)
+      )
       .where(
         and(
-          eq(reservationHolds.roomId, roomId),
+          eq(reservationHoldItems.roomId, roomId),
           gt(reservationHolds.expiresAt, now)
         )
       ),

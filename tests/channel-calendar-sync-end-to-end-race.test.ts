@@ -53,15 +53,18 @@ describe("hold-expiry race with a channel-sync arrival", () => {
           checkIn: interval.checkIn,
           checkOut: interval.checkOut,
           expiresAt: new Date(Date.now() - 60_000), // already expired
-          guestCount: 1,
           guestId: "guest-race-test",
-          pricing: {
-            chargesClp: 0,
-            nightlyPriceClp: 60_000,
-            nights: 2,
-            totalClp: 120_000,
-          },
-          roomId: room.id,
+          items: [
+            {
+              chargesClp: 0,
+              guestCount: 1,
+              nightlyPriceClp: 60_000,
+              nights: 2,
+              roomId: room.id,
+              totalClp: 120_000,
+            },
+          ],
+          totalClp: 120_000,
         })
     );
 
@@ -93,6 +96,7 @@ describe("hold-expiry race with a channel-sync arrival", () => {
         holdRepository,
         paymentExternalReference: "ext-ref-race",
         paymentId: "payment-race",
+        paymentProvider: "fintoc",
         providerPaymentId: "provider-payment-race",
         reservationRepository,
         roomLockGateway,

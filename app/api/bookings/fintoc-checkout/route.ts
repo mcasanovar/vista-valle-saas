@@ -1,5 +1,5 @@
 import { RoomLockConflictError } from "@/features/availability";
-import { publicFintocCheckoutCandidate } from "@/features/reservations";
+import { publicOnlineCheckoutCandidate } from "@/features/reservations";
 import { isBookingAcceptanceEnabled } from "@/features/reservations/confirm-pay-at-property";
 import {
   FintocCheckoutInputError,
@@ -61,7 +61,7 @@ export async function POST(request: Request) {
       );
     }
     const result = await initiatePublicFintocCheckout(
-      publicFintocCheckoutCandidate(await request.json())
+      publicOnlineCheckoutCandidate(await request.json())
     );
     return Response.json(
       { redirectUrl: result.redirectUrl },

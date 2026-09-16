@@ -1,13 +1,14 @@
-import {
-  confirmPayNowReservationFromHold,
-  HoldExpiredError,
-  releaseFailedPayNowHold,
-  type HoldRepository,
-  type ReservationRepository,
+import type {
+  HoldRepository,
+  ReservationRepository,
 } from "@/features/reservations";
 import type { RoomLockGateway } from "@/features/availability";
 
 import type { FintocPaymentRepository } from "./fintoc-payment-repository";
+import {
+  processOnlinePaymentWebhookEvent,
+  type ProcessOnlinePaymentWebhookEventResult,
+} from "./online-payment-webhook";
 
 /**
  * The subset of a Fintoc event this handler understands, after
@@ -61,106 +62,42 @@ export type ProcessFintocWebhookEventParams<TContext> = Readonly<{
   roomLockGateway: RoomLockGateway<TContext>;
 }>;
 
-export type ProcessFintocWebhookEventResult =
-  | Readonly<{ outcome: "ignored_duplicate" }>
-  | Readonly<{ outcome: "payment_not_found" }>
-  | Readonly<{ outcome: "reservation_confirmed" }>
-  | Readonly<{ outcome: "hold_expired" }>
-  | Readonly<{ outcome: "payment_failed" }>
-  | Readonly<{ outcome: "requires_action" }>
-  | Readonly<{ outcome: "no_action" }>;
+export type ProcessFintocWebhookEventResult = Exclude<
+  ProcessOnlinePaymentWebhookEventResult,
+  Readonly<{ outcome: "charged_back" }>
+>;
 
 /**
- * Dispatches one already signature-verified Fintoc webhook event (see
- * `verifyFintocWebhookSignature`). The caller must have already recorded
- * the event id for idempotency via `fintocPaymentRepository.recordWebhookEvent`
- * before calling this — this function assumes the event is new.
+ * Thin Fintoc-specific wrapper around the provider-agnostic
+ * `processOnlinePaymentWebhookEvent` (`./online-payment-webhook.ts`),
+ * kept as its own name/params for backward compatibility with existing
+ * call sites and tests (see `add-mercado-pago-checkout-pro` design.md
+ * decision 2). The caller must have already recorded the event id for
+ * idempotency via `fintocPaymentRepository.recordWebhookEvent` before
+ * calling this — this function assumes the event is new.
  */
 export async function processFintocWebhookEvent<TContext>(
   params: ProcessFintocWebhookEventParams<TContext>
 ): Promise<ProcessFintocWebhookEventResult> {
-  const {
-    event,
-    fintocPaymentRepository,
-    holdRepository,
-    reservationRepository,
-    roomLockGateway,
-  } = params;
-
-  const payment = event.checkoutSessionId
-    ? await fintocPaymentRepository.getPaymentByExternalReference(
-        event.checkoutSessionId
-      )
-    : event.paymentIntentId
-      ? await fintocPaymentRepository.getPaymentByProviderPaymentId(
-          event.paymentIntentId
-        )
-      : null;
-  if (!payment || !payment.holdId) {
-    return Object.freeze({ outcome: "payment_not_found" });
-  }
-  // Already in a final state (a retried/duplicate event that slipped past
-  // event-id idempotency, e.g. a redelivery with a new event id).
-  if (payment.status !== "pending" && payment.status !== "requires_action") {
-    return Object.freeze({ outcome: "ignored_duplicate" });
-  }
-
-  const hold = await holdRepository.getHoldById(payment.holdId);
-
-  if (event.sessionExpiredWithoutPayment) {
-    await fintocPaymentRepository.markFailed(payment, "cancelled");
-    if (hold) {
-      await releaseFailedPayNowHold({ hold, holdRepository, roomLockGateway });
-    }
-    return Object.freeze({ outcome: "payment_failed" });
-  }
-
-  if (!event.paymentIntentId) {
-    return Object.freeze({ outcome: "no_action" });
-  }
-  const paymentIntentId = event.paymentIntentId;
-
-  switch (event.paymentIntentStatus) {
-    case "succeeded": {
-      if (!hold) return Object.freeze({ outcome: "payment_not_found" });
-      try {
-        const confirmed = await confirmPayNowReservationFromHold({
-          hold,
-          holdRepository,
-          paymentExternalReference: payment.externalReference,
-          paymentId: payment.id,
-          providerPaymentId: paymentIntentId,
-          reservationRepository,
-          roomLockGateway,
-        });
-        await fintocPaymentRepository.markApproved(payment, {
-          providerPaymentId: paymentIntentId,
-          reservationId: confirmed.reservation.id,
-        });
-        return Object.freeze({ outcome: "reservation_confirmed" });
-      } catch (error) {
-        if (error instanceof HoldExpiredError) {
-          return Object.freeze({ outcome: "hold_expired" });
-        }
-        throw error;
-      }
-    }
-    case "failed":
-    case "rejected":
-    case "expired": {
-      const status =
-        event.paymentIntentStatus === "expired" ? "cancelled" : "rejected";
-      await fintocPaymentRepository.markFailed(payment, status, paymentIntentId);
-      if (hold) {
-        await releaseFailedPayNowHold({ hold, holdRepository, roomLockGateway });
-      }
-      return Object.freeze({ outcome: "payment_failed" });
-    }
-    case "requires_action": {
-      await fintocPaymentRepository.markRequiresAction(payment, paymentIntentId);
-      return Object.freeze({ outcome: "requires_action" });
-    }
-    default:
-      return Object.freeze({ outcome: "no_action" });
-  }
+  const result = await processOnlinePaymentWebhookEvent({
+    event: {
+      externalReference: params.event.checkoutSessionId,
+      id: params.event.id,
+      occurredAt: params.event.occurredAt,
+      paymentIntentId: params.event.paymentIntentId,
+      paymentIntentStatus: params.event.paymentIntentStatus,
+      payload: params.event.payload,
+      sessionExpiredWithoutPayment: params.event.sessionExpiredWithoutPayment,
+      type: params.event.type,
+    },
+    paymentProvider: "fintoc",
+    paymentRepository: params.fintocPaymentRepository,
+    holdRepository: params.holdRepository,
+    reservationRepository: params.reservationRepository,
+    roomLockGateway: params.roomLockGateway,
+  });
+  // Fintoc never sends a chargeback event (it settles by bank transfer,
+  // not card), so this outcome is unreachable here — narrowed away for
+  // this wrapper's callers.
+  return result as ProcessFintocWebhookEventResult;
 }

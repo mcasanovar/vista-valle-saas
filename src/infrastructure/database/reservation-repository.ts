@@ -165,6 +165,13 @@ export function createDrizzleReservationRepository(
       });
     },
     createConfirmedPayNowReservation: async (tx, input) => {
+      if (input.items.length === 0) {
+        throw new Error("Reservation requires room items");
+      }
+      const totalClp = input.items.reduce(
+        (total, item) => total + item.totalClp,
+        0
+      );
       const [reservationRow] = await tx
         .insert(reservations)
         .values({
@@ -175,7 +182,7 @@ export function createDrizzleReservationRepository(
           paymentMode: "pay_now",
           publicId: input.publicId,
           status: "confirmed",
-          totalClp: input.item.totalClp,
+          totalClp,
         })
         .returning();
       if (!reservationRow)
@@ -183,17 +190,17 @@ export function createDrizzleReservationRepository(
 
       const itemRows = await tx
         .insert(reservationItems)
-        .values([
-          {
-            chargesClp: input.item.chargesClp,
-            guestCount: input.item.guestCount,
-            nightlyPriceClp: input.item.nightlyPriceClp,
-            nights: input.item.nights,
+        .values(
+          input.items.map((item) => ({
+            chargesClp: item.chargesClp,
+            guestCount: item.guestCount,
+            nightlyPriceClp: item.nightlyPriceClp,
+            nights: item.nights,
             reservationId: reservationRow.id,
-            roomId: input.item.roomId,
-            subtotalClp: input.item.totalClp,
-          },
-        ])
+            roomId: item.roomId,
+            subtotalClp: item.totalClp,
+          }))
+        )
         .returning();
 
       const [paymentRow] = await tx
@@ -220,7 +227,7 @@ export function createDrizzleReservationRepository(
         !paymentRow.reservationId ||
         !paymentRow.providerPaymentId
       ) {
-        throw new Error("Failed to update Fintoc payment as approved");
+        throw new Error("Failed to update online payment as approved");
       }
 
       return Object.freeze({

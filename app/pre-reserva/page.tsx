@@ -30,6 +30,7 @@ export default async function PrebookingPage({
       (await getServerPaymentMethodSettingsRepository()?.get()) ?? {
         payAtPropertyEnabled: true,
         payOnlineEnabled: true,
+        payByCardEnabled: true,
       };
     return (
       <PrebookingReviewController
@@ -37,6 +38,7 @@ export default async function PrebookingPage({
         bookingEnabled={isBookingAcceptanceEnabled()}
         payAtPropertyEnabled={paymentMethodSettings.payAtPropertyEnabled}
         payOnlineEnabled={paymentMethodSettings.payOnlineEnabled}
+        payByCardEnabled={paymentMethodSettings.payByCardEnabled}
       />
     );
   }

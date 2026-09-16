@@ -11,9 +11,10 @@ import {
   raiseConflictAlertForExpiredHold,
 } from "@/features/channel-calendar-sync";
 
-function pricing(roomId: string) {
+function item(roomId: string) {
   return {
     chargesClp: 0,
+    guestCount: 1,
     nightlyPriceClp: 60_000,
     nights: 2,
     roomId,
@@ -34,10 +35,9 @@ describe("raiseConflictAlertForExpiredHold", () => {
           checkIn: interval.checkIn,
           checkOut: interval.checkOut,
           expiresAt: new Date(Date.now() - 60_000),
-          guestCount: 1,
           guestId: "guest-hold-expiry-alert",
-          pricing: pricing("room-hold-expiry-alert"),
-          roomId: "room-hold-expiry-alert",
+          items: [item("room-hold-expiry-alert")],
+          totalClp: 120_000,
         })
     );
 
@@ -71,10 +71,9 @@ describe("confirmPayNowReservationFromHold", () => {
           checkIn: interval.checkIn,
           checkOut: interval.checkOut,
           expiresAt: new Date(Date.now() - 1_000),
-          guestCount: 1,
           guestId: "guest-hold-expiry-flow",
-          pricing: pricing("room-hold-expiry-flow"),
-          roomId: "room-hold-expiry-flow",
+          items: [item("room-hold-expiry-flow")],
+          totalClp: 120_000,
         })
     );
 
@@ -84,6 +83,7 @@ describe("confirmPayNowReservationFromHold", () => {
         holdRepository,
         paymentExternalReference: "ext-ref",
         paymentId: "payment-id",
+        paymentProvider: "fintoc",
         providerPaymentId: "provider-payment-id",
         reservationRepository,
         roomLockGateway,

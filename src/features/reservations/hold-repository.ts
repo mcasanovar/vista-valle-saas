@@ -3,42 +3,50 @@ import {
   type MockRoomLockOperationContext,
 } from "@/features/availability";
 
-import type { ReservationPricingResult } from "./pricing";
+import type { ReservationItemPricingResult } from "./pricing";
+
+/** One room's frozen line within a hold (mirrors `ReservationItemRecord`). */
+export type ReservationHoldItemRecord = Readonly<{
+  chargesClp: number;
+  guestCount: number;
+  nightlyPriceClp: number;
+  nights: number;
+  roomId: string;
+  subtotalClp: number;
+}>;
 
 /**
- * A persisted `reservation_holds` row (see `src/persistence/schema.ts`).
- * Unlike `reservations`, holds have no `publicId`: they are an internal,
- * temporary entity never shown to the guest as a booking confirmation
- * (design.md decision 8).
+ * A persisted `reservation_holds` row plus its `reservation_hold_items`
+ * (see `src/persistence/schema.ts`). Unlike `reservations`, holds have no
+ * `publicId`: they are an internal, temporary entity never shown to the
+ * guest as a booking confirmation (design.md decision 8). A hold always
+ * covers every room of the reservation being paid for with a single
+ * payment — there is no per-room hold or partial release.
  */
 export type ReservationHoldRecord = Readonly<{
-  chargesClp: number;
   checkIn: string;
   checkOut: string;
   createdAt: Date;
   expiresAt: Date;
-  guestCount: number;
   guestId: string;
   id: string;
-  nightlyPriceClp: number;
-  roomId: string;
+  items: readonly ReservationHoldItemRecord[];
   totalClp: number;
 }>;
 
 /**
- * Input required to persist a hold. `pricing` is always the frozen
- * `ReservationPricingResult` produced by `buildReservationQuote`
- * (`./quote.ts`) so a repository implementation never has to (and never
+ * Input required to persist a hold. `items` is always the frozen
+ * `ReservationItemPricingResult[]` produced by `computeMultiRoomReservationPricing`
+ * (`./pricing.ts`) so a repository implementation never has to (and never
  * gets the chance to) recompute or accept a caller-supplied total.
  */
 export type CreateHoldInput = Readonly<{
   checkIn: string;
   checkOut: string;
   expiresAt: Date;
-  guestCount: number;
   guestId: string;
-  pricing: ReservationPricingResult;
-  roomId: string;
+  items: readonly ReservationItemPricingResult[];
+  totalClp: number;
 }>;
 
 /**
@@ -96,35 +104,50 @@ export function createMockHoldRepository(): HoldRepository<MockRoomLockOperation
       context: MockRoomLockOperationContext,
       input: CreateHoldInput
     ) => {
+      if (input.items.length === 0) {
+        throw new Error("Hold requires at least one room item");
+      }
+      const items: ReservationHoldItemRecord[] = input.items.map((item) =>
+        Object.freeze({
+          chargesClp: item.chargesClp,
+          guestCount: item.guestCount,
+          nightlyPriceClp: item.nightlyPriceClp,
+          nights: item.nights,
+          roomId: item.roomId,
+          subtotalClp: item.totalClp,
+        })
+      );
       const record: ReservationHoldRecord = Object.freeze({
-        chargesClp: input.pricing.chargesClp,
         checkIn: input.checkIn,
         checkOut: input.checkOut,
         createdAt: new Date(),
         expiresAt: input.expiresAt,
-        guestCount: input.guestCount,
         guestId: input.guestId,
         id: crypto.randomUUID(),
-        nightlyPriceClp: input.pricing.nightlyPriceClp,
-        roomId: input.roomId,
-        totalClp: input.pricing.totalClp,
+        items: Object.freeze(items),
+        totalClp: input.totalClp,
       });
 
       holdsById.set(record.id, record);
 
-      context.recordOccupancy({
-        expiresAt: record.expiresAt,
-        interval: createLodgingInterval(input.checkIn, input.checkOut),
-        source: "hold",
-        sourceId: record.id,
-      });
+      for (const item of items) {
+        context.recordOccupancy({
+          expiresAt: record.expiresAt,
+          interval: createLodgingInterval(input.checkIn, input.checkOut),
+          roomId: item.roomId,
+          source: "hold",
+          sourceId: record.id,
+        });
+      }
 
       return Promise.resolve(record);
     },
     getHoldById: (id: string) => Promise.resolve(holdsById.get(id) ?? null),
     deleteHold: (context: MockRoomLockOperationContext, hold) => {
       holdsById.delete(hold.id);
-      context.removeOccupancy("hold", hold.id, hold.roomId);
+      for (const item of hold.items) {
+        context.removeOccupancy("hold", hold.id, item.roomId);
+      }
       return Promise.resolve();
     },
   });

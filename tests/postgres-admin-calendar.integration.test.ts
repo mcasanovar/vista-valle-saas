@@ -6,6 +6,7 @@ import { queryAdminCalendar } from "@/infrastructure/database/admin-calendar-sou
 import * as schema from "@/persistence/schema";
 import {
   guests,
+  reservationHoldItems,
   reservationHolds,
   reservationItems,
   reservations,
@@ -93,27 +94,43 @@ if (!enabled) {
         subtotalClp: 60_000,
       });
 
-      await db.insert(reservationHolds).values({
-        checkIn: "2031-02-10",
-        checkOut: "2031-02-11",
+      const [activeHold] = await db
+        .insert(reservationHolds)
+        .values({
+          checkIn: "2031-02-10",
+          checkOut: "2031-02-11",
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+          guestId,
+          totalClp: 60_000,
+        })
+        .returning();
+      await db.insert(reservationHoldItems).values({
         chargesClp: 0,
-        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
         guestCount: 1,
-        guestId,
+        holdId: activeHold!.id,
         nightlyPriceClp: 60_000,
+        nights: 1,
         roomId,
-        totalClp: 60_000,
+        subtotalClp: 60_000,
       });
-      await db.insert(reservationHolds).values({
-        checkIn: "2031-02-12",
-        checkOut: "2031-02-13",
+      const [expiredHold] = await db
+        .insert(reservationHolds)
+        .values({
+          checkIn: "2031-02-12",
+          checkOut: "2031-02-13",
+          expiresAt: new Date(Date.now() - 60 * 60 * 1000),
+          guestId,
+          totalClp: 60_000,
+        })
+        .returning();
+      await db.insert(reservationHoldItems).values({
         chargesClp: 0,
-        expiresAt: new Date(Date.now() - 60 * 60 * 1000),
         guestCount: 1,
-        guestId,
+        holdId: expiredHold!.id,
         nightlyPriceClp: 60_000,
+        nights: 1,
         roomId,
-        totalClp: 60_000,
+        subtotalClp: 60_000,
       });
 
       await db.insert(roomBlocks).values({

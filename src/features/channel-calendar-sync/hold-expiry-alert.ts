@@ -16,14 +16,18 @@ export type HoldLookup = Readonly<{
  * Raises the shared channel-sync conflict alert for a `HoldExpiredError`
  * caught while confirming an online payment (see `channel-calendar-sync`
  * spec: "Alerta de conflicto por vencimiento de retención durante
- * sincronización") — the hold's room may have been taken by an inbound
- * channel-sync event during the expiry window. A no-op if the hold row is
- * no longer found (nothing to attribute the alert to).
+ * sincronización") — any of the hold's rooms may have been taken by an
+ * inbound channel-sync event during the expiry window, so one alert is
+ * raised per room. A no-op if the hold row is no longer found (nothing to
+ * attribute the alert to).
  */
 export async function raiseConflictAlertForExpiredHold(
   holdId: string,
   holdRepository: HoldLookup
 ): Promise<void> {
   const hold = await holdRepository.getHoldById(holdId);
-  if (hold) await recordChannelSyncConflictAlert({ roomId: hold.roomId });
+  if (!hold) return;
+  for (const item of hold.items) {
+    await recordChannelSyncConflictAlert({ roomId: item.roomId });
+  }
 }

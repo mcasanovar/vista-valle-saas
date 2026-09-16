@@ -10,6 +10,7 @@ import type {
 } from "@/features/reservations";
 import {
   guests,
+  reservationHoldItems,
   reservationHolds,
   reservationItems,
   reservations,
@@ -93,7 +94,7 @@ export async function queryAdminCalendar(
     overlapsWindow(reservationHolds.checkIn, reservationHolds.checkOut, window),
   ];
   if (filter.roomId)
-    holdConditions.push(eq(reservationHolds.roomId, filter.roomId));
+    holdConditions.push(eq(reservationHoldItems.roomId, filter.roomId));
 
   const blockConditions = [
     isNull(roomBlocks.removedAt),
@@ -129,12 +130,16 @@ export async function queryAdminCalendar(
         firstName: guests.firstName,
         id: reservationHolds.id,
         lastName: guests.lastName,
-        roomId: reservationHolds.roomId,
+        roomId: reservationHoldItems.roomId,
         roomName: rooms.name,
       })
       .from(reservationHolds)
       .innerJoin(guests, eq(reservationHolds.guestId, guests.id))
-      .innerJoin(rooms, eq(reservationHolds.roomId, rooms.id))
+      .innerJoin(
+        reservationHoldItems,
+        eq(reservationHoldItems.holdId, reservationHolds.id)
+      )
+      .innerJoin(rooms, eq(reservationHoldItems.roomId, rooms.id))
       .where(and(...holdConditions)),
     db
       .select({
@@ -170,7 +175,7 @@ export async function queryAdminCalendar(
         checkIn: row.checkIn,
         checkOut: row.checkOut,
         guestName: `${row.firstName} ${row.lastName}`,
-        id: `hold-${row.id}`,
+        id: `hold-${row.id}-${row.roomId}`,
         kind: "hold",
         room: row.roomName ?? "",
         roomId: row.roomId,

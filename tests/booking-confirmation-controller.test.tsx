@@ -63,7 +63,7 @@ describe("BookingConfirmationController", () => {
         json: async () => ({ publicId: "VV-123" }),
       })
     );
-    render(<BookingConfirmationController bookingEnabled roomCount={1} />);
+    render(<BookingConfirmationController bookingEnabled />);
 
     expect(
       screen.getByRole("radio", { name: /Pagar al llegar/ })
@@ -79,18 +79,17 @@ describe("BookingConfirmationController", () => {
     );
   });
 
-  it("offers the Fintoc online-payment option only for a single room", () => {
-    const { rerender } = render(
-      <BookingConfirmationController bookingEnabled roomCount={1} />
-    );
+  it("offers all three payment options regardless of how many rooms are selected", () => {
+    render(<BookingConfirmationController bookingEnabled />);
     expect(
-      screen.getByRole("radio", { name: /Pagar online/ })
+      screen.getByRole("radio", { name: /Pagar al llegar/ })
     ).toBeInTheDocument();
-
-    rerender(<BookingConfirmationController bookingEnabled roomCount={2} />);
     expect(
-      screen.queryByRole("radio", { name: /Pagar online/ })
-    ).not.toBeInTheDocument();
+      screen.getByRole("radio", { name: /Tarjeta de crédito o débito/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: /Transferencia bancaria/ })
+    ).toBeInTheDocument();
   });
 
   it("hides pagar al llegar when the admin disabled it", () => {
@@ -98,40 +97,47 @@ describe("BookingConfirmationController", () => {
       <BookingConfirmationController
         bookingEnabled
         payAtPropertyEnabled={false}
-        roomCount={1}
       />
     );
     expect(
       screen.queryByRole("radio", { name: /Pagar al llegar/ })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("radio", { name: /Pagar online/ })
+      screen.getByRole("radio", { name: /Transferencia bancaria/ })
     ).toBeChecked();
   });
 
-  it("hides pagar online when the admin disabled it, even for a single room", () => {
+  it("hides transferencia bancaria when the admin disabled Fintoc", () => {
     render(
-      <BookingConfirmationController
-        bookingEnabled
-        payOnlineEnabled={false}
-        roomCount={1}
-      />
+      <BookingConfirmationController bookingEnabled payOnlineEnabled={false} />
     );
     expect(
-      screen.queryByRole("radio", { name: /Pagar online/ })
+      screen.queryByRole("radio", { name: /Transferencia bancaria/ })
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole("radio", { name: /Pagar al llegar/ })
     ).toBeChecked();
   });
 
-  it("shows no payment option and no confirm button when both methods are disabled", () => {
+  it("hides tarjeta when the admin disabled Mercado Pago", () => {
+    render(
+      <BookingConfirmationController bookingEnabled payByCardEnabled={false} />
+    );
+    expect(
+      screen.queryByRole("radio", { name: /Tarjeta de crédito o débito/ })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("radio", { name: /Pagar al llegar/ })
+    ).toBeChecked();
+  });
+
+  it("shows no payment option and no confirm button when every method is disabled", () => {
     render(
       <BookingConfirmationController
         bookingEnabled
         payAtPropertyEnabled={false}
         payOnlineEnabled={false}
-        roomCount={1}
+        payByCardEnabled={false}
       />
     );
     expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
@@ -140,7 +146,7 @@ describe("BookingConfirmationController", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("redirects to the Fintoc checkout URL when pago online is selected and confirmed", async () => {
+  it("redirects to the Fintoc checkout URL when transferencia bancaria is selected and confirmed", async () => {
     const originalLocation = window.location;
     Object.defineProperty(window, "location", {
       configurable: true,
@@ -156,13 +162,53 @@ describe("BookingConfirmationController", () => {
       })
     );
 
-    render(<BookingConfirmationController bookingEnabled roomCount={1} />);
+    render(<BookingConfirmationController bookingEnabled />);
     const user = userEvent.setup();
-    await user.click(screen.getByRole("radio", { name: /Pagar online/ }));
+    await user.click(screen.getByRole("radio", { name: /Transferencia bancaria/ }));
     await user.click(screen.getByRole("button", { name: "Confirmar reserva" }));
 
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/bookings/fintoc-checkout",
+      expect.anything()
+    );
     expect(window.location.href).toBe(
       "https://pay.fintoc.com/checkout/cs_123"
+    );
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: originalLocation,
+    });
+  });
+
+  it("redirects to the Mercado Pago checkout URL when tarjeta is selected and confirmed", async () => {
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, href: "" },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          redirectUrl: "https://www.mercadopago.cl/checkout/v1/redirect?pref_id=mp_1",
+        }),
+      })
+    );
+
+    render(<BookingConfirmationController bookingEnabled />);
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("radio", { name: /Tarjeta de crédito o débito/ })
+    );
+    await user.click(screen.getByRole("button", { name: "Confirmar reserva" }));
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/bookings/mercadopago-checkout",
+      expect.anything()
+    );
+    expect(window.location.href).toBe(
+      "https://www.mercadopago.cl/checkout/v1/redirect?pref_id=mp_1"
     );
     Object.defineProperty(window, "location", {
       configurable: true,
