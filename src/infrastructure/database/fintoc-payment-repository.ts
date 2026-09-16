@@ -53,11 +53,11 @@ export function createDrizzleFintocPaymentRepository(
           externalReference: input.externalReference,
           holdId: input.holdId,
           mode: "pay_now",
-          provider: "fintoc",
+          provider: input.provider ?? "fintoc",
           status: "pending",
         })
         .returning(paymentColumns);
-      if (!row) throw new Error("Failed to insert pending Fintoc payment");
+      if (!row) throw new Error("Failed to insert pending online payment");
       return Object.freeze(row as FintocPaymentRecord);
     },
     getPaymentByExternalReference: async (externalReference) => {
@@ -148,6 +148,20 @@ export function createDrizzleFintocPaymentRepository(
       if (!row) throw new Error("Failed to update Fintoc payment");
       return Object.freeze(row as FintocPaymentRecord);
     },
+    markChargedBack: async (payment) => {
+      if (payment.status !== "approved") {
+        throw new Error(
+          `Payment ${payment.id} is not approved and cannot be charged back`
+        );
+      }
+      const [row] = await db
+        .update(payments)
+        .set({ status: "charged_back" })
+        .where(eq(payments.id, payment.id))
+        .returning(paymentColumns);
+      if (!row) throw new Error("Failed to update payment as charged back");
+      return Object.freeze(row as FintocPaymentRecord);
+    },
     recordWebhookEvent: async (input) => {
       try {
         await db.insert(paymentEvents).values({
@@ -155,7 +169,7 @@ export function createDrizzleFintocPaymentRepository(
           occurredAt: input.occurredAt,
           paymentId: input.paymentId,
           payload: input.payload,
-          provider: "fintoc",
+          provider: input.provider ?? "fintoc",
           providerEventId: input.providerEventId,
         });
         return Object.freeze({ alreadyProcessed: false });
@@ -173,12 +187,12 @@ export function createDrizzleFintocPaymentRepository(
         throw error;
       }
     },
-    discardWebhookEvent: async (providerEventId) => {
+    discardWebhookEvent: async (providerEventId, provider = "fintoc") => {
       await db
         .delete(paymentEvents)
         .where(
           and(
-            eq(paymentEvents.provider, "fintoc"),
+            eq(paymentEvents.provider, provider),
             eq(paymentEvents.providerEventId, providerEventId)
           )
         );

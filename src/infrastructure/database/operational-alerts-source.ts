@@ -5,8 +5,8 @@ import { desc } from "drizzle-orm";
 import { operationalAlerts } from "@/persistence/schema";
 import type { ProductionDatabase } from "./client";
 
-/** Mirrors the `operational_alert_kind` Drizzle enum. Only `channel_sync_conflict` is written today; the table stays generic for a future alert-event (see design.md). */
-export type OperationalAlertKind = "channel_sync_conflict";
+/** Mirrors the `operational_alert_kind` Drizzle enum. */
+export type OperationalAlertKind = "channel_sync_conflict" | "payment_chargeback";
 
 export type OperationalAlertRow = Readonly<{
   id: string;

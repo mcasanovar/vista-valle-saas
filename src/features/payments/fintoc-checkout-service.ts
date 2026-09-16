@@ -6,7 +6,11 @@ import {
 } from "@/features/availability";
 import { getServerEnvironment } from "@/config/server";
 import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
-import { parseGuestInput } from "@/features/reservations";
+import {
+  parseGuestInput,
+  selectedRooms,
+  toResolvedRoom,
+} from "@/features/reservations";
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
 import {
   captureServerException,
@@ -26,42 +30,30 @@ export class FintocCheckoutInputError extends Error {
   readonly code = "INVALID_FINTOC_CHECKOUT_INPUT" as const;
 }
 
-function selectedRoom(candidate: Record<string, unknown>, source: RoomReadSource) {
-  // `rooms` (comma-separated, from the multi-room prebooking flow) must
-  // resolve to exactly one room here — this checkout is single-room only.
-  const key = String(candidate.rooms ?? candidate.room ?? "").split(",")[0] ?? "";
-  return source
-    .listActive()
-    .find((room) => room.id === key || room.slug === key);
-}
-
 /**
  * Public entry point for the online-payment checkout, mirroring
  * `confirmPayAtPropertyBookingWith` in `@/features/reservations/confirm-pay-at-property.ts`:
- * rebuilds the request from untrusted values, then delegates to
- * `initiateFintocCheckout` for the hold + Fintoc session creation.
- * Single-room only (design.md non-goal for this change: multi-room online
- * payment is not required by the `fintoc-payment-integration` spec).
+ * rebuilds the request from untrusted values (resolving every selected
+ * room the same way pay-at-property does — see
+ * `add-mercado-pago-checkout-pro` design.md decision 3), then delegates
+ * to `initiateFintocCheckout` for the hold + Fintoc session creation.
+ * Supports one or more rooms under a single payment for the total (design.md decision 1).
  */
 export async function initiatePublicFintocCheckout(
   candidate: Record<string, unknown>,
   roomSource?: RoomReadSource
 ) {
   const resolvedRoomSource = roomSource ?? (await getRoomReadSource());
-  const roomKeys = String(candidate.rooms ?? candidate.room ?? "")
-    .split(",")
-    .filter(Boolean);
-  if (roomKeys.length > 1) {
-    throw new FintocCheckoutInputError(
-      "El pago en línea solo está disponible para una habitación a la vez."
-    );
-  }
-  const room = selectedRoom(candidate, resolvedRoomSource);
-  if (!room) {
+  const selected = selectedRooms(candidate, resolvedRoomSource);
+  if (
+    !selected.length ||
+    selected.length !== new Set(selected.map((entry) => entry.room.id)).size
+  ) {
     throw new FintocCheckoutInputError(
       "La habitación seleccionada ya no está disponible."
     );
   }
+  const rooms = selected.map(toResolvedRoom);
 
   try {
     const interval = createLodgingInterval(
@@ -77,7 +69,7 @@ export async function initiatePublicFintocCheckout(
       guestCandidate: candidate,
       holdDurationMinutes: environment.BOOKING_HOLD_DURATION_MINUTES,
       interval,
-      room,
+      rooms,
       successUrl: `${environment.SITE_URL}/reservar/procesando`,
     } as const;
 

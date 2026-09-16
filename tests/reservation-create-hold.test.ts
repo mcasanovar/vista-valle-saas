@@ -17,6 +17,7 @@ import {
 
 const ROOM = Object.freeze({
   capacity: 2,
+  guestCount: 2,
   id: "room-a",
   nightlyPriceClp: 60_000,
 });
@@ -58,14 +59,15 @@ describe("createPaymentHold", () => {
       holdRepository,
       interval,
       now,
-      room: ROOM,
+      rooms: [ROOM],
       roomLockGateway,
     });
 
-    expect(hold.roomId).toBe(ROOM.id);
-    expect(hold.guestCount).toBe(2);
-    expect(hold.nightlyPriceClp).toBe(60_000);
-    expect(hold.chargesClp).toBe(0);
+    expect(hold.items).toHaveLength(1);
+    expect(hold.items[0]!.roomId).toBe(ROOM.id);
+    expect(hold.items[0]!.guestCount).toBe(2);
+    expect(hold.items[0]!.nightlyPriceClp).toBe(60_000);
+    expect(hold.items[0]!.chargesClp).toBe(0);
     expect(hold.totalClp).toBe(3 * 60_000);
     expect(hold.checkIn).toBe("2024-05-05");
     expect(hold.checkOut).toBe("2024-05-08");
@@ -83,17 +85,19 @@ describe("createPaymentHold", () => {
     const interval = createLodgingInterval("2024-05-05", "2024-05-08");
 
     const hold = await createPaymentHold({
-      charges: [{ amountClp: 10_000, label: "Cleaning fee" }],
+      chargesByRoom: new Map([
+        [ROOM.id, [{ amountClp: 10_000, label: "Cleaning fee" }]],
+      ]),
       guestCandidate: validGuestCandidate,
       guestRepository,
       holdDurationMinutes: 15,
       holdRepository,
       interval,
-      room: ROOM,
+      rooms: [ROOM],
       roomLockGateway,
     });
 
-    expect(hold.chargesClp).toBe(10_000);
+    expect(hold.items[0]!.chargesClp).toBe(10_000);
     expect(hold.totalClp).toBe(3 * 60_000 + 10_000);
   });
 
@@ -126,7 +130,7 @@ describe("createPaymentHold", () => {
         holdDurationMinutes: 15,
         holdRepository: spiedHoldRepository,
         interval,
-        room: ROOM,
+        rooms: [ROOM],
         roomLockGateway,
       })
     ).rejects.toBeInstanceOf(InvalidGuestInputError);
@@ -151,12 +155,12 @@ describe("createPaymentHold", () => {
 
     await expect(
       createPaymentHold({
-        guestCandidate: { ...validGuestCandidate, guestCount: 3 },
+        guestCandidate: validGuestCandidate,
         guestRepository: spiedGuestRepository,
         holdDurationMinutes: 15,
         holdRepository,
         interval,
-        room: ROOM,
+        rooms: [{ ...ROOM, guestCount: 3 }],
         roomLockGateway,
       })
     ).rejects.toBeInstanceOf(GuestCapacityExceededError);
@@ -188,7 +192,7 @@ describe("createPaymentHold", () => {
         holdDurationMinutes: 15,
         holdRepository,
         interval,
-        room: ROOM,
+        rooms: [ROOM],
         roomLockGateway,
       });
 
@@ -232,7 +236,7 @@ describe("createPaymentHold", () => {
       holdRepository,
       interval,
       now,
-      room: ROOM,
+      rooms: [ROOM],
       roomLockGateway,
     });
 
@@ -248,7 +252,7 @@ describe("createPaymentHold", () => {
         holdRepository,
         interval,
         now,
-        room: ROOM,
+        rooms: [ROOM],
         roomLockGateway,
       })
     ).rejects.toBeInstanceOf(RoomLockConflictError);
@@ -269,12 +273,12 @@ describe("createPaymentHold", () => {
       holdRepository,
       interval,
       now,
-      room: ROOM,
+      rooms: [ROOM],
       roomLockGateway,
     });
 
     expect(secondHold.id).not.toBe(firstHold.id);
-    expect(secondHold.roomId).toBe(ROOM.id);
+    expect(secondHold.items[0]!.roomId).toBe(ROOM.id);
   });
 
   it("propagates RoomLockConflictError without swallowing it when the room is unavailable", async () => {
@@ -287,7 +291,7 @@ describe("createPaymentHold", () => {
       holdDurationMinutes: 15,
       holdRepository,
       interval,
-      room: ROOM,
+      rooms: [ROOM],
       roomLockGateway,
     });
 
@@ -298,7 +302,7 @@ describe("createPaymentHold", () => {
         holdDurationMinutes: 15,
         holdRepository,
         interval: createLodgingInterval("2024-06-02", "2024-06-03"),
-        room: ROOM,
+        rooms: [ROOM],
         roomLockGateway,
       })
     ).rejects.toBeInstanceOf(RoomLockConflictError);

@@ -1,5 +1,4 @@
 import {
-  createPaymentHold,
   type CreatePaymentHoldRoom,
   type GuestRepository,
   type HoldRepository,
@@ -7,10 +6,13 @@ import {
 } from "@/features/reservations";
 import type { LodgingInterval, RoomLockGateway } from "@/features/availability";
 
-import { captureServerException } from "@/infrastructure/observability/sentry";
-
 import type { FintocClient } from "./fintoc-client";
 import type { FintocPaymentRepository } from "./fintoc-payment-repository";
+import { createFintocOnlinePaymentProvider } from "./fintoc-provider";
+import {
+  initiateOnlinePaymentCheckout,
+  OnlinePaymentCheckoutUnavailableError,
+} from "./online-payment-checkout";
 
 /** A deliberately generic error for an unavailable Fintoc checkout creation (see `BookingConfirmationUnavailableError`). */
 export class FintocCheckoutUnavailableError extends Error {
@@ -28,7 +30,8 @@ export type InitiateFintocCheckoutParams<TContext> = Readonly<{
   holdRepository: HoldRepository<TContext>;
   interval: LodgingInterval;
   now?: () => Date;
-  room: CreatePaymentHoldRoom;
+  /** One or more distinct rooms; a single-room checkout passes an array of one (see `add-mercado-pago-checkout-pro` design.md decision 1). */
+  rooms: readonly CreatePaymentHoldRoom[];
   roomLockGateway: RoomLockGateway<TContext>;
   successUrl: string;
 }>;
@@ -39,51 +42,39 @@ export type InitiatedFintocCheckout = Readonly<{
 }>;
 
 /**
- * Implements the online-payment half of design.md decision 7 of
- * `build-vista-valle-booking-mvp`: retain the room with a hold (already
- * built), then create a Fintoc Checkout Session referencing it, and
- * persist a pending payment against the hold before redirecting the guest.
- * The hold creation and the Fintoc API call are deliberately two separate
- * steps — the room lock transaction never stays open across the outbound
- * HTTP request.
+ * Thin Fintoc-specific wrapper around the provider-agnostic
+ * `initiateOnlinePaymentCheckout` (`./online-payment-checkout.ts`), kept
+ * as its own name/params for backward compatibility with existing call
+ * sites and tests (see `add-mercado-pago-checkout-pro` design.md decision
+ * 2). Implements the online-payment half of design.md decision 7 of
+ * `build-vista-valle-booking-mvp`.
  */
 export async function initiateFintocCheckout<TContext>(
   params: InitiateFintocCheckoutParams<TContext>
 ): Promise<InitiatedFintocCheckout> {
-  const hold = await createPaymentHold(params);
-  // Generated here (before the Fintoc API call even exists) so it can be
-  // embedded in success_url/cancel_url as the token the post-redirect
-  // status page polls by (see `CreatePendingFintocPaymentInput.id`).
-  const paymentId = crypto.randomUUID();
-
+  const provider = createFintocOnlinePaymentProvider(params.fintocClient);
   try {
-    const successUrl = new URL(params.successUrl);
-    successUrl.searchParams.set("payment", paymentId);
-    const cancelUrl = new URL(params.cancelUrl);
-    cancelUrl.searchParams.set("payment", paymentId);
-
-    const session = await params.fintocClient.createCheckoutSession({
-      amountClp: hold.totalClp,
+    return await initiateOnlinePaymentCheckout({
+      cancelUrl: params.cancelUrl,
       customerEmail: params.customerEmail,
-      externalReference: hold.id,
-      successUrl: successUrl.toString(),
-      cancelUrl: cancelUrl.toString(),
+      guestCandidate: params.guestCandidate,
+      guestRepository: params.guestRepository,
+      holdDurationMinutes: params.holdDurationMinutes,
+      holdRepository: params.holdRepository,
+      interval: params.interval,
+      now: params.now,
+      paymentRepository: params.fintocPaymentRepository,
+      provider,
+      rooms: params.rooms,
+      roomLockGateway: params.roomLockGateway,
+      successUrl: params.successUrl,
     });
-    await params.fintocPaymentRepository.createPendingPayment({
-      id: paymentId,
-      amountClp: hold.totalClp,
-      externalReference: session.id,
-      holdId: hold.id,
-    });
-    return Object.freeze({ hold, redirectUrl: session.redirectUrl });
   } catch (error) {
-    // The hold is left in place: it simply expires via its existing TTL
-    // (see `HoldRepository`/`isHoldExpired`) if the guest never retries.
-    await captureServerException("fintoc_checkout.session_creation_failed", error, {
-      holdId: hold.id,
-    });
-    throw new FintocCheckoutUnavailableError(
-      "No se pudo iniciar el pago en línea con Fintoc"
-    );
+    if (error instanceof OnlinePaymentCheckoutUnavailableError) {
+      throw new FintocCheckoutUnavailableError(
+        "No se pudo iniciar el pago en línea con Fintoc"
+      );
+    }
+    throw error;
   }
 }

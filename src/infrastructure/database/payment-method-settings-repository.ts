@@ -12,6 +12,7 @@ import type { ProductionDatabase } from "./client";
 const defaultSettings: PaymentMethodSettings = Object.freeze({
   payAtPropertyEnabled: true,
   payOnlineEnabled: true,
+  payByCardEnabled: true,
 });
 
 /**
@@ -46,6 +47,7 @@ export function createDrizzlePaymentMethodSettingsRepository(
         return Object.freeze({
           payAtPropertyEnabled: row.payAtPropertyEnabled,
           payOnlineEnabled: row.payOnlineEnabled,
+          payByCardEnabled: row.payByCardEnabled,
         });
       await ensureRow();
       return defaultSettings;
@@ -57,6 +59,7 @@ export function createDrizzlePaymentMethodSettingsRepository(
         .set({
           payAtPropertyEnabled: input.payAtPropertyEnabled,
           payOnlineEnabled: input.payOnlineEnabled,
+          payByCardEnabled: input.payByCardEnabled,
           updatedAt: new Date(),
         })
         .where(eq(paymentMethodSettings.id, id))
@@ -64,6 +67,7 @@ export function createDrizzlePaymentMethodSettingsRepository(
       return Object.freeze({
         payAtPropertyEnabled: updated.payAtPropertyEnabled,
         payOnlineEnabled: updated.payOnlineEnabled,
+        payByCardEnabled: updated.payByCardEnabled,
       });
     },
   });

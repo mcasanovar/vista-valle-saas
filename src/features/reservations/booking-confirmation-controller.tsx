@@ -11,44 +11,52 @@ import {
 import { clearSessionRoomSelection } from "./selection-session";
 
 type ConfirmationResponse = Readonly<{ publicId: string; message?: string }>;
-type FintocCheckoutResponse = Readonly<{
+type OnlineCheckoutResponse = Readonly<{
   redirectUrl: string;
   message?: string;
 }>;
 
+type PaymentSelection = "pay_at_property" | "fintoc" | "mercado_pago";
+
 /**
  * Client-side wiring only; the server reconstructs every authoritative
- * value. `roomCount` gates the online-payment option: Fintoc checkout is
- * single-room only for this change (see design.md non-goals in
- * `add-fintoc-online-payment`), so with more than one room selected only
- * pago al llegar is offered. `payAtPropertyEnabled`/`payOnlineEnabled`
- * reflect the admin's payment-method toggle (see
- * `admin-manage-payment-methods`): a disabled method is hidden from
- * selection here, and independently rejected server-side by the
- * confirmation endpoints if requested directly.
+ * value. Every method here supports one or more rooms under a single
+ * payment for the total (see `add-mercado-pago-checkout-pro` design.md
+ * decision 1) — there is no room-count gate. `payAtPropertyEnabled`
+ * (pagar al llegar), `payOnlineEnabled` (Fintoc, transferencia bancaria)
+ * and `payByCardEnabled` (Mercado Pago, tarjeta) reflect the admin's
+ * payment-method toggles (see `admin-payment-method-settings`): a
+ * disabled method is hidden from selection here, and independently
+ * rejected server-side by the confirmation endpoints if requested
+ * directly.
  */
 export function BookingConfirmationController({
   bookingEnabled,
   payAtPropertyEnabled = true,
   payOnlineEnabled = true,
-  roomCount = 1,
+  payByCardEnabled = true,
 }: Readonly<{
   bookingEnabled: boolean;
   payAtPropertyEnabled?: boolean;
   payOnlineEnabled?: boolean;
-  roomCount?: number;
+  payByCardEnabled?: boolean;
 }>) {
   const router = useRouter();
   const idempotencyKeyRef = useRef<string | undefined>(undefined);
   const [error, setError] = useState<string>();
-  const [pendingMode, setPendingMode] = useState<
-    "pay_at_property" | "pay_now"
-  >();
+  const [pendingMode, setPendingMode] = useState<PaymentSelection>();
   const showPayAtProperty = payAtPropertyEnabled;
-  const showPayNow = payOnlineEnabled && roomCount === 1;
-  const [selectedMode, setSelectedMode] = useState<
-    "pay_at_property" | "pay_now" | undefined
-  >(showPayAtProperty ? "pay_at_property" : showPayNow ? "pay_now" : undefined);
+  const showFintoc = payOnlineEnabled;
+  const showMercadoPago = payByCardEnabled;
+  const [selectedMode, setSelectedMode] = useState<PaymentSelection | undefined>(
+    showPayAtProperty
+      ? "pay_at_property"
+      : showFintoc
+        ? "fintoc"
+        : showMercadoPago
+          ? "mercado_pago"
+          : undefined
+  );
 
   const confirmPayAtProperty = async () => {
     setPendingMode("pay_at_property");
@@ -92,17 +100,21 @@ export function BookingConfirmationController({
     }
   };
 
-  const confirmPayNow = async () => {
-    setPendingMode("pay_now");
+  const confirmOnline = async (mode: "fintoc" | "mercado_pago") => {
+    setPendingMode(mode);
     setError(undefined);
     try {
       const query = new URLSearchParams(window.location.search);
-      const response = await fetch("/api/bookings/fintoc-checkout", {
+      const endpoint =
+        mode === "fintoc"
+          ? "/api/bookings/fintoc-checkout"
+          : "/api/bookings/mercadopago-checkout";
+      const response = await fetch(endpoint, {
         body: JSON.stringify(Object.fromEntries(query)),
         headers: { "Content-Type": "application/json" },
         method: "POST",
       });
-      const body = (await response.json()) as FintocCheckoutResponse;
+      const body = (await response.json()) as OnlineCheckoutResponse;
       if (!response.ok || !body.redirectUrl) {
         throw publicApiResponseError(
           body,
@@ -136,11 +148,12 @@ export function BookingConfirmationController({
   const pending = pendingMode !== undefined;
 
   const confirm = () => {
-    if (selectedMode === "pay_now") return void confirmPayNow();
+    if (selectedMode === "fintoc") return void confirmOnline("fintoc");
+    if (selectedMode === "mercado_pago") return void confirmOnline("mercado_pago");
     if (selectedMode === "pay_at_property") return void confirmPayAtProperty();
   };
 
-  if (!showPayAtProperty && !showPayNow) {
+  if (!showPayAtProperty && !showFintoc && !showMercadoPago) {
     return (
       <div className="space-y-4 border-t border-border pt-4">
         <div aria-live="assertive">
@@ -189,10 +202,10 @@ export function BookingConfirmationController({
             </span>
           </label>
         ) : null}
-        {showPayNow ? (
+        {showMercadoPago ? (
           <label
             className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 shadow-md transition-colors ${
-              selectedMode === "pay_now"
+              selectedMode === "mercado_pago"
                 ? "border-accent bg-accent/10"
                 : "border-transparent bg-card hover:border-border"
             }`}
@@ -200,14 +213,41 @@ export function BookingConfirmationController({
             <input
               type="radio"
               name="paymentMode"
-              value="pay_now"
-              checked={selectedMode === "pay_now"}
-              onChange={() => setSelectedMode("pay_now")}
+              value="mercado_pago"
+              checked={selectedMode === "mercado_pago"}
+              onChange={() => setSelectedMode("mercado_pago")}
               className="mt-1 size-4 shrink-0"
               style={{ accentColor: "var(--color-accent)" }}
             />
             <span>
-              <span className="block font-semibold">Pagar online</span>
+              <span className="block font-semibold">
+                Tarjeta de crédito o débito
+              </span>
+              <span className="block text-sm text-muted-foreground">
+                Paga ahora de forma segura con Mercado Pago.
+              </span>
+            </span>
+          </label>
+        ) : null}
+        {showFintoc ? (
+          <label
+            className={`flex cursor-pointer items-start gap-3 rounded-2xl border-2 p-4 shadow-md transition-colors ${
+              selectedMode === "fintoc"
+                ? "border-accent bg-accent/10"
+                : "border-transparent bg-card hover:border-border"
+            }`}
+          >
+            <input
+              type="radio"
+              name="paymentMode"
+              value="fintoc"
+              checked={selectedMode === "fintoc"}
+              onChange={() => setSelectedMode("fintoc")}
+              className="mt-1 size-4 shrink-0"
+              style={{ accentColor: "var(--color-accent)" }}
+            />
+            <span>
+              <span className="block font-semibold">Transferencia bancaria</span>
               <span className="block text-sm text-muted-foreground">
                 Paga ahora de forma segura con Fintoc.
               </span>

@@ -13,6 +13,7 @@ describe("PaymentMethodsSettings", () => {
         json: async () => ({
           payAtPropertyEnabled: true,
           payOnlineEnabled: false,
+          payByCardEnabled: true,
         }),
       })
     );
@@ -22,27 +23,34 @@ describe("PaymentMethodsSettings", () => {
     expect(
       await screen.findByLabelText("Habilitar pagar al llegar")
     ).toBeChecked();
-    expect(screen.getByLabelText("Habilitar pagar online")).not.toBeChecked();
+    expect(
+      screen.getByLabelText("Habilitar transferencia bancaria")
+    ).not.toBeChecked();
+    expect(screen.getByLabelText("Habilitar pago con tarjeta")).toBeChecked();
   });
 
-  it("saves immediately when a toggle changes, including turning both off", async () => {
+  it("saves immediately when a toggle changes, including turning all three off", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         payAtPropertyEnabled: true,
         payOnlineEnabled: true,
+        payByCardEnabled: true,
       }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<PaymentMethodsSettings />);
-    const payOnline = await screen.findByLabelText("Habilitar pagar online");
+    const payOnline = await screen.findByLabelText(
+      "Habilitar transferencia bancaria"
+    );
 
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
         payAtPropertyEnabled: true,
         payOnlineEnabled: true,
+        payByCardEnabled: true,
       }),
     });
     fetchMock.mockResolvedValueOnce({
@@ -50,6 +58,7 @@ describe("PaymentMethodsSettings", () => {
       json: async () => ({
         payAtPropertyEnabled: true,
         payOnlineEnabled: false,
+        payByCardEnabled: true,
       }),
     });
 
@@ -62,6 +71,7 @@ describe("PaymentMethodsSettings", () => {
           body: JSON.stringify({
             payAtPropertyEnabled: true,
             payOnlineEnabled: false,
+            payByCardEnabled: true,
           }),
           method: "PUT",
         })
