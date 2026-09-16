@@ -31,12 +31,17 @@ const roomSource = {
       id: "trusted-room-a",
       name: "Habitación A",
       nightlyPriceClp: 55000,
+      occupancyPrices: [],
     },
     {
       capacity: 4,
       id: "trusted-room-b",
       name: "Habitación B",
       nightlyPriceClp: 70000,
+      occupancyPrices: [
+        { occupancy: 1, priceClp: 60000 },
+        { occupancy: 2, priceClp: 70000 },
+      ],
     },
   ],
 };
@@ -90,6 +95,10 @@ describe("manual reservation availability boundary", () => {
           id: "trusted-room-b",
           name: "Habitación B",
           nightlyPriceClp: 70000,
+          occupancyPrices: [
+            { occupancy: 1, priceClp: 60000 },
+            { occupancy: 2, priceClp: 70000 },
+          ],
         },
       ],
     });

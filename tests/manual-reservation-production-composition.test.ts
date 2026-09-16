@@ -103,7 +103,7 @@ describe("manual reservation production composition", () => {
         paymentStatus: "approved",
         phone: "+56 9 1234 5678",
         price: 1,
-        roomIds: ["production-room-a"],
+        rooms: "production-room-a",
         status: "cancelled",
         totalClp: 1,
       },

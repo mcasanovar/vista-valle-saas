@@ -59,7 +59,7 @@ describe("manual reservation action", () => {
       code: "availability_conflict",
       fieldErrors: [
         {
-          field: "roomIds",
+          field: "rooms",
           message:
             "Una o más habitaciones ya no están disponibles para estas fechas.",
         },

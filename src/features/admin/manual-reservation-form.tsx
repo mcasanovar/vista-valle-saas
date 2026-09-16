@@ -5,6 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 // eslint-disable-next-line architecture/feature-public-api -- the public availability barrel reaches server-only data access.
 import { nights as calculateNights } from "@/features/availability/client-date-only";
+// eslint-disable-next-line architecture/feature-public-api -- the public rooms barrel reaches server-only data access.
+import { resolveDisplayRoomNightlyPrice } from "@/features/rooms/occupancy-pricing";
+// eslint-disable-next-line architecture/feature-public-api -- the public reservations barrel reaches server-only data access.
+import { serializeRoomSelectionParam } from "@/features/reservations/room-selection-codec";
 import { useToast } from "@/presentation/organisms";
 import type {
   ManualReservationActionField,
@@ -22,6 +26,7 @@ type AvailableRoom = Readonly<{
   id: string;
   name: string;
   nightlyPriceClp: number;
+  occupancyPrices: readonly Readonly<{ occupancy: number; priceClp: number }>[];
 }>;
 type FieldName = ManualReservationActionField | "form" | "invoice";
 type FormErrors = Partial<Record<FieldName | "form", string>>;
@@ -75,6 +80,33 @@ function ErrorMessage({
 const controlClass =
   "mt-1.5 block min-h-11 w-full rounded-lg border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
 
+/**
+ * Reacts only to a native `<input type="date">` value being committed (a day
+ * picked in the calendar, or a complete value entered then blurred) - the
+ * native "change" event - instead of React's `onChange`, which for these
+ * inputs fires on the browser's native "input" event and therefore on every
+ * intermediate step (e.g. each month arrow press in the picker, once the
+ * field already holds a complete date). Reacting to every one of those closes
+ * the picker in Chrome before a different month's day can be selected.
+ */
+function useCommittedDateChange(onCommit: (value: string) => void) {
+  const ref = useRef<HTMLInputElement>(null);
+  const onCommitRef = useRef(onCommit);
+  useEffect(() => {
+    onCommitRef.current = onCommit;
+  }, [onCommit]);
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const handleChange = (event: Event) => {
+      onCommitRef.current((event.target as HTMLInputElement).value);
+    };
+    element.addEventListener("change", handleChange);
+    return () => element.removeEventListener("change", handleChange);
+  }, []);
+  return ref;
+}
+
 export function ManualReservationForm({
   action,
   initialData,
@@ -97,6 +129,9 @@ export function ManualReservationForm({
   const [selectedRoomIds, setSelectedRoomIds] = useState<readonly string[]>(
     initialSelection?.roomId ? [initialSelection.roomId] : []
   );
+  const [roomGuestCounts, setRoomGuestCounts] = useState<
+    Readonly<Record<string, number>>
+  >(initialSelection?.roomId ? { [initialSelection.roomId]: 1 } : {});
   const [availabilityState, setAvailabilityState] = useState<
     "dates_required" | "loading" | "ready" | "error"
   >(initialData.availability.status);
@@ -152,11 +187,18 @@ export function ManualReservationForm({
     else setCheckOut(value);
     setAvailableRooms([]);
     setSelectedRoomIds([]);
+    setRoomGuestCounts({});
     setAvailabilityError(undefined);
     setAvailabilityState(
       nextCheckIn && nextCheckOut ? "loading" : "dates_required"
     );
   };
+  const checkInRef = useCommittedDateChange((value) =>
+    updateDate("checkIn", value)
+  );
+  const checkOutRef = useCommittedDateChange((value) =>
+    updateDate("checkOut", value)
+  );
 
   const validate = (data: FormData): FormErrors => {
     const next: FormErrors = {};
@@ -172,8 +214,8 @@ export function ManualReservationForm({
         next[dateError.field] = dateError.message;
       }
     }
-    if (!data.getAll("roomIds").length)
-      next.roomIds = "Selecciona al menos una habitación disponible.";
+    if (!String(data.get("rooms") ?? "").trim())
+      next.rooms = "Selecciona al menos una habitación disponible.";
     if (!String(data.get("email") ?? "").trim())
       next.email = "Indica un correo electrónico.";
     if (
@@ -229,7 +271,23 @@ export function ManualReservationForm({
         ? [...current, roomId]
         : current.filter((selectedRoomId) => selectedRoomId !== roomId)
     );
+    setRoomGuestCounts((current) => {
+      if (selected) return { ...current, [roomId]: current[roomId] ?? 1 };
+      return Object.fromEntries(
+        Object.entries(current).filter(([id]) => id !== roomId)
+      );
+    });
   };
+  const setRoomGuestCount = (roomId: string, guestCount: number) => {
+    setRoomGuestCounts((current) => ({ ...current, [roomId]: guestCount }));
+  };
+  const roomsFieldValue = () =>
+    serializeRoomSelectionParam(
+      selectedRoomIds.map((roomId) => ({
+        roomId,
+        guestCount: roomGuestCounts[roomId] ?? 1,
+      }))
+    );
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     // Calling submit directly (not via startTransition) keeps the pending
@@ -251,9 +309,17 @@ export function ManualReservationForm({
     } catch {
       return null;
     }
-    const selectedRooms = availableRooms.filter((room) =>
-      selectedRoomIds.includes(room.id)
-    );
+    const selectedRooms = availableRooms
+      .filter((room) => selectedRoomIds.includes(room.id))
+      .map((room) => {
+        const guestCount = roomGuestCounts[room.id] ?? 1;
+        const nightlyPriceClp = resolveDisplayRoomNightlyPrice(
+          room,
+          room.occupancyPrices,
+          guestCount
+        );
+        return { ...room, guestCount, nightlyPriceClp };
+      });
     const total = selectedRooms.reduce(
       (sum, room) => sum + room.nightlyPriceClp * nightsCount,
       0
@@ -270,7 +336,10 @@ export function ManualReservationForm({
               key={room.id}
               className="flex items-center justify-between text-muted-foreground"
             >
-              <span>{room.name}</span>
+              <span>
+                {room.name} ({room.guestCount}{" "}
+                {room.guestCount === 1 ? "huésped" : "huéspedes"})
+              </span>
               <span>{currency.format(room.nightlyPriceClp * nightsCount)}</span>
             </li>
           ))}
@@ -308,29 +377,55 @@ export function ManualReservationForm({
       );
     return (
       <div className="grid gap-2 tablet:grid-cols-2">
-        {availableRooms.map((room) => (
-          <label
-            key={room.id}
-            className="flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-sm has-[:checked]:border-accent has-[:checked]:bg-[var(--admin-accent-background,#eef0fb)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent"
-          >
-            <input
-              checked={selectedRoomIds.includes(room.id)}
-              className="size-4 accent-[var(--admin-accent)]"
-              name="roomIds"
-              onChange={(event) => toggleRoom(room.id, event.target.checked)}
-              type="checkbox"
-              value={room.id}
-            />
-            <span>
-              <span className="block font-semibold text-foreground">
-                {room.name}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Capacidad: {room.capacity}
-              </span>
-            </span>
-          </label>
-        ))}
+        {availableRooms.map((room) => {
+          const isSelected = selectedRoomIds.includes(room.id);
+          return (
+            <div
+              key={room.id}
+              className="flex min-h-14 items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-sm has-[:checked]:border-accent has-[:checked]:bg-[var(--admin-accent-background,#eef0fb)]"
+            >
+              <label className="flex flex-1 cursor-pointer items-center gap-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent">
+                <input
+                  checked={isSelected}
+                  className="size-4 accent-[var(--admin-accent)]"
+                  onChange={(event) => toggleRoom(room.id, event.target.checked)}
+                  type="checkbox"
+                  value={room.id}
+                />
+                <span>
+                  <span className="block font-semibold text-foreground">
+                    {room.name}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Capacidad: {room.capacity}
+                  </span>
+                </span>
+              </label>
+              {isSelected ? (
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  Huéspedes
+                  <input
+                    aria-label={`Huéspedes en ${room.name}`}
+                    className="h-8 w-14 rounded-md border border-border bg-background px-2 text-center text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                    max={room.capacity}
+                    min={1}
+                    onChange={(event) =>
+                      setRoomGuestCount(
+                        room.id,
+                        Math.min(
+                          Math.max(1, Number(event.target.value) || 1),
+                          room.capacity
+                        )
+                      )
+                    }
+                    type="number"
+                    value={roomGuestCounts[room.id] ?? 1}
+                  />
+                </label>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -368,12 +463,12 @@ export function ManualReservationForm({
             <input
               aria-describedby={errors.checkIn ? "checkIn-error" : undefined}
               className={controlClass}
+              defaultValue={checkIn}
               min={dateMinimums.checkIn}
               name="checkIn"
-              onChange={(event) => updateDate("checkIn", event.target.value)}
+              ref={checkInRef}
               required
               type="date"
-              value={checkIn}
             />
           </label>
           <label className="text-sm font-semibold">
@@ -381,18 +476,19 @@ export function ManualReservationForm({
             <input
               aria-describedby={errors.checkOut ? "checkOut-error" : undefined}
               className={controlClass}
+              defaultValue={checkOut}
               min={dateMinimums.checkOut}
               name="checkOut"
-              onChange={(event) => updateDate("checkOut", event.target.value)}
+              ref={checkOutRef}
               required
               type="date"
-              value={checkOut}
             />
           </label>
         </div>
         <ErrorMessage id="checkIn-error" message={errors.checkIn} />
         <ErrorMessage id="checkOut-error" message={errors.checkOut} />
-        <div aria-describedby={errors.roomIds ? "roomIds-error" : undefined}>
+        <input name="rooms" type="hidden" value={roomsFieldValue()} />
+        <div aria-describedby={errors.rooms ? "rooms-error" : undefined}>
           {roomSection()}
         </div>
         {availabilityState === "ready" ? (
@@ -411,7 +507,7 @@ export function ManualReservationForm({
               : "."}
           </p>
         ) : null}
-        <ErrorMessage id="roomIds-error" message={errors.roomIds} />
+        <ErrorMessage id="rooms-error" message={errors.rooms} />
         {pricingSummary()}
       </fieldset>
       <fieldset className="grid gap-4 tablet:grid-cols-2">

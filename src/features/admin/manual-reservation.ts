@@ -7,6 +7,8 @@ import {
 import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
 import {
   createMultiRoomPayAtPropertyReservation,
+  selectedRooms,
+  toResolvedRoom,
   type GuestRepository,
   type ReservationRepository,
 } from "@/features/reservations";
@@ -57,13 +59,6 @@ export type ManualReservationDependencies<TContext> = Readonly<{
   roomLockGateway: RoomLockGateway<TContext>;
 }>;
 
-function requestedRoomIds(candidate: Record<string, unknown>) {
-  const requested = Array.isArray(candidate.roomIds)
-    ? candidate.roomIds.map(String)
-    : [String(candidate.room ?? "")];
-  return requested.map((id) => id.trim()).filter(Boolean);
-}
-
 function requestedInvoice(candidate: Record<string, unknown>) {
   if (
     candidate.invoiceRequested !== "true" &&
@@ -89,16 +84,9 @@ export async function createManualReservationWith<TContext>(
   const origin = candidate.origin;
   if (!manualOrigins.includes(origin as ManualOrigin))
     throw new Error("Invalid manual origin");
-  const roomIds = requestedRoomIds(candidate);
-  const rooms = roomIds.map((id) =>
-    roomSource.listActive().find((room) => room.id === id)
-  );
-  if (
-    !rooms.length ||
-    rooms.some((room) => !room) ||
-    new Set(roomIds).size !== roomIds.length
-  )
-    throw new Error("Unknown room");
+  const selected = selectedRooms(candidate, roomSource);
+  if (!selected.length) throw new Error("Unknown room");
+  const rooms = selected.map(toResolvedRoom);
   const interval = createLodgingInterval(
     String(candidate.checkIn ?? ""),
     String(candidate.checkOut ?? "")
@@ -114,7 +102,7 @@ export async function createManualReservationWith<TContext>(
     guestRepository: dependencies.guestRepository,
     interval,
     reservationRepository: dependencies.reservationRepository,
-    rooms: rooms as NonNullable<(typeof rooms)[number]>[],
+    rooms,
     roomLockGateway: dependencies.roomLockGateway,
     origin: origin as ManualOrigin,
     invoiceRequest: requestedInvoice(candidate),
