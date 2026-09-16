@@ -22,6 +22,8 @@ export function getServerScheduledOutboxProcessor() {
   const outbox = createDrizzleNotificationDeliveryOutbox(db, [
     "company_quotation_customer",
     "company_quotation_admin",
+    "reservation_confirmed_guest",
+    "reservation_confirmed_admin",
   ]);
   const worker = createNotificationDeliveryWorker(
     outbox,

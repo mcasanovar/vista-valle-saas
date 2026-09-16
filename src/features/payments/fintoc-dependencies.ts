@@ -6,11 +6,13 @@ import {
   mockReservationRepository,
   mockRoomLockGateway,
 } from "@/features/reservations";
+import { getNotificationOutboxWriter } from "@/features/notifications";
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
 import { createProductionDatabase } from "@/infrastructure/database/client";
 import { createDrizzleRoomLockGateway } from "@/infrastructure/database/room-lock";
 import { createDrizzleGuestRepository } from "@/infrastructure/database/guest-repository";
 import { createDrizzleHoldRepository } from "@/infrastructure/database/hold-repository";
+import { createDrizzleNotificationOutboxWriter } from "@/infrastructure/database/notification-outbox-repository";
 import { createDrizzleReservationRepository } from "@/infrastructure/database/reservation-repository";
 import { createDrizzleFintocPaymentRepository } from "@/infrastructure/database/fintoc-payment-repository";
 
@@ -32,6 +34,7 @@ export function getMockFintocOnlinePaymentDependencies() {
     fintocPaymentRepository: createCanonicalMockFintocPaymentRepository(),
     guestRepository: mockGuestRepository,
     holdRepository: getCanonicalMockHoldRepository(),
+    notificationOutboxWriter: getNotificationOutboxWriter(),
     reservationRepository: mockReservationRepository,
     roomLockGateway: mockRoomLockGateway,
   };
@@ -49,8 +52,9 @@ export function getProductionFintocOnlinePaymentDependencies() {
   return {
     fintocClient: getFintocClient(),
     fintocPaymentRepository: createDrizzleFintocPaymentRepository(db),
-    guestRepository: createDrizzleGuestRepository(),
+    guestRepository: createDrizzleGuestRepository(db),
     holdRepository: createDrizzleHoldRepository(db),
+    notificationOutboxWriter: createDrizzleNotificationOutboxWriter(),
     reservationRepository: createDrizzleReservationRepository(db),
     roomLockGateway: createDrizzleRoomLockGateway(db),
   };

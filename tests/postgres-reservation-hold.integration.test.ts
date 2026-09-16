@@ -36,7 +36,7 @@ if (!enabled) {
     const sql = postgres(integrationUrl!, { max: 4 });
     const db = drizzle(sql!, { schema });
     const roomLockGateway = createDrizzleRoomLockGateway(db);
-    const guestRepository = createDrizzleGuestRepository();
+    const guestRepository = createDrizzleGuestRepository(db);
     const holdRepository = createDrizzleHoldRepository(db);
     const reservationRepository = createDrizzleReservationRepository(db);
     const paymentRepository = createDrizzleFintocPaymentRepository(db);
@@ -182,6 +182,7 @@ if (!enabled) {
       });
 
       const confirmed = await confirmPayNowReservationFromHold({
+        guestRepository,
         hold,
         holdRepository,
         paymentExternalReference: pendingPayment.externalReference,

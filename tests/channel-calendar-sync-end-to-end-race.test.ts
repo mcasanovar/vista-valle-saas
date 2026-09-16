@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   confirmPayNowReservationFromHold,
+  createMockGuestRepository,
   createMockHoldRepository,
   createMockReservationRepository,
   HoldExpiredError,
@@ -44,6 +45,7 @@ describe("hold-expiry race with a channel-sync arrival", () => {
     const holdRepository = createMockHoldRepository();
     const roomLockGateway = createMockRoomLockGateway();
     const reservationRepository = createMockReservationRepository();
+    const guestRepository = createMockGuestRepository();
 
     const hold = await roomLockGateway.runExclusive(
       room.id,
@@ -92,6 +94,7 @@ describe("hold-expiry race with a channel-sync arrival", () => {
     // The late Fintoc approval for the now-expired hold arrives.
     await expect(
       confirmPayNowReservationFromHold({
+        guestRepository,
         hold,
         holdRepository,
         paymentExternalReference: "ext-ref-race",

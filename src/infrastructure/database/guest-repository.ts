@@ -1,12 +1,25 @@
 import "server-only";
 
+import { eq } from "drizzle-orm";
+
 import type {
   GuestContactDetails,
   GuestRecord,
   GuestRepository,
 } from "@/features/reservations";
 import { guests } from "@/persistence/schema";
+import type { ProductionDatabase } from "./client";
 import type { ProductionRoomLockTransaction } from "./room-lock";
+
+const guestColumns = {
+  company: guests.company,
+  email: guests.email,
+  firstName: guests.firstName,
+  id: guests.id,
+  lastName: guests.lastName,
+  phone: guests.phone,
+  rut: guests.rut,
+} as const;
 
 /**
  * Drizzle/PostgreSQL-backed `GuestRepository` (design.md decision 5).
@@ -24,7 +37,9 @@ import type { ProductionRoomLockTransaction } from "./room-lock";
  * runs under `VISTA_VALLE_CONFIG_CONTEXT=mock` (see
  * `src/infrastructure/database/server.ts` and design.md decision 13).
  */
-export function createDrizzleGuestRepository(): GuestRepository<ProductionRoomLockTransaction> {
+export function createDrizzleGuestRepository(
+  db: ProductionDatabase
+): GuestRepository<ProductionRoomLockTransaction> {
   return Object.freeze({
     createGuest: async (
       tx: ProductionRoomLockTransaction,
@@ -40,19 +55,29 @@ export function createDrizzleGuestRepository(): GuestRepository<ProductionRoomLo
           phone: guest.phone,
           rut: guest.rut,
         })
-        .returning({
-          company: guests.company,
-          email: guests.email,
-          firstName: guests.firstName,
-          id: guests.id,
-          lastName: guests.lastName,
-          phone: guests.phone,
-          rut: guests.rut,
-        });
+        .returning(guestColumns);
 
       if (!row) {
         throw new Error("Failed to insert guest: no row returned");
       }
+
+      return Object.freeze({
+        company: row.company ?? undefined,
+        email: row.email,
+        firstName: row.firstName,
+        id: row.id,
+        lastName: row.lastName,
+        phone: row.phone,
+        rut: row.rut ?? undefined,
+      });
+    },
+    getGuestById: async (id: string): Promise<GuestRecord | null> => {
+      const [row] = await db
+        .select(guestColumns)
+        .from(guests)
+        .where(eq(guests.id, id));
+
+      if (!row) return null;
 
       return Object.freeze({
         company: row.company ?? undefined,

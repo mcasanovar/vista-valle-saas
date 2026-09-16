@@ -154,7 +154,7 @@ export async function createManualReservation(
     actor,
     roomSource,
     {
-      guestRepository: createDrizzleGuestRepository(),
+      guestRepository: createDrizzleGuestRepository(db),
       notificationOutboxWriter: createDrizzleNotificationOutboxWriter(),
       reservationRepository: createDrizzleReservationRepository(db),
       roomLockGateway: createDrizzleRoomLockGateway(db),

@@ -1,8 +1,10 @@
 import type {
+  GuestRepository,
   HoldRepository,
   ReservationRepository,
 } from "@/features/reservations";
 import type { RoomLockGateway } from "@/features/availability";
+import type { NotificationOutboxWriter } from "@/features/notifications";
 
 import type { FintocPaymentRepository } from "./fintoc-payment-repository";
 import {
@@ -57,7 +59,10 @@ export type FintocWebhookEvent = Readonly<{
 export type ProcessFintocWebhookEventParams<TContext> = Readonly<{
   event: FintocWebhookEvent;
   fintocPaymentRepository: FintocPaymentRepository;
+  guestRepository: GuestRepository<TContext>;
   holdRepository: HoldRepository<TContext>;
+  /** Optional so tests/callers that don't care about notifications can omit it. */
+  notificationOutboxWriter?: NotificationOutboxWriter<TContext> | null;
   reservationRepository: ReservationRepository<TContext>;
   roomLockGateway: RoomLockGateway<TContext>;
 }>;
@@ -90,6 +95,8 @@ export async function processFintocWebhookEvent<TContext>(
       sessionExpiredWithoutPayment: params.event.sessionExpiredWithoutPayment,
       type: params.event.type,
     },
+    guestRepository: params.guestRepository,
+    notificationOutboxWriter: params.notificationOutboxWriter,
     paymentProvider: "fintoc",
     paymentRepository: params.fintocPaymentRepository,
     holdRepository: params.holdRepository,
