@@ -29,6 +29,9 @@ const operationalTables = [
   "operational_alerts",
   "company_quotations",
   "company_quotation_lines",
+  "room_occupancy_prices",
+  "payment_method_settings",
+  "reservation_hold_items",
 ];
 
 describe("security hardening contracts", () => {
