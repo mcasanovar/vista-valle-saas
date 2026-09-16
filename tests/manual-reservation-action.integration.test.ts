@@ -21,7 +21,7 @@ function manualReservationFormData(email: string) {
   data.set("lastName", "Manual");
   data.set("origin", "phone");
   data.set("phone", "+56912345678");
-  data.append("roomIds", "demo-room-andes");
+  data.set("rooms", "demo-room-andes");
   return data;
 }
 

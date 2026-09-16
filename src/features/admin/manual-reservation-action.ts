@@ -26,7 +26,7 @@ export type ManualReservationActionField =
   | "lastName"
   | "origin"
   | "phone"
-  | "roomIds";
+  | "rooms";
 
 type ManualReservationActionFailure = Readonly<{
   code: "availability_conflict" | "unavailable" | "validation";
@@ -81,7 +81,7 @@ function resultForCreationError(error: unknown): ManualReservationActionFailure 
       code: "availability_conflict",
       fieldErrors: Object.freeze([
         Object.freeze({
-          field: "roomIds" as const,
+          field: "rooms" as const,
           message:
             "Una o más habitaciones ya no están disponibles para estas fechas.",
         }),
@@ -137,7 +137,7 @@ function resultForCreationError(error: unknown): ManualReservationActionFailure 
   if (error instanceof Error && error.message === "Unknown room") {
     return validationResult([
       {
-        field: "roomIds",
+        field: "rooms",
         message: "Selecciona habitaciones disponibles para estas fechas.",
       },
     ]);
@@ -168,13 +168,9 @@ function resultForCreationError(error: unknown): ManualReservationActionFailure 
 
 export async function createManualReservationAction(formData: FormData) {
   const session = await requireAdministrator();
-  const roomIds = formData.getAll("roomIds").map(String).filter(Boolean);
   try {
     const created = await createManualReservation(
-      {
-        ...Object.fromEntries(formData),
-        roomIds: roomIds.length ? roomIds : undefined,
-      },
+      Object.fromEntries(formData),
       session.user.id
     );
     return Object.freeze({
