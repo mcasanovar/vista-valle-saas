@@ -2,10 +2,12 @@ import {
   confirmPayNowReservationFromHold,
   HoldExpiredError,
   releaseFailedPayNowHold,
+  type GuestRepository,
   type HoldRepository,
   type ReservationRepository,
 } from "@/features/reservations";
 import type { RoomLockGateway } from "@/features/availability";
+import type { NotificationOutboxWriter } from "@/features/notifications";
 
 import { recordPaymentChargebackAlert } from "./chargeback-alert";
 import type { FintocPaymentRecord, FintocPaymentRepository } from "./fintoc-payment-repository";
@@ -13,6 +15,9 @@ import type { NormalizedPaymentEvent } from "./online-payment-provider";
 
 export type ProcessOnlinePaymentWebhookEventParams<TContext> = Readonly<{
   event: NormalizedPaymentEvent;
+  guestRepository: GuestRepository<TContext>;
+  /** Optional so tests/callers that don't care about notifications can omit it. */
+  notificationOutboxWriter?: NotificationOutboxWriter<TContext> | null;
   /** e.g. `"fintoc"` or `"mercado_pago"` — passed through to `confirmPayNowReservationFromHold`. */
   paymentProvider: string;
   paymentRepository: FintocPaymentRepository;
@@ -51,6 +56,8 @@ export async function processOnlinePaymentWebhookEvent<TContext>(
 ): Promise<ProcessOnlinePaymentWebhookEventResult> {
   const {
     event,
+    guestRepository,
+    notificationOutboxWriter,
     paymentProvider,
     paymentRepository,
     holdRepository,
@@ -116,8 +123,10 @@ export async function processOnlinePaymentWebhookEvent<TContext>(
       if (!hold) return Object.freeze({ outcome: "payment_not_found" });
       try {
         const confirmed = await confirmPayNowReservationFromHold({
+          guestRepository,
           hold,
           holdRepository,
+          notificationOutboxWriter,
           paymentExternalReference: payment.externalReference,
           paymentId: payment.id,
           paymentProvider,

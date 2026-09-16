@@ -329,7 +329,7 @@ export function getPayAtPropertyBookingConfirmationService() {
   }
   const db = createProductionDatabase(boundary);
   const roomLockGateway = createDrizzleRoomLockGateway(db);
-  const guestRepository = createDrizzleGuestRepository();
+  const guestRepository = createDrizzleGuestRepository(db);
   const reservationRepository = createDrizzleReservationRepository(db);
   return createIdempotentPayAtPropertyBookingConfirmationService(
     mockIdempotencyStore,

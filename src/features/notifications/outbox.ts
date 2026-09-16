@@ -4,6 +4,7 @@ import { getServerEnvironment } from "@/config/server";
 import type { GuestRecord } from "@/features/reservations";
 import type { CompanyQuotationRecord } from "@/features/company-quotations";
 import type {
+  ApprovedPayNowPayment,
   PayAtPropertyPayment,
   ReservationRecord,
 } from "@/features/reservations";
@@ -77,7 +78,7 @@ export type NotificationOutboxWriter<TContext> = Readonly<{
     context: TContext,
     input: Readonly<{
       guest: GuestRecord;
-      payment: PayAtPropertyPayment;
+      payment: PayAtPropertyPayment | ApprovedPayNowPayment;
       reservation: ReservationRecord;
     }>
   ) => Promise<void>;

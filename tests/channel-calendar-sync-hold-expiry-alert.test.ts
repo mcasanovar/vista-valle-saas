@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   confirmPayNowReservationFromHold,
+  createMockGuestRepository,
   createMockHoldRepository,
   createMockReservationRepository,
   HoldExpiredError,
@@ -62,6 +63,7 @@ describe("confirmPayNowReservationFromHold", () => {
     const holdRepository = createMockHoldRepository();
     const roomLockGateway = createMockRoomLockGateway();
     const reservationRepository = createMockReservationRepository();
+    const guestRepository = createMockGuestRepository();
     const interval = createLodgingInterval("2041-02-01", "2041-02-03");
     const hold = await roomLockGateway.runExclusive(
       "room-hold-expiry-flow",
@@ -79,6 +81,7 @@ describe("confirmPayNowReservationFromHold", () => {
 
     await expect(
       confirmPayNowReservationFromHold({
+        guestRepository,
         hold,
         holdRepository,
         paymentExternalReference: "ext-ref",
