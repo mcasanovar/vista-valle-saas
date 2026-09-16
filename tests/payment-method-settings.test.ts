@@ -7,11 +7,12 @@ import {
 } from "@/features/payments";
 
 describe("payment method settings", () => {
-  it("defaults both methods to enabled before any edit", async () => {
+  it("defaults all three methods to enabled before any edit", async () => {
     const repository = createMockPaymentMethodSettingsRepository();
     await expect(repository.get()).resolves.toEqual({
       payAtPropertyEnabled: true,
       payOnlineEnabled: true,
+      payByCardEnabled: true,
     });
   });
 
@@ -20,23 +21,27 @@ describe("payment method settings", () => {
     await repository.update({
       payAtPropertyEnabled: true,
       payOnlineEnabled: false,
+      payByCardEnabled: true,
     });
     await expect(repository.get()).resolves.toEqual({
       payAtPropertyEnabled: true,
       payOnlineEnabled: false,
+      payByCardEnabled: true,
     });
   });
 
-  it("allows persisting both methods disabled", async () => {
+  it("allows persisting all three methods disabled", async () => {
     const repository = createMockPaymentMethodSettingsRepository();
     await expect(
       repository.update({
         payAtPropertyEnabled: false,
         payOnlineEnabled: false,
+        payByCardEnabled: false,
       })
     ).resolves.toEqual({
       payAtPropertyEnabled: false,
       payOnlineEnabled: false,
+      payByCardEnabled: false,
     });
   });
 
@@ -45,8 +50,13 @@ describe("payment method settings", () => {
       normalizePaymentMethodSettingsInput({
         payAtPropertyEnabled: false,
         payOnlineEnabled: true,
+        payByCardEnabled: false,
       })
-    ).toEqual({ payAtPropertyEnabled: false, payOnlineEnabled: true });
+    ).toEqual({
+      payAtPropertyEnabled: false,
+      payOnlineEnabled: true,
+      payByCardEnabled: false,
+    });
   });
 
   it("rejects non-boolean or missing fields", () => {
@@ -56,5 +66,14 @@ describe("payment method settings", () => {
     expect(() => normalizePaymentMethodSettingsInput(null)).toThrow(
       PaymentMethodSettingsInputError
     );
+  });
+
+  it("rejects input missing payByCardEnabled", () => {
+    expect(() =>
+      normalizePaymentMethodSettingsInput({
+        payAtPropertyEnabled: true,
+        payOnlineEnabled: true,
+      })
+    ).toThrow(PaymentMethodSettingsInputError);
   });
 });

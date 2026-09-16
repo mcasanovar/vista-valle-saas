@@ -6,6 +6,7 @@ import { Feedback, Heading, Text } from "@/presentation/atoms";
 type PaymentMethodSettings = Readonly<{
   payAtPropertyEnabled: boolean;
   payOnlineEnabled: boolean;
+  payByCardEnabled: boolean;
 }>;
 
 export function PaymentMethodsSettings() {
@@ -89,7 +90,7 @@ export function PaymentMethodsSettings() {
         </label>
         <label className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
           <span>
-            <span className="block font-semibold">Pagar online</span>
+            <span className="block font-semibold">Transferencia bancaria</span>
             <span className="block text-sm text-muted-foreground">
               El huésped paga de inmediato con Fintoc.
             </span>
@@ -102,7 +103,27 @@ export function PaymentMethodsSettings() {
             }
             className="size-5 shrink-0"
             style={{ accentColor: "var(--color-accent)" }}
-            aria-label="Habilitar pagar online"
+            aria-label="Habilitar transferencia bancaria"
+          />
+        </label>
+        <label className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
+          <span>
+            <span className="block font-semibold">
+              Tarjeta de crédito o débito
+            </span>
+            <span className="block text-sm text-muted-foreground">
+              El huésped paga de inmediato con Mercado Pago.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={values.payByCardEnabled}
+            onChange={(event) =>
+              save({ ...values, payByCardEnabled: event.target.checked })
+            }
+            className="size-5 shrink-0"
+            style={{ accentColor: "var(--color-accent)" }}
+            aria-label="Habilitar pago con tarjeta"
           />
         </label>
       </div>

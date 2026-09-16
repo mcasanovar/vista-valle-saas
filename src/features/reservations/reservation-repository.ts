@@ -121,21 +121,25 @@ export type CreateConfirmedPayAtPropertyReservationInput = Readonly<{
 }>;
 
 /**
- * Confirms a single-room reservation from an already-locked, already-priced
- * `reservation_holds` row (see `createPaymentHold` in `./create-hold.ts`)
- * once its Fintoc payment has succeeded. The implementation updates the
- * existing pending payment row (`paymentId`) in place rather than creating
- * a new one, so `payments.hold_id` and the newly-set `payments.reservation_id`
- * both point at this reservation.
+ * Confirms a reservation (one or more rooms, always a single payment for
+ * the total — see `add-mercado-pago-checkout-pro` design.md decision 1)
+ * from an already-locked, already-priced `reservation_holds` row (see
+ * `createPaymentHold` in `./create-hold.ts`) once its online payment has
+ * succeeded. The implementation updates the existing pending payment row
+ * (`paymentId`) in place rather than creating a new one, so
+ * `payments.hold_id` and the newly-set `payments.reservation_id` both
+ * point at this reservation.
  */
 export type CreateConfirmedPayNowReservationInput = Readonly<{
   checkIn: string;
   checkOut: string;
   guestCount: number;
   guestId: string;
-  item: ReservationItemPricingResult;
+  items: readonly ReservationItemPricingResult[];
   paymentExternalReference: string;
   paymentId: string;
+  /** e.g. `"fintoc"` or `"mercado_pago"`. */
+  paymentProvider: string;
   providerPaymentId: string;
   publicId: string;
 }>;
@@ -397,32 +401,40 @@ export function createMockReservationRepository(
       if (storage.publicIds.has(input.publicId)) {
         throw new Error("Reservation public identifier collision");
       }
+      if (input.items.length === 0) {
+        throw new Error("Reservation requires room items");
+      }
 
       const createdAt = new Date();
-      const item = Object.freeze({
-        chargesClp: input.item.chargesClp,
-        guestCount: input.item.guestCount,
-        nightlyPriceClp: input.item.nightlyPriceClp,
-        nights: input.item.nights,
-        roomId: input.item.roomId,
-        subtotalClp: input.item.totalClp,
-      });
+      const items = Object.freeze(
+        input.items.map((item) =>
+          Object.freeze({
+            chargesClp: item.chargesClp,
+            guestCount: item.guestCount,
+            nightlyPriceClp: item.nightlyPriceClp,
+            nights: item.nights,
+            roomId: item.roomId,
+            subtotalClp: item.totalClp,
+          })
+        )
+      );
+      const firstItem = items[0]!;
       const reservation: ReservationRecord = Object.freeze({
-        chargesClp: item.chargesClp,
+        chargesClp: firstItem.chargesClp,
         checkIn: input.checkIn,
         checkOut: input.checkOut,
         createdAt,
         guestCount: input.guestCount,
         guestId: input.guestId,
         id: crypto.randomUUID(),
-        nightlyPriceClp: item.nightlyPriceClp,
-        items: [item],
+        nightlyPriceClp: firstItem.nightlyPriceClp,
+        items,
         origin: "website",
         paymentMode: "pay_now",
         publicId: input.publicId,
-        roomId: item.roomId,
+        roomId: firstItem.roomId,
         status: "confirmed",
-        totalClp: item.subtotalClp,
+        totalClp: items.reduce((total, item) => total + item.subtotalClp, 0),
         updatedAt: createdAt,
       });
       const payment: ApprovedPayNowPayment = Object.freeze({
@@ -431,7 +443,7 @@ export function createMockReservationRepository(
         externalReference: input.paymentExternalReference,
         id: input.paymentId,
         mode: "pay_now",
-        provider: "fintoc",
+        provider: input.paymentProvider,
         providerPaymentId: input.providerPaymentId,
         reservationId: reservation.id,
         status: "approved",
@@ -440,12 +452,13 @@ export function createMockReservationRepository(
       storage.reservationsById.set(reservation.id, reservation);
       storage.payNowPaymentsByReservationId.set(reservation.id, payment);
       storage.publicIds.add(reservation.publicId);
-      context.recordOccupancy({
-        interval: createLodgingInterval(input.checkIn, input.checkOut),
-        roomId: item.roomId,
-        source: "reservation",
-        sourceId: reservation.id,
-      });
+      for (const item of items)
+        context.recordOccupancy({
+          interval: createLodgingInterval(input.checkIn, input.checkOut),
+          roomId: item.roomId,
+          source: "reservation",
+          sourceId: reservation.id,
+        });
       return Object.freeze({ payment, reservation });
     },
     getReservationById: (id) =>

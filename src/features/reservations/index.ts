@@ -10,7 +10,7 @@ export * from "@/features/reservations/reservation-repository";
 export * from "@/features/reservations/create-pay-at-property-reservation";
 export * from "@/features/reservations/confirm-pay-at-property";
 export * from "@/features/reservations/confirm-pay-now-reservation";
-export * from "@/features/reservations/fintoc-checkout-candidate";
+export * from "@/features/reservations/online-checkout-candidate";
 export * from "@/features/reservations/transition-reservation-state";
 export * from "@/features/reservations/edit-reservation-dates";
 export * from "@/features/reservations/guest-form-validation";
@@ -25,5 +25,6 @@ export { PrebookingSelectionRestore } from "@/features/reservations/prebooking-s
 export * from "@/features/reservations/prebooking-review";
 export * from "@/features/reservations/selection-session";
 export * from "@/features/reservations/room-selection-codec";
+export * from "@/features/reservations/room-selection";
 export * from "@/features/reservations/guest-allocation";
 export { GuestAllocationBanner } from "@/features/reservations/guest-allocation-banner";

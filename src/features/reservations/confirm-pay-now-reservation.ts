@@ -22,6 +22,8 @@ export type ConfirmPayNowReservationFromHoldParams<TContext> = Readonly<{
   hold: ReservationHoldRecord;
   holdRepository: HoldRepository<TContext>;
   now?: () => Date;
+  /** e.g. `"fintoc"` or `"mercado_pago"` — the provider whose webhook confirmed this payment. */
+  paymentProvider: string;
   paymentExternalReference: string;
   paymentId: string;
   providerPaymentId: string;
@@ -30,13 +32,15 @@ export type ConfirmPayNowReservationFromHoldParams<TContext> = Readonly<{
 }>;
 
 /**
- * Converts an unexpired hold into a `CONFIRMED`/`pay_now` reservation once
- * its Fintoc payment has succeeded (design.md decision 7 of
- * `build-vista-valle-booking-mvp`: "confirmar en una nueva transacción
- * cuando se agregue ese proveedor"). Runs under `RoomLockGateway.runLocked`
- * rather than `runExclusive`: the hold already reserved this exact
- * interval, so there is nothing left to re-validate, only state to change
- * (see `RoomLockGateway`'s doc comment on `runLocked`).
+ * Converts an unexpired hold (one or more rooms, always a single payment
+ * for the total — see `add-mercado-pago-checkout-pro` design.md decision
+ * 1) into a `CONFIRMED`/`pay_now` reservation once its online payment has
+ * succeeded (design.md decision 7 of `build-vista-valle-booking-mvp`:
+ * "confirmar en una nueva transacción cuando se agregue ese proveedor").
+ * Runs under `RoomLockGateway.runLockedMany` rather than
+ * `runExclusiveMany`: the hold already reserved every one of these exact
+ * rooms/interval, so there is nothing left to re-validate, only state to
+ * change (see `RoomLockGateway`'s doc comment on `runLocked`).
  */
 export async function confirmPayNowReservationFromHold<TContext>(
   params: ConfirmPayNowReservationFromHoldParams<TContext>
@@ -48,6 +52,7 @@ export async function confirmPayNowReservationFromHold<TContext>(
     hold,
     holdRepository,
     now = () => new Date(),
+    paymentProvider,
     paymentExternalReference,
     paymentId,
     providerPaymentId,
@@ -59,34 +64,40 @@ export async function confirmPayNowReservationFromHold<TContext>(
     throw new HoldExpiredError(hold.id);
   }
 
-  return roomLockGateway.runLocked(hold.roomId, async (context) => {
-    const created = await reservationRepository.createConfirmedPayNowReservation(
-      context,
-      {
-        checkIn: hold.checkIn,
-        checkOut: hold.checkOut,
-        guestCount: hold.guestCount,
-        guestId: hold.guestId,
-        item: {
-          chargesClp: hold.chargesClp,
-          guestCount: hold.guestCount,
-          nightlyPriceClp: hold.nightlyPriceClp,
-          nights: nights(hold.checkIn, hold.checkOut),
-          roomId: hold.roomId,
-          totalClp: hold.totalClp,
-        },
-        paymentExternalReference,
-        paymentId,
-        providerPaymentId,
-        publicId: generatePublicId(),
-      }
-    );
-    await holdRepository.deleteHold(context, hold);
-    return created;
-  });
+  const holdNights = nights(hold.checkIn, hold.checkOut);
+
+  return roomLockGateway.runLockedMany(
+    hold.items.map((item) => item.roomId),
+    async (context) => {
+      const created = await reservationRepository.createConfirmedPayNowReservation(
+        context,
+        {
+          checkIn: hold.checkIn,
+          checkOut: hold.checkOut,
+          guestCount: hold.items.reduce((sum, item) => sum + item.guestCount, 0),
+          guestId: hold.guestId,
+          items: hold.items.map((item) => ({
+            chargesClp: item.chargesClp,
+            guestCount: item.guestCount,
+            nightlyPriceClp: item.nightlyPriceClp,
+            nights: holdNights,
+            roomId: item.roomId,
+            totalClp: item.subtotalClp,
+          })),
+          paymentExternalReference,
+          paymentId,
+          paymentProvider,
+          providerPaymentId,
+          publicId: generatePublicId(),
+        }
+      );
+      await holdRepository.deleteHold(context, hold);
+      return created;
+    }
+  );
 }
 
-/** Frees the room immediately once a hold's Fintoc payment definitively fails, instead of waiting for `expiresAt`. */
+/** Frees every room of the hold together (never partially), immediately once the hold's online payment definitively fails, instead of waiting for `expiresAt`. */
 export async function releaseFailedPayNowHold<TContext>(
   params: Readonly<{
     hold: ReservationHoldRecord;
@@ -95,7 +106,8 @@ export async function releaseFailedPayNowHold<TContext>(
   }>
 ): Promise<void> {
   const { hold, holdRepository, roomLockGateway } = params;
-  await roomLockGateway.runLocked(hold.roomId, (context) =>
-    holdRepository.deleteHold(context, hold)
+  await roomLockGateway.runLockedMany(
+    hold.items.map((item) => item.roomId),
+    (context) => holdRepository.deleteHold(context, hold)
   );
 }

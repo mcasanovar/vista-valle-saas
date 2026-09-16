@@ -58,6 +58,7 @@ try {
       "vitest",
       "run",
       "tests/postgres-reservation.integration.test.ts",
+      "tests/postgres-reservation-hold.integration.test.ts",
       "tests/postgres-company-quotation.integration.test.ts",
       "tests/postgres-notification-outbox.integration.test.ts",
       "tests/postgres-room-block.integration.test.ts",
@@ -67,6 +68,13 @@ try {
       "tests/postgres-alerts-end-to-end.integration.test.ts",
       "--environment",
       "node",
+      // Every integration file shares one live Postgres database with no
+      // per-file isolation; running files in parallel workers lets their
+      // inserts interleave and corrupts assertions over global table
+      // state in other files (see the multi-room hold file added in
+      // `add-mercado-pago-checkout-pro`, which surfaced this once a
+      // ninth file joined the run).
+      "--no-file-parallelism",
     ],
     {
       env: {

@@ -2,7 +2,10 @@ import "server-only";
 
 export type PaymentMethodSettings = Readonly<{
   payAtPropertyEnabled: boolean;
+  /** Fintoc — transferencia bancaria. */
   payOnlineEnabled: boolean;
+  /** Mercado Pago Checkout Pro — tarjeta de crédito o débito. */
+  payByCardEnabled: boolean;
 }>;
 
 export type PaymentMethodSettingsInput = PaymentMethodSettings;
@@ -39,7 +42,13 @@ export function normalizePaymentMethodSettingsInput(
   if (typeof payOnlineEnabled !== "boolean")
     issues.push({
       field: "payOnlineEnabled",
-      message: "Indique si pagar online está habilitado.",
+      message: "Indique si la transferencia bancaria está habilitada.",
+    });
+  const payByCardEnabled = candidate.payByCardEnabled;
+  if (typeof payByCardEnabled !== "boolean")
+    issues.push({
+      field: "payByCardEnabled",
+      message: "Indique si el pago con tarjeta está habilitado.",
     });
   if (issues.length)
     throw new PaymentMethodSettingsInputError(Object.freeze(issues));
@@ -47,6 +56,7 @@ export function normalizePaymentMethodSettingsInput(
   return Object.freeze({
     payAtPropertyEnabled: payAtPropertyEnabled as boolean,
     payOnlineEnabled: payOnlineEnabled as boolean,
+    payByCardEnabled: payByCardEnabled as boolean,
   });
 }
 
@@ -60,6 +70,7 @@ export type PaymentMethodSettingsRepository = Readonly<{
 const defaultPaymentMethodSettings: PaymentMethodSettings = Object.freeze({
   payAtPropertyEnabled: true,
   payOnlineEnabled: true,
+  payByCardEnabled: true,
 });
 
 export function createMockPaymentMethodSettingsRepository(

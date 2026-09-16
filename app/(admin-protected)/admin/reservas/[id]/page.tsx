@@ -40,6 +40,30 @@ const originLabels = {
 
 const channelLabels = { airbnb: "Airbnb", booking: "Booking" } as const;
 
+const paymentProviderLabels: Record<string, string> = {
+  fintoc: "Transferencia bancaria (Fintoc)",
+  mercado_pago: "Tarjeta (Mercado Pago)",
+  pay_at_property: "Pago al llegar",
+};
+
+function paymentProviderLabel(provider: string) {
+  return paymentProviderLabels[provider] ?? provider;
+}
+
+const paymentStatusLabels: Record<string, string> = {
+  approved: "aprobado",
+  cancelled: "cancelado",
+  charged_back: "contracargo",
+  pending: "pendiente",
+  refunded: "reembolsado",
+  rejected: "rechazado",
+  requires_action: "requiere acción",
+};
+
+function paymentStatusLabel(status: string) {
+  return paymentStatusLabels[status] ?? status;
+}
+
 const originChipClasses = {
   admin: "bg-muted text-[var(--admin-neutral)]",
   airbnb: "bg-red-100 text-red-700",
@@ -258,12 +282,12 @@ export default async function ReservationDetail({
               <li key={payment.id} className="border-b border-[#f2f3f7] pb-3 last:border-0">
                 <p className="flex items-center justify-between">
                   <span className="font-semibold">
-                    {payment.provider === "fintoc" ? "Fintoc" : "Pago al llegar"}
+                    {paymentProviderLabel(payment.provider)}
                   </span>
                   <span>{currency.format(payment.amountClp)}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Estado: {payment.status}
+                  Estado: {paymentStatusLabel(payment.status)}
                   {payment.refundedAmountClp > 0
                     ? ` · Reembolsado: ${currency.format(payment.refundedAmountClp)}`
                     : ""}

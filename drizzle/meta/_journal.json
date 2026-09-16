@@ -85,6 +85,27 @@
       "when": 1789421771520,
       "tag": "0011_little_molly_hayes",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789501461206,
+      "tag": "0012_yummy_felicia_hardy",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789502127071,
+      "tag": "0013_uneven_lady_deathstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789502145568,
+      "tag": "0014_broad_stellaris",
+      "breakpoints": true
     }
   ]
 }

@@ -9,12 +9,7 @@ import {
   type RoomLockGateway,
 } from "@/features/availability";
 import { getServerEnvironment } from "@/config/server";
-import {
-  getRoomReadSource,
-  resolveRoomNightlyPrice,
-  type RoomReadModel,
-  type RoomReadSource,
-} from "@/features/rooms";
+import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
 import { createProductionDatabase } from "@/infrastructure/database/client";
 import {
@@ -30,7 +25,7 @@ import {
   isPublicReservationId,
   type CreatePayAtPropertyReservationRoom,
 } from "./create-pay-at-property-reservation";
-import { parseRoomSelectionParam } from "./room-selection-codec";
+import { selectedRooms, toResolvedRoom } from "./room-selection";
 import {
   createCanonicalMockGuestRepository,
   type GuestRepository,
@@ -192,46 +187,10 @@ export async function listMockReservationPaymentAdminViews() {
   );
 }
 
-type SelectedRoom = Readonly<{ guestCount: number; room: RoomReadModel }>;
-
-/**
- * Resolves the untrusted `rooms` (or single `room`) form field into
- * authoritative rooms paired with the occupancy the visitor chose for each
- * one - see `room-occupancy-pricing` spec. A bare room key (no
- * `:<guestCount>`, the pre-occupancy shape, or the single-room `room`
- * field) defaults to 1 guest. An out-of-range guest count for a room's
- * capacity drops that room, surfacing as "unavailable" like any other
- * invalid selection.
- */
-function selectedRooms(
-  candidate: Record<string, unknown>,
-  source: RoomReadSource
-): readonly SelectedRoom[] {
-  const raw = candidate.rooms ?? candidate.room ?? "";
-  const entries = parseRoomSelectionParam(String(raw));
-  return entries
-    .map((entry) => {
-      const room = source
-        .listActive()
-        .find((candidateRoom) => candidateRoom.id === entry.roomId || candidateRoom.slug === entry.roomId);
-      if (!room) return null;
-      if (entry.guestCount < 1 || entry.guestCount > room.capacity) return null;
-      return Object.freeze({ guestCount: entry.guestCount, room });
-    })
-    .filter((entry): entry is SelectedRoom => entry !== null);
-}
-
-function toReservationRoom(entry: SelectedRoom): CreatePayAtPropertyReservationRoom {
-  return Object.freeze({
-    capacity: entry.room.capacity,
-    guestCount: entry.guestCount,
-    id: entry.room.id,
-    nightlyPriceClp: resolveRoomNightlyPrice(
-      entry.room,
-      entry.room.occupancyPrices,
-      entry.guestCount
-    ),
-  });
+function toReservationRoom(
+  entry: ReturnType<typeof selectedRooms>[number]
+): CreatePayAtPropertyReservationRoom {
+  return toResolvedRoom(entry);
 }
 
 export type PayAtPropertyBookingDependencies<TContext> = Readonly<{

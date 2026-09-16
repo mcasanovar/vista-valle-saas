@@ -1,0 +1,1 @@
+ALTER TABLE "payment_method_settings" ADD COLUMN "pay_by_card_enabled" boolean DEFAULT true NOT NULL;

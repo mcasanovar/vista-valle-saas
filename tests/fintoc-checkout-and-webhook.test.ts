@@ -85,7 +85,7 @@ describe("initiateFintocCheckout", () => {
       holdDurationMinutes: 15,
       holdRepository: setup.holdRepository,
       interval,
-      room: ROOM,
+      rooms: [ROOM],
       roomLockGateway: setup.roomLockGateway,
       successUrl: "https://mock-vista-valle.example.test/success",
     });
@@ -125,7 +125,7 @@ describe("initiateFintocCheckout", () => {
         holdDurationMinutes: 15,
         holdRepository: setup.holdRepository,
         interval,
-        room: ROOM,
+        rooms: [ROOM],
         roomLockGateway: setup.roomLockGateway,
         successUrl: "https://mock-vista-valle.example.test/success",
       })
@@ -145,7 +145,7 @@ describe("processFintocWebhookEvent", () => {
       holdDurationMinutes: 15,
       holdRepository: setup.holdRepository,
       interval,
-      room: ROOM,
+      rooms: [ROOM],
       roomLockGateway: setup.roomLockGateway,
       successUrl: "https://mock-vista-valle.example.test/success",
     });

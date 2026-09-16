@@ -46,6 +46,7 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "cancelled",
   "refunded",
   "requires_action",
+  "charged_back",
 ]);
 export const channelEnum = pgEnum("channel", ["airbnb", "booking"]);
 export const channelTaskStatusEnum = pgEnum("channel_task_status", [
@@ -79,6 +80,7 @@ export const assistantInteractionStatusEnum = pgEnum(
 /** Only `channel_sync_conflict` is written today; new values are additive as future alert-events (e.g. an OTA feed going stale) get built. */
 export const operationalAlertKindEnum = pgEnum("operational_alert_kind", [
   "channel_sync_conflict",
+  "payment_chargeback",
 ]);
 
 export const rooms = pgTable(
@@ -317,24 +319,17 @@ export const reservationHolds = pgTable(
   "reservation_holds",
   {
     id: id(),
-    roomId: uuid("room_id")
-      .notNull()
-      .references(() => rooms.id, { onDelete: "restrict" }),
     guestId: uuid("guest_id")
       .notNull()
       .references(() => guests.id, { onDelete: "restrict" }),
     checkIn: date("check_in", { mode: "string" }).notNull(),
     checkOut: date("check_out", { mode: "string" }).notNull(),
-    guestCount: integer("guest_count").notNull(),
-    nightlyPriceClp: integer("nightly_price_clp").notNull(),
-    chargesClp: integer("charges_clp").default(0).notNull(),
     totalClp: integer("total_clp").notNull(),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
     createdAt: createdAt(),
   },
   (table) => [
-    index("reservation_holds_room_interval_expiry_idx").on(
-      table.roomId,
+    index("reservation_holds_interval_expiry_idx").on(
       table.checkIn,
       table.checkOut,
       table.expiresAt
@@ -343,19 +338,60 @@ export const reservationHolds = pgTable(
       "reservation_holds_interval_valid",
       sql`${table.checkOut} > ${table.checkIn}`
     ),
+    check("reservation_holds_total_non_negative", sql`${table.totalClp} >= 0`),
+  ]
+);
+
+/**
+ * One row per room in a multi-room hold (mirrors `reservationItems`).
+ * `holdId` cascades on delete (unlike `reservationItems.reservationId`,
+ * which restricts) because a hold is a short-lived, non-authoritative
+ * entity: deleting it (consumed into a reservation, or released on
+ * payment failure/expiry) must always take its items with it.
+ */
+export const reservationHoldItems = pgTable(
+  "reservation_hold_items",
+  {
+    id: id(),
+    holdId: uuid("hold_id")
+      .notNull()
+      .references(() => reservationHolds.id, { onDelete: "cascade" }),
+    roomId: uuid("room_id")
+      .notNull()
+      .references(() => rooms.id, { onDelete: "restrict" }),
+    nights: integer("nights").notNull(),
+    guestCount: integer("guest_count").default(1).notNull(),
+    nightlyPriceClp: integer("nightly_price_clp").notNull(),
+    chargesClp: integer("charges_clp").default(0).notNull(),
+    subtotalClp: integer("subtotal_clp").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("reservation_hold_items_hold_room_unique").on(
+      table.holdId,
+      table.roomId
+    ),
+    index("reservation_hold_items_room_hold_idx").on(
+      table.roomId,
+      table.holdId
+    ),
+    check("reservation_hold_items_nights_positive", sql`${table.nights} > 0`),
     check(
-      "reservation_holds_guest_count_positive",
+      "reservation_hold_items_guest_count_positive",
       sql`${table.guestCount} > 0`
     ),
     check(
-      "reservation_holds_nightly_price_positive",
+      "reservation_hold_items_nightly_price_positive",
       sql`${table.nightlyPriceClp} > 0`
     ),
     check(
-      "reservation_holds_charges_non_negative",
+      "reservation_hold_items_charges_non_negative",
       sql`${table.chargesClp} >= 0`
     ),
-    check("reservation_holds_total_non_negative", sql`${table.totalClp} >= 0`),
+    check(
+      "reservation_hold_items_subtotal_non_negative",
+      sql`${table.subtotalClp} >= 0`
+    ),
   ]
 );
 
@@ -658,6 +694,7 @@ export const paymentMethodSettings = pgTable("payment_method_settings", {
     .notNull()
     .default(true),
   payOnlineEnabled: boolean("pay_online_enabled").notNull().default(true),
+  payByCardEnabled: boolean("pay_by_card_enabled").notNull().default(true),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
