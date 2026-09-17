@@ -28,20 +28,21 @@ export type EditReservationDatesActionResult =
     }>;
 
 /**
- * Server-side edit of a reservation's `check-in`/`check-out` (design.md
- * decision 1). Re-validates authorization, eligibility, the interval, and
- * room availability regardless of what the UI already hid or checked, and
- * returns a typed result instead of throwing so the form can show a
- * specific conflict message (spec "Conflicto en una de las habitaciones").
+ * Typed core: edits a reservation's dates from already-validated values,
+ * resolving production dependencies itself (design.md decision 1).
+ * Re-validates eligibility, the interval, and room availability regardless
+ * of what the caller already checked, and returns a typed result instead
+ * of throwing.
  */
-export async function editAdminReservationDatesAction(
-  formData: FormData
+export async function editAdminReservationDatesWithResult(
+  input: Readonly<{
+    actorUserId: string;
+    checkIn: string;
+    checkOut: string;
+    reservationId: string;
+  }>
 ): Promise<EditReservationDatesActionResult> {
-  const session = await requireAdministrator();
-  const id = String(formData.get("id") ?? "");
-  const checkIn = String(formData.get("checkIn") ?? "");
-  const checkOut = String(formData.get("checkOut") ?? "");
-  if (!id || !checkIn || !checkOut) {
+  if (!input.reservationId || !input.checkIn || !input.checkOut) {
     return Object.freeze({
       code: "validation" as const,
       message: "Completa la reserva y las nuevas fechas.",
@@ -71,12 +72,7 @@ export async function editAdminReservationDatesAction(
             .map((room) => [room.id, room])
         );
       },
-      input: {
-        actorUserId: session.user.id,
-        checkIn,
-        checkOut,
-        reservationId: id,
-      },
+      input,
       notificationOutboxWriter: createDrizzleNotificationOutboxWriter(),
       reservationRepository,
       roomLockGateway,
@@ -122,8 +118,30 @@ export async function editAdminReservationDatesAction(
     });
   }
 
-  revalidatePath("/admin/reservas");
-  revalidatePath(`/admin/reservas/${id}`);
-  revalidatePath("/admin/calendario");
   return Object.freeze({ ok: true as const });
+}
+
+/** Thin `FormData` adapter over `editAdminReservationDatesWithResult`. */
+export async function editAdminReservationDatesAction(
+  formData: FormData
+): Promise<EditReservationDatesActionResult> {
+  const session = await requireAdministrator();
+  const id = String(formData.get("id") ?? "");
+  const checkIn = String(formData.get("checkIn") ?? "");
+  const checkOut = String(formData.get("checkOut") ?? "");
+
+  const result = await editAdminReservationDatesWithResult({
+    actorUserId: session.user.id,
+    checkIn,
+    checkOut,
+    reservationId: id,
+  });
+
+  if (result.ok) {
+    revalidatePath("/admin/reservas");
+    revalidatePath(`/admin/reservas/${id}`);
+    revalidatePath("/admin/calendario");
+  }
+
+  return result;
 }

@@ -77,6 +77,10 @@ export const assistantInteractionStatusEnum = pgEnum(
   "assistant_interaction_status",
   ["proposed", "confirmed", "cancelled", "failed", "expired"]
 );
+export const assistantMessageRoleEnum = pgEnum("assistant_message_role", [
+  "user",
+  "assistant",
+]);
 /** Only `channel_sync_conflict` is written today; new values are additive as future alert-events (e.g. an OTA feed going stale) get built. */
 export const operationalAlertKindEnum = pgEnum("operational_alert_kind", [
   "channel_sync_conflict",
@@ -761,6 +765,65 @@ export const assistantInteractions = pgTable(
       table.status,
       table.expiresAt
     ),
+  ]
+);
+
+/** One conversation between an administrator and the assistant (proposal.md "Página del asistente"). */
+export const assistantThreads = pgTable(
+  "assistant_threads",
+  {
+    id: id(),
+    adminUserId: uuid("admin_user_id").notNull(),
+    /** Derived from the first instruction; see design.md's open question on thread titles. */
+    title: varchar("title", { length: 200 }),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("assistant_threads_admin_user_idx").on(
+      table.adminUserId,
+      table.createdAt
+    ),
+  ]
+);
+
+export const assistantMessages = pgTable(
+  "assistant_messages",
+  {
+    id: id(),
+    threadId: uuid("thread_id")
+      .notNull()
+      .references(() => assistantThreads.id, { onDelete: "cascade" }),
+    role: assistantMessageRoleEnum("role").notNull(),
+    content: text("content").notNull(),
+    /** Tool calls/results attached to this turn, for resuming a thread with full context. */
+    toolActivity: jsonb("tool_activity"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("assistant_messages_thread_idx").on(
+      table.threadId,
+      table.createdAt
+    ),
+  ]
+);
+
+/**
+ * A fact the administrator explicitly taught the assistant (proposal.md
+ * "Memoria de preferencias"). Never written from inferred data — only ever
+ * populated by the `registrar_hecho` tool on an explicit instruction.
+ */
+export const assistantMemoryFacts = pgTable(
+  "assistant_memory_facts",
+  {
+    id: id(),
+    adminUserId: uuid("admin_user_id").notNull(),
+    fact: text("fact").notNull(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [
+    index("assistant_memory_facts_admin_user_idx").on(table.adminUserId),
   ]
 );
 

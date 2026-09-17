@@ -138,4 +138,39 @@ describe("administrative password authentication", () => {
       )
     ).toBe(false);
   });
+
+  it("also accepts DEV_TUNNEL_ORIGIN, but only that exact host, and never when unset", () => {
+    const previous = process.env.DEV_TUNNEL_ORIGIN;
+    process.env.DEV_TUNNEL_ORIGIN = "tunnel.ngrok-free.dev";
+    try {
+      // request.url reflects the local dev server, not the tunnel's public
+      // host — this is the same shape a tunneled request actually arrives in.
+      expect(
+        isTrustedAdminMutationOrigin(
+          new Request("http://localhost:3000/api/admin/auth/login", {
+            headers: { origin: "https://tunnel.ngrok-free.dev" },
+          })
+        )
+      ).toBe(true);
+      expect(
+        isTrustedAdminMutationOrigin(
+          new Request("http://localhost:3000/api/admin/auth/login", {
+            headers: { origin: "https://evil.test" },
+          })
+        )
+      ).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.DEV_TUNNEL_ORIGIN;
+      else process.env.DEV_TUNNEL_ORIGIN = previous;
+    }
+
+    delete process.env.DEV_TUNNEL_ORIGIN;
+    expect(
+      isTrustedAdminMutationOrigin(
+        new Request("http://localhost:3000/api/admin/auth/login", {
+          headers: { origin: "https://tunnel.ngrok-free.dev" },
+        })
+      )
+    ).toBe(false);
+  });
 });

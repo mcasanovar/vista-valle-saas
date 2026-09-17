@@ -8,6 +8,7 @@ import {
   type InputHTMLAttributes,
   type LabelHTMLAttributes,
   type ReactNode,
+  type TextareaHTMLAttributes,
 } from "react";
 
 type ClassNameProps = Readonly<{ className?: string }>;
@@ -174,6 +175,19 @@ export const Input = forwardRef<
     <input
       ref={ref}
       className={`min-h-11 w-full rounded-md border bg-card px-4 py-3 font-sans text-base text-foreground transition-colors duration-200 ease-standard placeholder:text-muted-foreground focus:border-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground read-only:bg-muted ${className}`}
+      {...props}
+    />
+  );
+});
+
+export const Textarea = forwardRef<
+  HTMLTextAreaElement,
+  TextareaHTMLAttributes<HTMLTextAreaElement>
+>(function Textarea({ className = "", ...props }, ref) {
+  return (
+    <textarea
+      ref={ref}
+      className={`w-full resize-none rounded-md border bg-card px-4 py-3 font-sans text-base text-foreground transition-colors duration-200 ease-standard placeholder:text-muted-foreground focus:border-ring disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground ${className}`}
       {...props}
     />
   );

@@ -66,6 +66,7 @@ try {
       "tests/postgres-admin-pending-payments.integration.test.ts",
       "tests/postgres-reservation-summary.integration.test.ts",
       "tests/postgres-alerts-end-to-end.integration.test.ts",
+      "tests/postgres-assistant-interaction-audit.integration.test.ts",
       "--environment",
       "node",
       // Every integration file shares one live Postgres database with no

@@ -1,9 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requireAdministrator: vi.fn(),
-  execute: vi.fn(),
-  cancel: vi.fn(),
-  create: vi.fn(),
+  createRoomBlocks: vi.fn(),
   revalidatePath: vi.fn(),
   getAudit: vi.fn(),
   auditCreate: vi.fn(),
@@ -14,10 +12,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/infrastructure/auth/authorization", () => ({
   requireAdministrator: mocks.requireAdministrator,
 }));
-vi.mock("@/features/assistant/proposal-tokens", () => ({
-  executeBlockProposalToken: mocks.execute,
-  cancelBlockProposalToken: mocks.cancel,
-  createBlockProposalToken: mocks.create,
+vi.mock("@/features/room-blocks", () => ({
+  createRoomBlocks: mocks.createRoomBlocks,
 }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/features/assistant/interaction-audit", () => ({
@@ -28,6 +24,14 @@ import {
   confirmBlockProposalAction,
   startBlockProposalAction,
 } from "@/features/assistant/actions";
+
+const demoPayload = Object.freeze({
+  checkIn: "2044-01-01",
+  checkOut: "2044-01-03",
+  reason: "Mantenimiento programado",
+  roomId: "demo-room-valle",
+});
+
 describe("proposal actions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -42,31 +46,49 @@ describe("proposal actions", () => {
   it("blocks unauthenticated confirm and cancel", async () => {
     mocks.requireAdministrator.mockRejectedValueOnce(new Error("unauthorized"));
     await expect(confirmBlockProposalAction(new FormData())).rejects.toThrow();
-    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.auditApprove).not.toHaveBeenCalled();
     mocks.requireAdministrator.mockRejectedValueOnce(new Error("unauthorized"));
     await expect(cancelBlockProposalAction(new FormData())).rejects.toThrow();
-    expect(mocks.cancel).not.toHaveBeenCalled();
+    expect(mocks.auditCancel).not.toHaveBeenCalled();
   });
-  it("forwards token and actor", async () => {
+
+  it("confirms by executing the same domain function the room-blocks form uses, then cancels a separate token", async () => {
     mocks.requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
-    mocks.execute.mockResolvedValue({ id: "block-1" });
+    mocks.auditApprove.mockResolvedValue({
+      interpretation: { operation: "crear_bloqueo", payload: demoPayload },
+    });
+    mocks.createRoomBlocks.mockResolvedValue([{ id: "block-1" }]);
+
     const data = new FormData();
+    // Client-supplied fields on the request are never read — the payload
+    // comes only from the persisted proposal the token points to.
     data.set("token", "token-1");
     data.set("roomId", "attacker-room");
     data.set("checkIn", "2099-01-01");
     data.set("checkOut", "2099-01-03");
     data.set("reason", "attacker-reason");
-    await confirmBlockProposalAction(data);
-    expect(mocks.execute).toHaveBeenCalledWith("token-1", "admin-1");
-    await cancelBlockProposalAction(data);
-    expect(mocks.cancel).toHaveBeenCalledWith("token-1", "admin-1");
+
+    const block = await confirmBlockProposalAction(data);
+
+    expect(mocks.auditApprove).toHaveBeenCalledWith("token-1", "admin-1");
+    expect(mocks.createRoomBlocks).toHaveBeenCalledWith(
+      {
+        checkIn: demoPayload.checkIn,
+        checkOut: demoPayload.checkOut,
+        reason: demoPayload.reason,
+        roomIds: [demoPayload.roomId],
+      },
+      "admin-1"
+    );
+    expect(block).toEqual({ id: "block-1" });
+    expect(mocks.auditResult).toHaveBeenCalledWith("token-1", "admin-1", {
+      data: { blockId: "block-1" },
+      outcome: "executed",
+    });
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/admin/calendario");
     expect(mocks.revalidatePath).toHaveBeenCalledWith("/admin/bloqueos");
-    expect(mocks.auditApprove).toHaveBeenCalledWith("token-1", "admin-1");
-    expect(mocks.auditResult).toHaveBeenCalledWith("token-1", "admin-1", {
-      outcome: "executed",
-      blockId: "block-1",
-    });
+
+    await cancelBlockProposalAction(data);
     expect(mocks.auditCancel).toHaveBeenCalledWith("token-1", "admin-1");
   });
 
@@ -80,51 +102,30 @@ describe("proposal actions", () => {
 
     mocks.requireAdministrator.mockRejectedValueOnce(new Error("unauthorized"));
     await expect(startBlockProposalAction(clientFields)).rejects.toThrow();
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
 
     mocks.requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
-    mocks.create.mockReturnValue({
-      token: "proposal-token",
-      roomId: "demo-room-valle",
-      checkIn: "2044-01-01",
-      checkOut: "2044-01-03",
-      reason: "Mantenimiento programado",
-      actor: "admin-1",
-      expiresAt: new Date("2044-01-01T00:00:00.000Z"),
-    });
 
-    await expect(startBlockProposalAction(clientFields)).resolves.toEqual({
-      token: "proposal-token",
-      roomId: "demo-room-valle",
-      checkIn: "2044-01-01",
-      checkOut: "2044-01-03",
-      reason: "Mantenimiento programado",
-    });
-    expect(mocks.create).toHaveBeenCalledWith({
-      roomId: "demo-room-valle",
-      checkIn: "2044-01-01",
-      checkOut: "2044-01-03",
-      reason: "Mantenimiento programado",
-      actor: "admin-1",
-    });
+    const result = await startBlockProposalAction(clientFields);
+
+    expect(result).toEqual({ token: expect.any(String), ...demoPayload });
     expect(mocks.auditCreate).toHaveBeenCalledWith({
       actor: "admin-1",
-      instruction: "Bloquea la habitación por mantención",
-      interpretation: {
-        action: "CREATE_ROOM_BLOCK",
-        roomId: "demo-room-valle",
-        checkIn: "2044-01-01",
-        checkOut: "2044-01-03",
-        reason: "Mantenimiento programado",
-      },
       corrections: [],
-      proposalToken: "proposal-token",
+      instruction: "Bloquea la habitación por mantención",
+      interpretation: { operation: "crear_bloqueo", payload: demoPayload },
+      proposalToken: result.token,
     });
   });
 
   it("records a safe execution failure without retaining provider details", async () => {
     mocks.requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
-    mocks.execute.mockRejectedValue(new Error("provider secret: never expose"));
+    mocks.auditApprove.mockResolvedValue({
+      interpretation: { operation: "crear_bloqueo", payload: demoPayload },
+    });
+    mocks.createRoomBlocks.mockRejectedValue(
+      new Error("provider secret: never expose")
+    );
     const data = new FormData();
     data.set("token", "token-1");
 
@@ -132,8 +133,8 @@ describe("proposal actions", () => {
       "Assistant unavailable"
     );
     expect(mocks.auditResult).toHaveBeenCalledWith("token-1", "admin-1", {
-      outcome: "failed",
       code: "unavailable_or_conflict",
+      outcome: "failed",
     });
   });
 });
