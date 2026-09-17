@@ -56,7 +56,14 @@ const serverEnvironmentSchema = z.object({
   AI_API_KEY: z.string().trim().min(1),
   AI_MODEL: z.string().trim().min(1),
   AI_PROVIDER: z.string().trim().min(1),
+  /** Speech-to-text model for the assistant's voice input (design.md decision 7); a separate model name from AI_MODEL because transcription and chat are different model families even on the same provider. */
+  AI_TRANSCRIPTION_MODEL: z.string().trim().min(1),
   ADMIN_NOTIFICATION_EMAIL: z.email(),
+  /** Kill switch for the admin assistant page and its API routes; defaults to disabled so deploying this change doesn't expose it before credentials and spend limits are configured (design.md decision 11). */
+  ASSISTANT_ENABLED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
   ASSISTANT_PROPOSAL_TTL_MINUTES: positiveInteger,
   /** Operational kill switch for new reservations; defaults to enabled so an unset value never silently blocks bookings. */
   BOOKING_ENABLED: z
@@ -108,6 +115,7 @@ const configurationValuesThatMayBeMocked = [
   "AI_API_KEY",
   "AI_MODEL",
   "AI_PROVIDER",
+  "AI_TRANSCRIPTION_MODEL",
   "CLOUDINARY_API_KEY",
   "CLOUDINARY_API_SECRET",
   "CLOUDINARY_CLOUD_NAME",
@@ -180,7 +188,9 @@ export function getServerEnvironment(
     AI_API_KEY: environment.AI_API_KEY,
     AI_MODEL: environment.AI_MODEL,
     AI_PROVIDER: environment.AI_PROVIDER,
+    AI_TRANSCRIPTION_MODEL: environment.AI_TRANSCRIPTION_MODEL,
     ADMIN_NOTIFICATION_EMAIL: environment.ADMIN_NOTIFICATION_EMAIL,
+    ASSISTANT_ENABLED: environment.ASSISTANT_ENABLED,
     ASSISTANT_PROPOSAL_TTL_MINUTES: environment.ASSISTANT_PROPOSAL_TTL_MINUTES,
     BOOKING_ENABLED: environment.BOOKING_ENABLED,
     BOOKING_HOLD_DURATION_MINUTES: environment.BOOKING_HOLD_DURATION_MINUTES,

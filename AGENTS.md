@@ -65,7 +65,7 @@ The Quality Engineer should not normally write application code. It may make sma
 - Store lodging dates as date-only values interpreted in `America/Santiago`; store technical event timestamps in UTC.
 - Serialize committing availability operations by room and recheck overlap inside the transaction.
 - Browser redirects never confirm online payments. Only authenticated, reconciled, idempotent webhook processing can confirm them.
-- The AI assistant only proposes `CREATE_ROOM_BLOCK`; it cannot access SQL or mutate availability directly, and execution requires deterministic revalidation plus human confirmation.
+- The AI assistant's tool surface is a closed, declared list (`admin-assistant-operations`): read tools execute directly against real data; write tools (`crear_reserva`, `editar_fechas`, `cambiar_estado`, `registrar_cobro`, `crear_bloqueo`, `eliminar_bloqueo`) only ever build a proposal — no tool call executes a domain mutation. It cannot access SQL or mutate availability directly; execution of a proposal happens in a separate, human-triggered confirmation that revalidates deterministically against current data before running the same domain function the equivalent admin screen uses, and every interaction is audited.
 - Do not invent room, policy, price, contact, or location data that the owner has not supplied.
 - Redact personal or provider-sensitive data from logs, fixtures, and reports.
 - Avoid unrelated refactors and preserve user changes already present in the worktree.

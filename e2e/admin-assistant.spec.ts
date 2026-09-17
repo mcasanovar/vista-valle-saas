@@ -1,68 +1,48 @@
+import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 
-async function prepareAndConfirmAssistantProposal(
-  page: import("@playwright/test").Page
-) {
-  await page
-    .getByLabel("Instrucción")
-    .fill("Bloquea la habitación para mantenimiento");
-  await page.getByRole("button", { name: "Preparar propuesta" }).click();
-  await expect(page.getByText("Vista previa: demo-room-valle")).toBeVisible();
-  await expect(page.getByText("Mantenimiento programado")).toBeVisible();
-  await page.getByRole("button", { name: "Confirmar propuesta" }).click();
-}
+// The assistant page redirects to /admin while ASSISTANT_ENABLED is off
+// (design.md decision 11 — the flag stays off until the real provider is
+// wired in section 11's migration step). This suite exercises the actual
+// module, so it only runs against an environment where the flag is on.
+test.skip(
+  process.env.ASSISTANT_ENABLED !== "true",
+  "requires ASSISTANT_ENABLED=true"
+);
 
-// Módulo del asistente temporalmente cerrado (2026-09-07): /admin/asistente
-// redirige a /admin, por lo que este flujo queda deshabilitado hasta reabrirlo.
-test.skip("administrator confirms assistant preview, rejects conflict, and uses manual fallback", async ({
+test("assistant page renders as a full module page, not an overlay (task 8.1)", async ({
   page,
 }) => {
-  const providerRequests: string[] = [];
-  page.on("request", (request) => {
-    const hostname = new URL(request.url()).hostname;
-    if (hostname !== "127.0.0.1" && hostname !== "localhost") {
-      providerRequests.push(request.url());
-    }
-  });
-
   await page.goto("/admin/asistente");
+  await expect(page.getByRole("heading", { name: "Asistente" })).toBeVisible();
+  // A full page occupies the admin content area alongside the shell nav,
+  // rather than floating as a modal/overlay above it.
   await expect(
-    page.getByRole("heading", { name: "Asistente de calendario" })
+    page.getByRole("navigation", { name: "Navegación administrativa" })
   ).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+});
 
-  await prepareAndConfirmAssistantProposal(page);
-  await expect(
-    page.getByText("Bloqueo creado y disponibilidad actualizada.")
-  ).toBeVisible();
-
-  await page.getByRole("link", { name: "Usar bloqueo manual" }).click();
-  await expect(page).toHaveURL(/\/admin\/bloqueos$/);
-  await expect(
-    page.getByText("demo-room-valle: 2044-01-01 a 2044-01-03")
-  ).toBeVisible();
-
+test("has no automated accessibility violations (task 8.6)", async ({ page }) => {
   await page.goto("/admin/asistente");
-  await prepareAndConfirmAssistantProposal(page);
-  await expect(
-    page.getByText(
-      "No pudimos ejecutar la propuesta. La disponibilidad pudo haber cambiado; revisa el calendario o usa el formulario manual."
-    )
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Asistente" })).toBeVisible();
 
-  await page.getByRole("link", { name: "Usar bloqueo manual" }).click();
-  await expect(
-    page.getByText("demo-room-valle: 2044-01-01 a 2044-01-03")
-  ).toHaveCount(1);
-  const manual = page.getByRole("form", { name: "Crear bloqueo" });
-  await manual.getByLabel("Habitación").fill("demo-room-andes");
-  await manual.getByLabel("Entrada").fill("2044-02-01");
-  await manual.getByLabel("Salida").fill("2044-02-03");
-  await manual.getByLabel("Motivo").fill("Mantenimiento manual E2E");
-  await manual.getByRole("button", { name: "Crear bloqueo" }).click();
-  await expect(page.getByRole("status")).toHaveText("Bloqueo creado.");
-  await expect(
-    page.getByText("demo-room-andes: 2044-02-01 a 2044-02-03")
-  ).toBeVisible();
+  const results = await new AxeBuilder({ page }).analyze();
+  expect(results.violations).toEqual([]);
+});
 
-  expect(providerRequests).toEqual([]);
+test("opening a new thread and resuming a previous one both work from the thread list (task 8.5)", async ({
+  page,
+}) => {
+  await page.goto("/admin/asistente");
+
+  const instruction = page.getByLabel("Instrucción para el asistente");
+  await instruction.fill("Busca disponibilidad para mañana");
+  await page.getByRole("button", { name: "Enviar" }).click();
+  await expect(page.getByText("Busca disponibilidad para mañana")).toBeVisible();
+
+  await page.getByRole("button", { name: "Nuevo hilo" }).click();
+  await expect(
+    page.getByText("Busca disponibilidad para mañana")
+  ).not.toBeVisible();
 });

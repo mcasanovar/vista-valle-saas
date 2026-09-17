@@ -221,6 +221,33 @@ export function ContactLink({
   );
 }
 
+export function ChatMessageBubble({
+  author,
+  children,
+  role,
+}: Readonly<{
+  author: string;
+  children: string;
+  role: "assistant" | "user";
+}>) {
+  return (
+    <div
+      className={`flex flex-col gap-1 ${role === "user" ? "items-end" : "items-start"}`}
+    >
+      <Text className="text-xs text-muted-foreground">{author}</Text>
+      <div
+        className={`max-w-[85%] whitespace-pre-wrap rounded-lg px-4 py-3 font-sans text-base ${
+          role === "user"
+            ? "bg-primary text-on-primary"
+            : "border bg-card text-foreground"
+        }`}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function StatusPresentation({
   label,
   description,

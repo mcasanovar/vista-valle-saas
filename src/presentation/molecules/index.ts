@@ -1,5 +1,6 @@
 export {
   Amenities,
+  ChatMessageBubble,
   ContactLink,
   DateField,
   FormField,

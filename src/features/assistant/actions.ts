@@ -1,11 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
-import {
-  cancelBlockProposalToken,
-  createBlockProposalToken,
-  executeBlockProposalToken,
-} from "./proposal-tokens";
+import { createRoomBlocks } from "@/features/room-blocks";
 import { getAssistantInteractionAudit } from "./interaction-audit";
 
 function getAuditOrThrow() {
@@ -14,71 +10,81 @@ function getAuditOrThrow() {
   return audit;
 }
 
+type CreateRoomBlockPayload = Readonly<{
+  checkIn: string;
+  checkOut: string;
+  reason: string;
+  roomId: string;
+}>;
+
+/**
+ * Demo-scripted proposal (calendar-assistant's MVP scope, still
+ * `CREATE_ROOM_BLOCK`-only per `AGENTS.md` until section 8 reactivates
+ * `/admin/asistente` against the full tool surface in
+ * `admin-assistant-operations`). The proposal is persisted like any other
+ * assistant proposal (design.md decision 4); only the interpretation step
+ * is hardcoded instead of coming from a real `AssistantModel` turn.
+ */
 export async function startBlockProposalAction(data: FormData) {
   const user = await requireAdministrator();
   const instruction = String(data.get("instruction") ?? "").trim();
   if (!instruction) throw new Error("Assistant unavailable");
-  const proposal = createBlockProposalToken({
-    roomId: "demo-room-valle",
+  const payload: CreateRoomBlockPayload = {
     checkIn: "2044-01-01",
     checkOut: "2044-01-03",
     reason: "Mantenimiento programado",
-    actor: user.user.id,
-  });
+    roomId: "demo-room-valle",
+  };
   const correction = String(data.get("correction") ?? "").trim();
-  getAuditOrThrow().create({
+  const token = crypto.randomUUID();
+  await getAuditOrThrow().create({
     actor: user.user.id,
-    instruction,
-    interpretation: {
-      action: "CREATE_ROOM_BLOCK",
-      roomId: proposal.roomId,
-      checkIn: proposal.checkIn,
-      checkOut: proposal.checkOut,
-      reason: proposal.reason,
-    },
     corrections: correction ? [correction] : [],
-    proposalToken: proposal.token,
+    instruction,
+    interpretation: { operation: "crear_bloqueo", payload },
+    proposalToken: token,
   });
 
-  return Object.freeze({
-    token: proposal.token,
-    roomId: proposal.roomId,
-    checkIn: proposal.checkIn,
-    checkOut: proposal.checkOut,
-    reason: proposal.reason,
-  });
+  return Object.freeze({ token, ...payload });
 }
 
 export async function confirmBlockProposalAction(data: FormData) {
   const user = await requireAdministrator();
   const token = String(data.get("token") ?? "");
   const audit = getAuditOrThrow();
-  audit.approve(token, user.user.id);
+  const approved = await audit.approve(token, user.user.id);
+  const payload = approved.interpretation.payload as CreateRoomBlockPayload;
 
   try {
-    const result = await executeBlockProposalToken(token, user.user.id);
-    audit.recordExecutionResult(token, user.user.id, {
+    const [block] = await createRoomBlocks(
+      {
+        checkIn: payload.checkIn,
+        checkOut: payload.checkOut,
+        reason: payload.reason,
+        roomIds: [payload.roomId],
+      },
+      user.user.id
+    );
+    await audit.recordExecutionResult(token, user.user.id, {
+      data: { blockId: block!.id },
       outcome: "executed",
-      blockId: result.id,
     });
     revalidatePath("/admin/asistente");
     revalidatePath("/admin/calendario");
     revalidatePath("/admin/bloqueos");
-    return result;
+    return block;
   } catch {
-    audit.recordExecutionResult(token, user.user.id, {
-      outcome: "failed",
+    await audit.recordExecutionResult(token, user.user.id, {
       code: "unavailable_or_conflict",
+      outcome: "failed",
     });
     throw new Error("Assistant unavailable");
   }
 }
+
 export async function cancelBlockProposalAction(data: FormData) {
   const user = await requireAdministrator();
   const token = String(data.get("token") ?? "");
-  const audit = getAuditOrThrow();
-  const result = await cancelBlockProposalToken(token, user.user.id);
-  audit.cancel(token, user.user.id);
+  await getAuditOrThrow().cancel(token, user.user.id);
   revalidatePath("/admin/asistente");
-  return result;
 }

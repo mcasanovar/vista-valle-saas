@@ -32,7 +32,11 @@ const securityHeaders = [
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
   {
     key: "Permissions-Policy",
-    value: "camera=(), geolocation=(), microphone=()",
+    // The admin assistant's voice dictation (task 9.1) records audio via
+    // `getUserMedia` from the same origin, so microphone can't be denied
+    // outright — `(self)` still blocks it for any third-party/embedded
+    // context, just not the app itself.
+    value: "camera=(), geolocation=(), microphone=(self)",
   },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Content-Type-Options", value: "nosniff" },

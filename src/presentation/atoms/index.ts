@@ -11,6 +11,7 @@ export {
   Skeleton,
   Spinner,
   Text,
+  Textarea,
   VistaValleBrand,
 } from "./atoms";
 export type { IconName } from "./atoms";

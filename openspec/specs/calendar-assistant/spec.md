@@ -2,27 +2,12 @@
 
 ## Purpose
 
-Permitir que el administrador prepare bloqueos de disponibilidad escribiendo instrucciones naturales en español, manteniendo validación determinista y confirmación humana antes de modificar el calendario. En este MVP, el chat usa una única respuesta mock y determinista; la integración con un proveedor de IA se difiere a un cambio OpenSpec posterior.
+Permitir que el administrador prepare operaciones de reservas, pagos y bloqueos escribiendo instrucciones naturales en español, manteniendo validación determinista y confirmación humana antes de modificar cualquier dato. La interpretación se resuelve con un proveedor de IA real detrás de un adaptador tipado (ver `admin-ai-assistant`); la superficie completa de operaciones que puede proponer, separada en lectura directa y escritura con propuesta, queda definida en `admin-assistant-operations`.
 
 ## Requirements
 
-### Requirement: Interpretación restringida de cierres
-El sistema SHALL interpretar lenguaje natural exclusivamente como propuestas para crear bloqueos de habitación y SHALL producir habitación, fecha inicial, fecha final y motivo en una estructura validada.
-
-#### Scenario: Respuesta mock del MVP
-- **WHEN** el administrador envía una instrucción compatible en el chat del asistente bajo el contexto mock
-- **THEN** el sistema presenta la única respuesta estructurada determinista configurada, sin realizar solicitudes a proveedores de IA ni requerir credenciales
-
-#### Scenario: Cierre de una noche
-- **WHEN** el administrador escribe "bloquea la habitación 1 el 5 de mayo"
-- **THEN** el asistente propone un bloqueo de una noche para esa habitación y presenta las fechas absolutas interpretadas
-
-#### Scenario: Acción fuera de alcance
-- **WHEN** el administrador solicita cancelar una reserva, cambiar precios o ejecutar otra acción no soportada
-- **THEN** el asistente rechaza la acción y explica que solo puede proponer cierres de fechas
-
 ### Requirement: Resolución de ambigüedades
-El sistema SHALL solicitar información adicional cuando la habitación, el intervalo o el año no puedan resolverse con seguridad y SHALL mostrar cualquier inferencia temporal antes de continuar.
+El sistema SHALL solicitar información adicional cuando la operación, la entidad afectada, el intervalo o el año no puedan resolverse con seguridad, y SHALL mostrar cualquier inferencia temporal en términos absolutos antes de continuar.
 
 #### Scenario: Habitación omitida
 - **WHEN** el administrador escribe "cierra la habitación para el viernes"
@@ -32,15 +17,27 @@ El sistema SHALL solicitar información adicional cuando la habitación, el inte
 - **WHEN** el administrador indica día y mes sin año
 - **THEN** el asistente propone una fecha futura usando `America/Santiago` y exige confirmación explícita de la fecha absoluta
 
+#### Scenario: Reserva referida de forma ambigua
+- **WHEN** la instrucción hace referencia a una reserva y más de una coincide con el criterio entregado
+- **THEN** el asistente presenta las coincidencias, pide al administrador que elija y no genera una propuesta
+
+#### Scenario: Operación ambigua
+- **WHEN** la instrucción admite más de una operación posible sobre la misma entidad
+- **THEN** el asistente pregunta cuál corresponde y no ejecuta ni propone ninguna
+
 ### Requirement: Vista previa y aprobación humana
-El sistema MUST presentar habitación, intervalo, noches y motivo interpretados y MUST requerir una confirmación explícita antes de ejecutar la operación.
+El sistema MUST presentar la operación interpretada, la entidad afectada y todos sus valores en términos absolutos, y MUST requerir una confirmación explícita antes de ejecutar cualquier operación de escritura.
 
 #### Scenario: Propuesta sin confirmar
 - **WHEN** la IA devuelve una interpretación válida
-- **THEN** el calendario permanece sin cambios hasta que el administrador confirma la vista previa
+- **THEN** los datos del sistema permanecen sin cambios hasta que el administrador confirma la vista previa
+
+#### Scenario: Vista previa de una operación sobre reservas
+- **WHEN** la propuesta afecta a una reserva
+- **THEN** la vista previa identifica la reserva, su huésped, su habitación, su intervalo, su estado vigente y su estado de pago antes de pedir confirmación
 
 ### Requirement: Validación determinista
-El sistema MUST resolver la habitación contra datos reales y aplicar las reglas normales de fechas, autorización y conflictos después de la interpretación de IA.
+El sistema MUST resolver toda entidad referida por el modelo contra datos reales y MUST aplicar las reglas normales de fechas, capacidad, autorización, transiciones de estado y conflictos después de la interpretación de IA, en el momento de la confirmación.
 
 #### Scenario: Habitación inventada
 - **WHEN** la salida del modelo contiene una habitación inexistente
@@ -50,6 +47,10 @@ El sistema MUST resolver la habitación contra datos reales y aplicar las reglas
 - **WHEN** el bloqueo confirmado se superpone con una reserva o retención incompatible
 - **THEN** el sistema no crea el bloqueo y muestra el conflicto al administrador
 
+#### Scenario: Estado cambiado entre la propuesta y la confirmación
+- **WHEN** la entidad afectada cambia de estado entre la generación de la propuesta y su confirmación
+- **THEN** el sistema revalida contra el estado vigente y rechaza la operación si dejó de ser válida
+
 ### Requirement: Sin acceso directo de la IA
 El sistema MUST impedir que el modelo ejecute SQL, invoque operaciones arbitrarias o modifique disponibilidad directamente.
 
@@ -58,15 +59,23 @@ El sistema MUST impedir que el modelo ejecute SQL, invoque operaciones arbitrari
 - **THEN** el sistema trata la interpretación como fallida y no ejecuta acciones
 
 ### Requirement: Auditoría del asistente
-El sistema SHALL conservar la instrucción original, interpretación, correcciones, confirmación, actor y resultado de cada operación ejecutada mediante el asistente.
+El sistema SHALL conservar de forma duradera la instrucción original, interpretación, correcciones, confirmación, actor y resultado de cada operación ejecutada mediante el asistente, cualquiera sea la operación.
 
 #### Scenario: Bloqueo confirmado
 - **WHEN** el administrador confirma una propuesta y el bloqueo se crea
 - **THEN** el detalle del bloqueo identifica que fue iniciado mediante el asistente y conserva su trazabilidad
 
+#### Scenario: Operación sobre una reserva confirmada
+- **WHEN** el administrador confirma una propuesta que crea o modifica una reserva o registra un cobro
+- **THEN** el registro de esa interacción queda conservado e identifica la reserva o el pago afectado
+
 ### Requirement: Alternativa manual
-El sistema SHALL mantener disponible el formulario normal de creación de bloqueos cuando el asistente no esté disponible o no comprenda una instrucción.
+El sistema SHALL mantener plenamente disponibles las pantallas y formularios normales de administración cuando el asistente no esté disponible o no comprenda una instrucción.
 
 #### Scenario: Proveedor de IA no disponible
 - **WHEN** el servicio de IA devuelve un error o excede el tiempo de respuesta
-- **THEN** el panel informa el fallo sin modificar datos y ofrece crear el bloqueo manualmente
+- **THEN** el panel informa el fallo sin modificar datos y ofrece realizar la operación en su pantalla correspondiente
+
+#### Scenario: Instrucción no comprendida
+- **WHEN** el asistente no logra interpretar una instrucción con seguridad
+- **THEN** no ejecuta ni propone nada y el administrador conserva la vía manual intacta para esa operación

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { ToastProvider } from "@/presentation/organisms";
 import {
   BedDouble,
+  Bot,
   CalendarDays,
   CircleAlert,
   Ellipsis,
@@ -54,6 +55,7 @@ const navigationGroups: ReadonlyArray<
       },
       { href: "/admin/alertas", label: "Alertas", icon: CircleAlert },
       { href: "/admin/configuracion", label: "Configuración", icon: Settings },
+      { href: "/admin/asistente", label: "Asistente", icon: Bot },
     ],
   },
 ] as const;

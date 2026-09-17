@@ -7,8 +7,10 @@ import {
 import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
 import {
   createMultiRoomPayAtPropertyReservation,
+  parseGuestInput,
   selectedRooms,
   toResolvedRoom,
+  type GuestBookingInput,
   type GuestRepository,
   type ReservationRepository,
 } from "@/features/reservations";
@@ -59,6 +61,35 @@ export type ManualReservationDependencies<TContext> = Readonly<{
   roomLockGateway: RoomLockGateway<TContext>;
 }>;
 
+export type ManualReservationRoomSelection = Readonly<{
+  guestCount: number;
+  roomId: string;
+}>;
+
+export type ManualReservationInvoiceInput = Readonly<{
+  businessActivity: string;
+  email: string;
+  name: string;
+  phone: string;
+  rut: string;
+}>;
+
+/**
+ * Typed shape for `createManualReservationWith`'s domain logic, independent
+ * of the `FormData`/loose-record encoding the admin form and its server
+ * action use. Callers with already-typed values (e.g. the assistant's
+ * `crear_reserva` tool) build this directly instead of round-tripping
+ * through strings.
+ */
+export type ManualReservationInput = Readonly<{
+  checkIn: string;
+  checkOut: string;
+  guest: GuestBookingInput;
+  invoice?: ManualReservationInvoiceInput;
+  origin: ManualOrigin;
+  rooms: readonly ManualReservationRoomSelection[];
+}>;
+
 function requestedInvoice(candidate: Record<string, unknown>) {
   if (
     candidate.invoiceRequested !== "true" &&
@@ -74,23 +105,28 @@ function requestedInvoice(candidate: Record<string, unknown>) {
   };
 }
 
-export async function createManualReservationWith<TContext>(
-  candidate: Record<string, unknown>,
+/**
+ * Typed core: creates a manual reservation from already-validated, typed
+ * values. This is the function to call from anything other than the admin
+ * form's `FormData` action — it never parses strings or reads a loose
+ * record, so it can't diverge from what the form path validates.
+ */
+export async function createManualReservationFromInput<TContext>(
+  input: ManualReservationInput,
   actor: string,
   roomSource: RoomReadSource,
   dependencies: ManualReservationDependencies<TContext>
 ) {
   if (!actor.trim()) throw new Error("Administrator actor is required");
-  const origin = candidate.origin;
-  if (!manualOrigins.includes(origin as ManualOrigin))
+  if (!manualOrigins.includes(input.origin))
     throw new Error("Invalid manual origin");
-  const selected = selectedRooms(candidate, roomSource);
+  const selected = selectedRooms(
+    { rooms: input.rooms.map((r) => `${r.roomId}:${r.guestCount}`).join(",") },
+    roomSource
+  );
   if (!selected.length) throw new Error("Unknown room");
   const rooms = selected.map(toResolvedRoom);
-  const interval = createLodgingInterval(
-    String(candidate.checkIn ?? ""),
-    String(candidate.checkOut ?? "")
-  );
+  const interval = createLodgingInterval(input.checkIn, input.checkOut);
   const dateErrors = validateManualReservationDateRange(
     interval.checkIn,
     interval.checkOut
@@ -98,22 +134,91 @@ export async function createManualReservationWith<TContext>(
   if (dateErrors.length) throw new ManualReservationDateRangeError(dateErrors);
   const result = await createMultiRoomPayAtPropertyReservation({
     actorUserId: actor,
-    guestCandidate: candidate,
+    guestCandidate: input.guest,
     guestRepository: dependencies.guestRepository,
     interval,
     reservationRepository: dependencies.reservationRepository,
     rooms,
     roomLockGateway: dependencies.roomLockGateway,
-    origin: origin as ManualOrigin,
-    invoiceRequest: requestedInvoice(candidate),
+    origin: input.origin,
+    invoiceRequest: input.invoice,
     notificationOutboxWriter: dependencies.notificationOutboxWriter,
   });
   writeStructuredLog("info", "reservation.manual_confirmed", {
     paymentId: result.payment.id,
     reservationId: result.reservation.id,
-    source: origin,
+    source: input.origin,
   });
-  return Object.freeze({ ...result, actor, origin: origin as ManualOrigin });
+  return Object.freeze({ ...result, actor, origin: input.origin });
+}
+
+/**
+ * Adapter over `createManualReservationFromInput` for callers that still
+ * hand over a loose, string-keyed record — the admin form's `FormData`
+ * (via `createManualReservationAction`) is the only intended caller.
+ */
+export async function createManualReservationWith<TContext>(
+  candidate: Record<string, unknown>,
+  actor: string,
+  roomSource: RoomReadSource,
+  dependencies: ManualReservationDependencies<TContext>
+) {
+  const origin = candidate.origin;
+  if (!manualOrigins.includes(origin as ManualOrigin))
+    throw new Error("Invalid manual origin");
+  const selected = selectedRooms(candidate, roomSource);
+  if (!selected.length) throw new Error("Unknown room");
+  const guest = parseGuestInput(candidate);
+  const input: ManualReservationInput = {
+    checkIn: String(candidate.checkIn ?? ""),
+    checkOut: String(candidate.checkOut ?? ""),
+    guest,
+    invoice: requestedInvoice(candidate),
+    origin: origin as ManualOrigin,
+    rooms: selected.map((entry) => ({
+      guestCount: entry.guestCount,
+      roomId: entry.room.id,
+    })),
+  };
+  return createManualReservationFromInput(input, actor, roomSource, dependencies);
+}
+
+/**
+ * Same dependency resolution as `createManualReservation`, for callers
+ * that already have a typed `ManualReservationInput` (the assistant's
+ * `crear_reserva` tool) instead of a loose candidate record.
+ */
+export async function createManualReservationFromInputResolved(
+  input: ManualReservationInput,
+  actor: string
+) {
+  const roomSource = await getRoomReadSource();
+  const boundary = createDatabaseBoundary();
+  if (boundary.context === "mock") {
+    const notificationOutboxWriter =
+      getNotificationOutboxWriter<MockRoomLockOperationContext>();
+    if (!notificationOutboxWriter)
+      throw new Error("Manual reservations unavailable");
+    return createManualReservationFromInput(input, actor, roomSource, {
+      guestRepository: mockGuestRepository,
+      notificationOutboxWriter,
+      reservationRepository: mockReservationRepository,
+      roomLockGateway: mockRoomLockGateway,
+    });
+  }
+
+  const db = createProductionDatabase(boundary);
+  return createManualReservationFromInput<ProductionRoomLockTransaction>(
+    input,
+    actor,
+    roomSource,
+    {
+      guestRepository: createDrizzleGuestRepository(db),
+      notificationOutboxWriter: createDrizzleNotificationOutboxWriter(),
+      reservationRepository: createDrizzleReservationRepository(db),
+      roomLockGateway: createDrizzleRoomLockGateway(db),
+    }
+  );
 }
 
 /** Resolves only server-side, context-matched dependencies. */

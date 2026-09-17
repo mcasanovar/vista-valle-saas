@@ -79,7 +79,22 @@ export async function authenticateAdministrativePassword(
   }
 }
 
+/**
+ * `request.url` is built from the raw socket `next dev` accepted, not any
+ * `X-Forwarded-*` header — behind a TLS-terminating tunnel (ngrok) it
+ * resolves to `http(s)://localhost:<port>/...` regardless of the public
+ * host the browser actually used, so it can never equal the browser's
+ * `Origin` there. `DEV_TUNNEL_ORIGIN` is the same explicit, developer-set
+ * escape hatch `next.config.ts` already uses for that scenario — trusting
+ * the `X-Forwarded-*` headers themselves would accept a client-spoofed
+ * origin, since nothing here can verify they were actually set by a
+ * trusted proxy. Unset in every real deployment (see `next.config.ts`).
+ */
 export function isTrustedAdminMutationOrigin(request: Request) {
   const origin = request.headers.get("origin");
-  return origin !== null && origin === new URL(request.url).origin;
+  if (origin === null) return false;
+  if (origin === new URL(request.url).origin) return true;
+
+  const devTunnelOrigin = process.env.DEV_TUNNEL_ORIGIN;
+  return devTunnelOrigin !== undefined && origin === `https://${devTunnelOrigin}`;
 }

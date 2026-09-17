@@ -32,6 +32,7 @@ describe("mock infrastructure boundaries", () => {
         AI_API_KEY: "mock-ai-api-key",
         AI_MODEL: "mock-ai-model",
         AI_PROVIDER: "mock-ai-provider",
+        AI_TRANSCRIPTION_MODEL: "mock-ai-transcription-model",
         ASSISTANT_PROPOSAL_TTL_MINUTES: "10",
         BOOKING_ENABLED: "false",
         BOOKING_HOLD_DURATION_MINUTES: "15",
@@ -65,6 +66,7 @@ describe("mock infrastructure boundaries", () => {
         AI_API_KEY: "key",
         AI_MODEL: "model",
         AI_PROVIDER: "provider",
+        AI_TRANSCRIPTION_MODEL: "transcription-model",
         ASSISTANT_PROPOSAL_TTL_MINUTES: "10",
         BOOKING_ENABLED: "false",
         BOOKING_HOLD_DURATION_MINUTES: "15",
@@ -87,5 +89,38 @@ describe("mock infrastructure boundaries", () => {
         VISTA_VALLE_CONFIG_CONTEXT: "production",
       })
     ).toThrow(/ADMIN_ALLOWED_EMAILS/);
+  });
+
+  it("fails to start with a clear message when AI_TRANSCRIPTION_MODEL is missing", () => {
+    expect(() =>
+      getServerEnvironment({
+        ADMIN_ALLOWED_EMAILS: "mock-admin@example.test",
+        ADMIN_NOTIFICATION_EMAIL: "admin@example.test",
+        AI_API_KEY: "mock-ai-api-key",
+        AI_MODEL: "mock-ai-model",
+        AI_PROVIDER: "mock-ai-provider",
+        ASSISTANT_PROPOSAL_TTL_MINUTES: "10",
+        BOOKING_ENABLED: "false",
+        BOOKING_HOLD_DURATION_MINUTES: "15",
+        CLOUDINARY_API_KEY: "mock-cloudinary-api-key",
+        CLOUDINARY_API_SECRET: "mock-cloudinary-api-secret",
+        CLOUDINARY_CLOUD_NAME: "mock-cloudinary-cloud-name",
+        DATABASE_URL:
+          "postgresql://mock_user:mock_password@localhost:5432/mock_vista_valle",
+        FINTOC_API_KEY: "mock-fintoc-api-key",
+        FINTOC_WEBHOOK_SECRET: "mock-fintoc-webhook-secret",
+        MERCADO_PAGO_ACCESS_TOKEN: "mock-mercado-pago-access-token",
+        MERCADO_PAGO_WEBHOOK_SECRET: "mock-mercado-pago-webhook-secret",
+        NOTIFICATION_MAX_RETRIES: "3",
+        OUTBOX_PROCESSOR_SECRET: "mock-outbox-processor-secret-000000",
+        RESEND_API_KEY: "mock-resend-api-key",
+        RESEND_DELIVERY_MODE: "mock",
+        RESEND_FROM_EMAIL: "reservas@vistavalle.cl",
+        SITE_URL: "https://mock-vista-valle.example.test",
+        SUPABASE_SERVICE_ROLE_KEY: "mock-supabase-service-role-key",
+        TIMEZONE: "America/Santiago",
+        VISTA_VALLE_CONFIG_CONTEXT: "mock",
+      })
+    ).toThrow(/AI_TRANSCRIPTION_MODEL is required/);
   });
 });
