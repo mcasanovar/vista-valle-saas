@@ -26,6 +26,12 @@ vi.mock("@/features/admin/edit-reservation-dates-action", () => ({
 vi.mock("@/features/admin/edit-reservation-dates-form", () => ({
   EditReservationDatesForm: () => null,
 }));
+vi.mock("@/features/admin/edit-reservation-guest-contact-action", () => ({
+  editReservationGuestContactAction: vi.fn(),
+}));
+vi.mock("@/features/admin/edit-reservation-guest-contact-form", () => ({
+  EditReservationGuestContactForm: () => null,
+}));
 vi.mock("@/features/admin/pay-at-property-admin-collect-action", () => ({
   collectPayAtPropertyAdminAction: vi.fn(),
 }));

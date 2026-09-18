@@ -36,10 +36,7 @@ vi.mock("@/features/reservations", async (importOriginal) => {
 });
 
 import { editAdminReservationDatesAction } from "@/features/admin/edit-reservation-dates-action";
-import {
-  ReservationDateEditIneligibleError,
-  ReservationNotFoundError,
-} from "@/features/reservations";
+import { ReservationNotFoundError } from "@/features/reservations";
 import {
   InvalidLodgingIntervalError,
   RoomLockConflictError,
@@ -79,18 +76,6 @@ describe("edit admin reservation dates action", () => {
     );
     expect(result).toMatchObject({ ok: false, code: "failure" });
     expect(mocks.editReservationDates).not.toHaveBeenCalled();
-  });
-
-  it("maps an ineligibility error to a specific result without throwing", async () => {
-    mocks.requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
-    mocks.createDatabaseBoundary.mockReturnValue({ context: "production" });
-    mocks.editReservationDates.mockRejectedValueOnce(
-      new ReservationDateEditIneligibleError("airbnb")
-    );
-    const result = await editAdminReservationDatesAction(
-      formData({ id: "r1", checkIn: "2030-01-01", checkOut: "2030-01-03" })
-    );
-    expect(result).toMatchObject({ ok: false, code: "ineligible" });
   });
 
   it("maps an invalid interval error to a validation result", async () => {

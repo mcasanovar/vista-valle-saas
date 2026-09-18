@@ -84,4 +84,64 @@ describe("pollAllActiveConnections", () => {
         ?.lastPollStatus
     ).toBe("error");
   });
+
+  it("skips every connection of a paused platform without touching its enabled state", async () => {
+    const connections = getChannelConnections()!;
+    const paused = connections.setInboundFeedUrl({
+      roomId: mockDemoRooms[2]!.id,
+      platform: "airbnb",
+      inboundFeedUrl: "https://www.airbnb.com/calendar/ical/paused.ics",
+      paymentBehavior: "auto_approved",
+    });
+    connections.setEnabled(paused.id, true);
+
+    connections.setPlatformPaused("airbnb", true);
+    try {
+      const outcomes = await pollAllActiveConnections(async () =>
+        "BEGIN:VCALENDAR\r\nEND:VCALENDAR"
+      );
+      const outcome = outcomes.find((o) => o.connectionId === paused.id);
+      expect(outcome?.status).toBe("skipped");
+      expect(
+        connections.getByRoomAndPlatform(mockDemoRooms[2]!.id, "airbnb")
+          ?.enabled
+      ).toBe(true);
+      expect(connections.isPlatformPaused("airbnb")).toBe(true);
+    } finally {
+      connections.setPlatformPaused("airbnb", false);
+    }
+  });
+
+  it("polling the other platform is unaffected while one platform is paused", async () => {
+    const connections = getChannelConnections()!;
+    const airbnbConnection = connections.setInboundFeedUrl({
+      roomId: mockDemoRooms[1]!.id,
+      platform: "airbnb",
+      inboundFeedUrl: "https://www.airbnb.com/calendar/ical/other.ics",
+      paymentBehavior: "auto_approved",
+    });
+    connections.setEnabled(airbnbConnection.id, true);
+    const bookingConnection = connections.setInboundFeedUrl({
+      roomId: mockDemoRooms[0]!.id,
+      platform: "booking",
+      inboundFeedUrl: "https://admin.booking.com/ical/other.ics",
+      paymentBehavior: "pay_at_property",
+    });
+    connections.setEnabled(bookingConnection.id, true);
+
+    connections.setPlatformPaused("airbnb", true);
+    try {
+      const outcomes = await pollAllActiveConnections(async () =>
+        "BEGIN:VCALENDAR\r\nEND:VCALENDAR"
+      );
+      expect(
+        outcomes.find((o) => o.connectionId === airbnbConnection.id)?.status
+      ).toBe("skipped");
+      expect(
+        outcomes.find((o) => o.connectionId === bookingConnection.id)?.status
+      ).toBe("ok");
+    } finally {
+      connections.setPlatformPaused("airbnb", false);
+    }
+  });
 });

@@ -28,6 +28,14 @@ vi.mock("@/features/admin/edit-reservation-dates-form", () => ({
     <form aria-label="Editar fechas de la reserva" />
   ),
 }));
+vi.mock("@/features/admin/edit-reservation-guest-contact-action", () => ({
+  editReservationGuestContactAction: vi.fn(),
+}));
+vi.mock("@/features/admin/edit-reservation-guest-contact-form", () => ({
+  EditReservationGuestContactForm: () => (
+    <form aria-label="Editar datos del huésped" />
+  ),
+}));
 vi.mock("@/features/admin/pay-at-property-admin-collect-action", () => ({
   collectPayAtPropertyAdminAction: vi.fn(),
 }));
@@ -89,7 +97,14 @@ async function renderDetail(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe("admin reservation detail — date edit eligibility", () => {
-  it.each(["website", "phone", "whatsapp", "admin"] as const)(
+  it.each([
+    "website",
+    "phone",
+    "whatsapp",
+    "admin",
+    "airbnb",
+    "booking",
+  ] as const)(
     "shows the date edit form for a confirmed %s reservation",
     async (origin) => {
       await renderDetail({ origin });
@@ -99,20 +114,10 @@ describe("admin reservation detail — date edit eligibility", () => {
     }
   );
 
-  it.each(["airbnb", "booking"] as const)(
-    "hides the date edit form for a %s reservation",
-    async (origin) => {
-      await renderDetail({ origin });
-      expect(
-        screen.queryByRole("form", { name: "Editar fechas de la reserva" })
-      ).not.toBeInTheDocument();
-    }
-  );
-
   it.each(["cancelled", "completed", "no_show"] as const)(
-    "still shows the date edit form for a %s reservation of an eligible origin",
+    "still shows the date edit form for a %s reservation regardless of origin",
     async (status) => {
-      await renderDetail({ status, origin: "website" });
+      await renderDetail({ status, origin: "airbnb" });
       expect(
         screen.getByRole("form", { name: "Editar fechas de la reserva" })
       ).toBeInTheDocument();

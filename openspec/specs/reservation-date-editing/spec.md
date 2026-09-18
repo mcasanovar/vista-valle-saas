@@ -32,16 +32,16 @@ El sistema SHALL permitir a un administrador autorizado modificar `check-in` y `
 
 ### Requirement: Elegibilidad por origen
 
-El sistema SHALL permitir la edición para reservas con origen `website`, `phone`, `whatsapp` o `admin`, en cualquier estado (`confirmed`, `cancelled`, `completed` o `no_show`), y SHALL rechazarla únicamente para reservas originadas en `airbnb` o `booking`. Editar las fechas SHALL NOT modificar el estado de la reserva: una reserva cancelada, completada o no presentada conserva ese estado después de la edición.
+El sistema SHALL permitir la edición de fechas para reservas de cualquier origen (`website`, `phone`, `whatsapp`, `admin`, `airbnb` o `booking`) y en cualquier estado (`confirmed`, `cancelled`, `completed` o `no_show`). Editar las fechas SHALL NOT modificar el estado de la reserva: una reserva cancelada, completada o no presentada conserva ese estado después de la edición.
 
 #### Scenario: Reserva de Airbnb o Booking
 
-- **WHEN** el administrador intenta editar las fechas de una reserva originada en Airbnb o Booking
-- **THEN** el sistema no muestra la acción de edición y el servidor rechaza cualquier solicitud manipulada
+- **WHEN** el administrador edita las fechas de una reserva originada en Airbnb o Booking
+- **THEN** el sistema aplica el mismo recálculo transaccional que a cualquier otro origen y confirma el cambio, sin requerir ninguna acción en la plataforma externa
 
 #### Scenario: Reserva cancelada, completada o no presentada
 
-- **WHEN** el administrador edita las fechas de una reserva elegible por origen que está cancelada, completada o marcada como no presentada
+- **WHEN** el administrador edita las fechas de una reserva que está cancelada, completada o marcada como no presentada
 - **THEN** el sistema aplica el mismo recálculo de fechas, precio y saldo, y la reserva conserva su estado original
 
 ### Requirement: Recálculo autoritativo del valor
