@@ -1,4 +1,4 @@
-import type { GuestContactDetails } from "./guest";
+import type { GuestContactDetails, GuestContactEditInput } from "./guest";
 
 /**
  * A persisted `guests` row (see `src/persistence/schema.ts`). Mirrors
@@ -26,6 +26,17 @@ export type GuestRecord = Readonly<
  * guest creation, hold creation, and the room lock commit or roll back
  * together.
  */
+export class GuestNotFoundError extends Error {
+  readonly code = "GUEST_NOT_FOUND" as const;
+  readonly guestId: string;
+
+  constructor(guestId: string) {
+    super(`Guest ${guestId} not found`);
+    this.name = "GuestNotFoundError";
+    this.guestId = guestId;
+  }
+}
+
 export type GuestRepository<TContext> = Readonly<{
   createGuest: (
     context: TContext,
@@ -44,6 +55,18 @@ export type GuestRepository<TContext> = Readonly<{
    * surrounding room-lock transaction instead.
    */
   rollbackGuest?: (context: TContext, guest: GuestRecord) => Promise<void>;
+  /**
+   * Non-transactional contact-info update, used by
+   * `editReservationGuestContact` (design.md decision 4 of
+   * "allow-full-reservation-editing-and-ota-sync-toggle"): unlike
+   * `createGuest`, this edit has no other side effect to stay atomic with,
+   * so it never needs a room-lock transaction. Throws `GuestNotFoundError`
+   * when `id` does not match a persisted guest.
+   */
+  updateGuest: (
+    id: string,
+    contact: GuestContactEditInput
+  ) => Promise<GuestRecord>;
 }>;
 
 export type MockGuestRepository<TContext> = GuestRepository<TContext>;
@@ -84,6 +107,13 @@ export function createMockGuestRepository<TContext>(
     rollbackGuest: (_context, guest) => {
       storage.guestsById.delete(guest.id);
       return Promise.resolve();
+    },
+    updateGuest: (id, contact) => {
+      const existing = storage.guestsById.get(id);
+      if (!existing) return Promise.reject(new GuestNotFoundError(id));
+      const updated = Object.freeze({ ...existing, ...contact });
+      storage.guestsById.set(id, updated);
+      return Promise.resolve(updated);
     },
   });
 }

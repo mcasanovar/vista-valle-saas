@@ -18,51 +18,24 @@ import {
   ReservationNotFoundError,
   type ReservationDateEditPaymentAction,
   type ReservationItemRecord,
-  type ReservationOrigin,
   type ReservationRecord,
   type ReservationRepository,
 } from "./reservation-repository";
 
 /**
- * Origins eligible for an administrative date edit (design.md decision 4).
- * `airbnb` and `booking` reservations are managed by their channel and must
- * never be mutated here. Eligibility does not depend on status: a
- * `confirmed`, `cancelled`, `completed`, or `no_show` reservation of an
- * eligible origin may all have their dates edited, and the edit never
+ * Single point of truth for date-edit eligibility, kept as an explicit
+ * function (rather than removed) so both the UI gate and the server
+ * transaction keep sharing one call site if a future eligibility rule is
+ * ever needed. Every reservation is eligible today, regardless of origin
+ * (`website`, `phone`, `whatsapp`, `admin`, `airbnb`, `booking`) or status
+ * (`confirmed`, `cancelled`, `completed`, `no_show`); editing dates never
  * changes the reservation's status.
  */
-export const EDITABLE_RESERVATION_ORIGINS: readonly ReservationOrigin[] =
-  Object.freeze(["website", "phone", "whatsapp", "admin"]);
-
-/**
- * Thrown by `assertReservationDatesEditable` when a reservation's origin
- * disqualifies it from a date edit. The UI hides the action for the same
- * case (spec "Elegibilidad por origen"), but the server repeats the check
- * so a manipulated request cannot bypass it.
- */
-export class ReservationDateEditIneligibleError extends Error {
-  readonly code = "RESERVATION_DATE_EDIT_INELIGIBLE" as const;
-  readonly origin: ReservationOrigin;
-
-  constructor(origin: ReservationOrigin) {
-    super(`Reservation origin "${origin}" is not eligible for date edits`);
-    this.name = "ReservationDateEditIneligibleError";
-    this.origin = origin;
-  }
-}
-
-/**
- * Server-side eligibility guard: a reservation may have its `check-in`/
- * `check-out` edited when it originated from `website`, `phone`,
- * `whatsapp`, or `admin`, regardless of its current status. Only
- * `airbnb`/`booking` reservations are rejected.
- */
 export function assertReservationDatesEditable(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept as the shared eligibility call site (design.md decision 1); every reservation currently passes.
   reservation: ReservationRecord
 ): void {
-  if (!EDITABLE_RESERVATION_ORIGINS.includes(reservation.origin)) {
-    throw new ReservationDateEditIneligibleError(reservation.origin);
-  }
+  // No restrictions: every reservation is eligible for a date edit.
 }
 
 export type EditReservationDatesInput = Readonly<{
@@ -201,14 +174,14 @@ export type EditReservationDatesParams<TContext> = Readonly<{
 
 /**
  * The single transactional entry point for editing a reservation's stay
- * dates (design.md decision 1). Re-reads the reservation, repeats the
- * origin eligibility check server-side, recalculates pricing from
- * the requested interval and each room's current rate, then locks every
- * room the reservation occupies in stable order and revalidates
- * availability - excluding the reservation's own current occupancy - before
- * updating its header and items as one atomic operation. Any failure
- * (ineligibility, invalid interval, missing rate, or a room-lock conflict)
- * leaves the reservation's dates, prices, and availability untouched.
+ * dates (design.md decision 1). Re-reads the reservation, recalculates
+ * pricing from the requested interval and each room's current rate, then
+ * locks every room the reservation occupies in stable order and
+ * revalidates availability - excluding the reservation's own current
+ * occupancy - before updating its header and items as one atomic
+ * operation. Any failure (invalid interval, missing rate, or a room-lock
+ * conflict) leaves the reservation's dates, prices, and availability
+ * untouched.
  */
 export type EditReservationDatesResult = Readonly<{
   financialSummary: ReservationDateEditFinancialSummary;

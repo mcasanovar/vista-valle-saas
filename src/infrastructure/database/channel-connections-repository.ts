@@ -1,13 +1,15 @@
 import "server-only";
 
 import { and, eq } from "drizzle-orm";
-import { channelConnections } from "@/persistence/schema";
-import type {
-  ChannelConnection,
-  AsyncChannelConnectionStore,
-  ChannelPlatform,
-  RecordPollResultInput,
-  SetInboundFeedUrlInput,
+import { channelConnections, channelPlatformPauses } from "@/persistence/schema";
+import {
+  CHANNEL_PLATFORMS,
+  type ChannelConnection,
+  type AsyncChannelConnectionStore,
+  type ChannelPlatform,
+  type ChannelPlatformPauseState,
+  type RecordPollResultInput,
+  type SetInboundFeedUrlInput,
 } from "@/features/channel-calendar-sync";
 import type { ProductionDatabase } from "./client";
 
@@ -159,5 +161,41 @@ export function createDrizzleChannelConnectionRepository(
     },
     getInboundFeedUrl: async (id: string) =>
       (await findById(id)).inboundFeedUrl ?? undefined,
+    isPlatformPaused: async (platform: ChannelPlatform) => {
+      const [row] = await db
+        .select({ paused: channelPlatformPauses.paused })
+        .from(channelPlatformPauses)
+        .where(eq(channelPlatformPauses.platform, platform));
+      return row?.paused ?? false;
+    },
+    setPlatformPaused: async (
+      platform: ChannelPlatform,
+      paused: boolean
+    ): Promise<ChannelPlatformPauseState> => {
+      await db
+        .insert(channelPlatformPauses)
+        .values({ platform, paused })
+        .onConflictDoUpdate({
+          target: channelPlatformPauses.platform,
+          set: { paused, updatedAt: new Date() },
+        });
+      return Object.freeze({ platform, paused });
+    },
+    listPlatformPauseStates: async (): Promise<
+      readonly ChannelPlatformPauseState[]
+    > => {
+      const rows = await db.select().from(channelPlatformPauses);
+      const pausedByPlatform = new Map(
+        rows.map((row) => [row.platform as ChannelPlatform, row.paused])
+      );
+      return Object.freeze(
+        CHANNEL_PLATFORMS.map((platform) =>
+          Object.freeze({
+            platform,
+            paused: pausedByPlatform.get(platform) ?? false,
+          })
+        )
+      );
+    },
   });
 }

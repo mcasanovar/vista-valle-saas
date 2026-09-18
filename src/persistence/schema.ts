@@ -578,6 +578,20 @@ export const channelConnections = pgTable(
   ]
 );
 
+/**
+ * One row per platform (Airbnb, Booking), independent of `channel_connections.enabled`
+ * (design.md decision 2 of "allow-full-reservation-editing-and-ota-sync-toggle"):
+ * pausing a platform here stops its inbound polling and outbound feed for
+ * every connection of that platform without touching each connection's own
+ * `enabled` value, so reactivating restores exactly what was configured
+ * before the pause.
+ */
+export const channelPlatformPauses = pgTable("channel_platform_pauses", {
+  platform: channelEnum("platform").primaryKey(),
+  paused: boolean("paused").default(false).notNull(),
+  updatedAt: updatedAt(),
+});
+
 export const auditEvents = pgTable("audit_events", {
   id: id(),
   actorUserId: uuid("actor_user_id"),

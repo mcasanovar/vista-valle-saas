@@ -86,3 +86,21 @@ export async function regenerateChannelConnectionTokenAction(data: FormData) {
   revalidatePath("/admin/sincronizaciones");
   return result;
 }
+
+/**
+ * Pauses/resumes a platform's sync (both inbound polling and the outbound
+ * feed, across every connection of that platform) without touching any
+ * connection's own `enabled` value (design.md decision 2 of
+ * "allow-full-reservation-editing-and-ota-sync-toggle"): resuming restores
+ * exactly what was configured before the pause.
+ */
+export async function setChannelPlatformPausedAction(data: FormData) {
+  await requireAdministrator();
+  const connections = getChannelConnectionStore();
+  if (!connections) throw new Error("Channel sync unavailable");
+  const platform = readPlatform(data);
+  const paused = String(data.get("paused") ?? "") === "true";
+  const result = await connections.setPlatformPaused(platform, paused);
+  revalidatePath("/admin/sincronizaciones");
+  return result;
+}

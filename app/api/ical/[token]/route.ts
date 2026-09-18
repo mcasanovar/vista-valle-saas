@@ -24,6 +24,9 @@ export async function GET(
   if (!connection) {
     return new Response("Not found.", { status: 404 });
   }
+  if (await connections?.isPlatformPaused(connection.platform)) {
+    return new Response("Not found.", { status: 404 });
+  }
 
   const entries =
     getChannelConnections() !== null

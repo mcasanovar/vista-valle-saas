@@ -97,6 +97,50 @@ export type GuestBookingInputCandidate = z.input<
   typeof guestBookingInputSchema
 >;
 
+/**
+ * Contact fields an administrator can correct from a reservation's detail
+ * page, independent of the reservation's origin or status (proposal
+ * "allow-full-reservation-editing-and-ota-sync-toggle"). Deliberately
+ * narrower than `GuestBookingInput`: this edit never touches `company`,
+ * `rut`, `guestCount`, or `comment`.
+ */
+export type GuestContactEditInput = Readonly<{
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+}>;
+
+const guestContactEditInputSchema = z.object({
+  email: requiredTrimmed(320).refine(isValidEmail, {
+    message: "Ingresa un correo electrónico válido.",
+  }),
+  firstName: requiredTrimmed(160),
+  lastName: requiredTrimmed(160),
+  phone: requiredTrimmed(80),
+});
+
+export type GuestContactEditInputCandidate = z.input<
+  typeof guestContactEditInputSchema
+>;
+
+/**
+ * Validates and normalizes raw guest contact-edit input, mirroring
+ * `parseGuestInput`'s defensive parsing (never trusts the caller, never
+ * throws a raw `ZodError`).
+ */
+export function parseGuestContactEditInput(
+  candidate: unknown
+): GuestContactEditInput {
+  const parsed = guestContactEditInputSchema.safeParse(candidate);
+
+  if (!parsed.success) {
+    throw new InvalidGuestInputError(parsed.error.issues.map(describeIssue));
+  }
+
+  return Object.freeze({ ...parsed.data });
+}
+
 function describeIssue(issue: z.core.$ZodIssue): GuestValidationIssue {
   return {
     field: issue.path.join(".") || "guest",

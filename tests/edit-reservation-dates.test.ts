@@ -14,7 +14,6 @@ import {
   editReservationDates,
   parseRequestedEditInterval,
   recalculateReservationDatesPricing,
-  ReservationDateEditIneligibleError,
   ReservationDateEditRoomRateMissingError,
   type ReservationDateEditRoomRate,
 } from "@/features/reservations/edit-reservation-dates";
@@ -67,7 +66,7 @@ function buildReservation(
 }
 
 describe("reservation date edit eligibility", () => {
-  it.each(["website", "phone", "whatsapp", "admin"] as const)(
+  it.each(["website", "phone", "whatsapp", "admin", "airbnb", "booking"] as const)(
     "allows a confirmed %s reservation",
     (origin) => {
       expect(() =>
@@ -76,17 +75,8 @@ describe("reservation date edit eligibility", () => {
     }
   );
 
-  it.each(["airbnb", "booking"] as const)(
-    "rejects a %s reservation regardless of status",
-    (origin) => {
-      expect(() =>
-        assertReservationDatesEditable(buildReservation({ origin }))
-      ).toThrow(ReservationDateEditIneligibleError);
-    }
-  );
-
   it.each(["cancelled", "completed", "no_show"] as const)(
-    "allows a %s reservation as long as its origin is eligible",
+    "allows a %s reservation regardless of origin",
     (status) => {
       expect(() =>
         assertReservationDatesEditable(buildReservation({ status }))
@@ -94,18 +84,12 @@ describe("reservation date edit eligibility", () => {
     }
   );
 
-  it("rejects an ineligible origin even when the status would otherwise be allowed", () => {
-    try {
+  it("allows an Airbnb/Booking-origin reservation even when cancelled, completed, or no_show", () => {
+    expect(() =>
       assertReservationDatesEditable(
         buildReservation({ origin: "airbnb", status: "cancelled" })
-      );
-      throw new Error("expected assertion to throw");
-    } catch (error) {
-      expect(error).toBeInstanceOf(ReservationDateEditIneligibleError);
-      expect((error as ReservationDateEditIneligibleError).origin).toBe(
-        "airbnb"
-      );
-    }
+      )
+    ).not.toThrow();
   });
 });
 
@@ -568,7 +552,7 @@ describe("editReservationDates transactional operation", () => {
     ).rejects.toBeInstanceOf(RoomLockConflictError);
   });
 
-  it("rejects editing an Airbnb reservation and leaves it untouched", async () => {
+  it("allows editing an Airbnb reservation's dates", async () => {
     const roomLockGateway = createMockRoomLockGateway();
     const reservationRepository = createMockReservationRepository();
     const { reservation } = await roomLockGateway.runExclusiveMany(
@@ -598,23 +582,18 @@ describe("editReservationDates transactional operation", () => {
         )
     );
 
-    await expect(
-      editReservationDates({
-        getRoomRates: ratesOf({ "room-4": { nightlyPriceClp: 50_000 } }),
-        input: {
-          checkIn: "2026-09-01",
-          checkOut: "2026-09-05",
-          reservationId: reservation.id,
-        },
-        reservationRepository,
-        roomLockGateway,
-      })
-    ).rejects.toThrow(ReservationDateEditIneligibleError);
+    const { reservation: updated } = await editReservationDates({
+      getRoomRates: ratesOf({ "room-4": { nightlyPriceClp: 50_000 } }),
+      input: {
+        checkIn: "2026-09-01",
+        checkOut: "2026-09-05",
+        reservationId: reservation.id,
+      },
+      reservationRepository,
+      roomLockGateway,
+    });
 
-    const unchanged = await reservationRepository.getReservationById(
-      reservation.id
-    );
-    expect(unchanged?.checkOut).toBe("2026-09-03");
+    expect(updated.checkOut).toBe("2026-09-05");
   });
 
   it("rejects an unknown reservation id", async () => {

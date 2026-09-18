@@ -20,6 +20,12 @@ export type ChannelConnection = Readonly<{
   lastPollError?: string;
 }>;
 
+/** All supported platforms, used to seed a default (unpaused) state for a platform with no row yet. */
+export const CHANNEL_PLATFORMS: readonly ChannelPlatform[] = Object.freeze([
+  "airbnb",
+  "booking",
+]);
+
 export type ChannelConnectionStore = Readonly<{
   list: () => readonly ChannelConnection[];
   listActive: () => readonly ChannelConnection[];
@@ -45,6 +51,19 @@ export type ChannelConnectionStore = Readonly<{
   regenerateOutboundToken: (id: string) => ChannelConnection;
   recordPollResult: (input: RecordPollResultInput) => ChannelConnection;
   getInboundFeedUrl: (id: string) => string | undefined;
+  /**
+   * Whether a platform's sync (inbound polling and outbound feed) is
+   * currently paused (design.md decision 2 of
+   * "allow-full-reservation-editing-and-ota-sync-toggle"). A platform with
+   * no stored pause row defaults to `false` (not paused).
+   */
+  isPlatformPaused: (platform: ChannelPlatform) => boolean;
+  /** Pauses/resumes a platform without touching any connection's `enabled` value. */
+  setPlatformPaused: (
+    platform: ChannelPlatform,
+    paused: boolean
+  ) => ChannelPlatformPauseState;
+  listPlatformPauseStates: () => readonly ChannelPlatformPauseState[];
 }>;
 
 export type AsyncChannelConnectionStore = Readonly<{
@@ -69,6 +88,17 @@ export type AsyncChannelConnectionStore = Readonly<{
     input: RecordPollResultInput
   ) => Promise<ChannelConnection>;
   getInboundFeedUrl: (id: string) => Promise<string | undefined>;
+  isPlatformPaused: (platform: ChannelPlatform) => Promise<boolean>;
+  setPlatformPaused: (
+    platform: ChannelPlatform,
+    paused: boolean
+  ) => Promise<ChannelPlatformPauseState>;
+  listPlatformPauseStates: () => Promise<readonly ChannelPlatformPauseState[]>;
+}>;
+
+export type ChannelPlatformPauseState = Readonly<{
+  platform: ChannelPlatform;
+  paused: boolean;
 }>;
 
 export type SetInboundFeedUrlInput = Readonly<{
@@ -94,12 +124,22 @@ type InternalChannelConnection = ChannelConnection &
   Readonly<{ inboundFeedUrl?: string }>;
 
 const connectionsKey = Symbol.for("vista-valle.mock.channel-connections");
+const platformPausesKey = Symbol.for(
+  "vista-valle.mock.channel-platform-pauses"
+);
 
 function getConnections(): InternalChannelConnection[] {
   const scope = globalThis as typeof globalThis & {
     [key: symbol]: InternalChannelConnection[] | undefined;
   };
   return (scope[connectionsKey] ??= []);
+}
+
+function getPlatformPauses(): Map<ChannelPlatform, boolean> {
+  const scope = globalThis as typeof globalThis & {
+    [key: symbol]: Map<ChannelPlatform, boolean> | undefined;
+  };
+  return (scope[platformPausesKey] ??= new Map());
 }
 
 function toPublic(connection: InternalChannelConnection): ChannelConnection {
@@ -223,5 +263,22 @@ export function getChannelConnections() {
     /** Internal accessor for the inbound feed URL, used only by the polling job — never exposed through `toPublic`. */
     getInboundFeedUrl: (id: string) =>
       store.find((c) => c.id === id)?.inboundFeedUrl,
+    isPlatformPaused: (platform: ChannelPlatform) =>
+      getPlatformPauses().get(platform) ?? false,
+    setPlatformPaused: (
+      platform: ChannelPlatform,
+      paused: boolean
+    ): ChannelPlatformPauseState => {
+      getPlatformPauses().set(platform, paused);
+      return Object.freeze({ platform, paused });
+    },
+    listPlatformPauseStates: (): readonly ChannelPlatformPauseState[] => {
+      const pauses = getPlatformPauses();
+      return Object.freeze(
+        CHANNEL_PLATFORMS.map((platform) =>
+          Object.freeze({ platform, paused: pauses.get(platform) ?? false })
+        )
+      );
+    },
   });
 }
