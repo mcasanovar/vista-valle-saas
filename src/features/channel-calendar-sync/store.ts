@@ -24,6 +24,10 @@ export function getChannelConnectionStore(): AsyncChannelConnectionStore | null 
       regenerateOutboundToken: async (id) => mock.regenerateOutboundToken(id),
       recordPollResult: async (input) => mock.recordPollResult(input),
       getInboundFeedUrl: async (id) => mock.getInboundFeedUrl(id),
+      isPlatformPaused: async (platform) => mock.isPlatformPaused(platform),
+      setPlatformPaused: async (platform, paused) =>
+        mock.setPlatformPaused(platform, paused),
+      listPlatformPauseStates: async () => mock.listPlatformPauseStates(),
     };
   const boundary = createDatabaseBoundary();
   if (boundary.context !== "production") return null;

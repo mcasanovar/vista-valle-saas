@@ -2,10 +2,12 @@ import "server-only";
 
 import { eq } from "drizzle-orm";
 
-import type {
-  GuestContactDetails,
-  GuestRecord,
-  GuestRepository,
+import {
+  GuestNotFoundError,
+  type GuestContactDetails,
+  type GuestContactEditInput,
+  type GuestRecord,
+  type GuestRepository,
 } from "@/features/reservations";
 import { guests } from "@/persistence/schema";
 import type { ProductionDatabase } from "./client";
@@ -78,6 +80,33 @@ export function createDrizzleGuestRepository(
         .where(eq(guests.id, id));
 
       if (!row) return null;
+
+      return Object.freeze({
+        company: row.company ?? undefined,
+        email: row.email,
+        firstName: row.firstName,
+        id: row.id,
+        lastName: row.lastName,
+        phone: row.phone,
+        rut: row.rut ?? undefined,
+      });
+    },
+    updateGuest: async (
+      id: string,
+      contact: GuestContactEditInput
+    ): Promise<GuestRecord> => {
+      const [row] = await db
+        .update(guests)
+        .set({
+          email: contact.email,
+          firstName: contact.firstName,
+          lastName: contact.lastName,
+          phone: contact.phone,
+        })
+        .where(eq(guests.id, id))
+        .returning(guestColumns);
+
+      if (!row) throw new GuestNotFoundError(id);
 
       return Object.freeze({
         company: row.company ?? undefined,

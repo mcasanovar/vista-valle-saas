@@ -14,7 +14,8 @@ import { PayAtPropertyCollectionForm } from "@/features/payments/pay-at-property
 import { FintocRefundForm } from "@/features/payments/fintoc-refund-form";
 import { MarkPaymentPaidForm } from "@/features/payments/mark-payment-paid-form";
 import { AdminBackLink } from "@/features/admin/admin-back-link";
-import { EDITABLE_RESERVATION_ORIGINS } from "@/features/reservations";
+import { editReservationGuestContactAction } from "@/features/admin/edit-reservation-guest-contact-action";
+import { EditReservationGuestContactForm } from "@/features/admin/edit-reservation-guest-contact-form";
 
 const currency = new Intl.NumberFormat("es-CL", {
   currency: "CLP",
@@ -100,9 +101,8 @@ export default async function ReservationDetail({
     approvedPaymentsClp - reservation.totalClp,
     0
   );
-  const canEditDates = (
-    EDITABLE_RESERVATION_ORIGINS as readonly string[]
-  ).includes(reservation.origin);
+  const isExternalChannelOrigin =
+    reservation.origin === "airbnb" || reservation.origin === "booking";
 
   return (
     <section className="space-y-5">
@@ -153,38 +153,22 @@ export default async function ReservationDetail({
           <p className="mt-1 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
             Datos provisionales generados automáticamente — esta reserva
             llegó por sincronización con {channelLabels[reservation.externalPlatform]}.
-            Contacta al huésped a través de esa plataforma; estos no son
-            datos de contacto reales.
+            Puedes completarlos con los datos reales del huésped a
+            continuación.
           </p>
         ) : null}
-        <dl className="mt-2 grid gap-2 tablet:grid-cols-2">
-          <div>
-            <dt className="text-xs text-muted-foreground">Nombre</dt>
-            <dd>
-              {reservation.guest.firstName} {reservation.guest.lastName}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Email</dt>
-            <dd>{reservation.guest.email}</dd>
-          </div>
-          <div>
-            <dt className="text-xs text-muted-foreground">Teléfono</dt>
-            <dd>{reservation.guest.phone}</dd>
-          </div>
-          {reservation.guest.rut ? (
-            <div>
-              <dt className="text-xs text-muted-foreground">RUT</dt>
-              <dd>{reservation.guest.rut}</dd>
-            </div>
-          ) : null}
-          {reservation.guest.company ? (
-            <div>
-              <dt className="text-xs text-muted-foreground">Empresa</dt>
-              <dd>{reservation.guest.company}</dd>
-            </div>
-          ) : null}
-        </dl>
+        <div className="mt-2">
+          <EditReservationGuestContactForm
+            action={editReservationGuestContactAction}
+            company={reservation.guest.company ?? undefined}
+            email={reservation.guest.email}
+            firstName={reservation.guest.firstName}
+            lastName={reservation.guest.lastName}
+            phone={reservation.guest.phone}
+            reservationId={reservation.id}
+            rut={reservation.guest.rut ?? undefined}
+          />
+        </div>
       </section>
 
       <section aria-labelledby="items-heading" className="rounded-xl border border-border bg-card p-4">
@@ -213,16 +197,21 @@ export default async function ReservationDetail({
           <span>Total</span>
           <span>{currency.format(reservation.totalClp)}</span>
         </p>
-        {canEditDates ? (
-          <div className="mt-4">
-            <EditReservationDatesForm
-              action={editAdminReservationDatesAction}
-              checkIn={reservation.checkIn}
-              checkOut={reservation.checkOut}
-              reservationId={reservation.id}
-            />
-          </div>
+        {isExternalChannelOrigin ? (
+          <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
+            Editar las fechas de esta reserva no se refleja en{" "}
+            {originLabels[reservation.origin]}: la plataforma externa no se
+            entera del cambio.
+          </p>
         ) : null}
+        <div className="mt-4">
+          <EditReservationDatesForm
+            action={editAdminReservationDatesAction}
+            checkIn={reservation.checkIn}
+            checkOut={reservation.checkOut}
+            reservationId={reservation.id}
+          />
+        </div>
       </section>
 
       {reservation.guestComment ? (

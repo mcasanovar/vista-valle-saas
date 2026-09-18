@@ -6,6 +6,9 @@ const mocks = vi.hoisted(() => ({
   rooms: vi.fn(),
   connections: vi.fn(),
 }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), back: vi.fn() }),
+}));
 vi.mock("@/features/channel-sync/actions", () => ({
   completeChannelSyncTaskAction: vi.fn(),
 }));
@@ -16,11 +19,15 @@ vi.mock("@/features/channel-calendar-sync/actions", () => ({
   saveChannelConnectionAction: vi.fn(),
   regenerateChannelConnectionTokenAction: vi.fn(),
   createBookingChannelConnectionAction: vi.fn(),
+  setChannelPlatformPausedAction: vi.fn(),
 }));
 vi.mock("@/features/channel-calendar-sync/connections", () => ({
   getChannelConnections: mocks.connections,
 }));
 vi.mock("@/features/rooms", () => ({ getRoomReadSource: mocks.rooms }));
+vi.mock("@/features/channel-calendar-sync/platform-pause-toggles", () => ({
+  PlatformPauseToggles: () => null,
+}));
 
 import SyncPage from "../app/(admin-protected)/admin/sincronizaciones/page";
 
@@ -32,6 +39,10 @@ describe("Sincronizaciones page tabs", () => {
     });
     mocks.connections.mockReturnValue({
       getByRoomAndPlatform: () => null,
+      listPlatformPauseStates: () => [
+        { platform: "airbnb", paused: false },
+        { platform: "booking", paused: false },
+      ],
     });
   });
 

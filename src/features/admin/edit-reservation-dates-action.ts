@@ -3,7 +3,6 @@ import { revalidatePath } from "next/cache";
 
 import {
   editReservationDates,
-  ReservationDateEditIneligibleError,
   ReservationDateEditRoomRateMissingError,
   ReservationNotFoundError,
 } from "@/features/reservations";
@@ -22,7 +21,7 @@ import { createDatabaseBoundary } from "@/infrastructure/database/server";
 export type EditReservationDatesActionResult =
   | Readonly<{ ok: true }>
   | Readonly<{
-      code: "conflict" | "failure" | "ineligible" | "validation";
+      code: "conflict" | "failure" | "validation";
       message: string;
       ok: false;
     }>;
@@ -78,14 +77,6 @@ export async function editAdminReservationDatesWithResult(
       roomLockGateway,
     });
   } catch (error) {
-    if (error instanceof ReservationDateEditIneligibleError) {
-      return Object.freeze({
-        code: "ineligible" as const,
-        message:
-          "Esta reserva no puede editar sus fechas (reservas de Airbnb o Booking se gestionan desde el canal externo).",
-        ok: false as const,
-      });
-    }
     if (error instanceof InvalidLodgingIntervalError) {
       return Object.freeze({
         code: "validation" as const,

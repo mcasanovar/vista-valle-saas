@@ -39,6 +39,10 @@ export async function pollAllActiveConnections(
 
   const outcomes: ChannelSyncPollOutcome[] = [];
   for (const connection of await connections.listActive()) {
+    if (await connections.isPlatformPaused(connection.platform)) {
+      outcomes.push({ connectionId: connection.id, status: "skipped" });
+      continue;
+    }
     const inboundFeedUrl = await connections.getInboundFeedUrl(connection.id);
     if (!inboundFeedUrl) {
       outcomes.push({ connectionId: connection.id, status: "skipped" });

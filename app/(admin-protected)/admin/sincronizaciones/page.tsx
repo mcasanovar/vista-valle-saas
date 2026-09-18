@@ -7,12 +7,14 @@ import {
   createBookingChannelConnectionAction,
   regenerateChannelConnectionTokenAction,
   saveChannelConnectionAction,
+  setChannelPlatformPausedAction,
 } from "@/features/channel-calendar-sync/actions";
 import { getChannelConnectionStore } from "@/features/channel-calendar-sync";
 import {
   ChannelConnectionsPanel,
   type RoomConnectionCards,
 } from "@/features/channel-calendar-sync/connections-panel";
+import { PlatformPauseToggles } from "@/features/channel-calendar-sync/platform-pause-toggles";
 
 const PLATFORMS = ["airbnb", "booking"] as const;
 
@@ -26,6 +28,7 @@ export default async function SyncPage({
   const rooms = (await getRoomReadSource()).listActive();
   const connections = getChannelConnectionStore();
   const siteUrl = getServerEnvironment().SITE_URL;
+  const platformPauseStates = (await connections?.listPlatformPauseStates()) ?? [];
 
   const roomCards: readonly RoomConnectionCards[] = await Promise.all(
     rooms.map(async (room) => ({
@@ -97,12 +100,18 @@ export default async function SyncPage({
             complete={completeChannelSyncTaskAction}
           />
         ) : (
-          <ChannelConnectionsPanel
-            rooms={roomCards}
-            save={saveChannelConnectionAction}
-            regenerate={regenerateChannelConnectionTokenAction}
-            createPendingConnection={createBookingChannelConnectionAction}
-          />
+          <div className="space-y-4">
+            <PlatformPauseToggles
+              setPaused={setChannelPlatformPausedAction}
+              states={platformPauseStates}
+            />
+            <ChannelConnectionsPanel
+              rooms={roomCards}
+              save={saveChannelConnectionAction}
+              regenerate={regenerateChannelConnectionTokenAction}
+              createPendingConnection={createBookingChannelConnectionAction}
+            />
+          </div>
         )}
       </div>
     </section>

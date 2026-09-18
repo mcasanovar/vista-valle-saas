@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   requireAdministrator: vi.fn(),
   revalidatePath: vi.fn(),
   createPendingConnection: vi.fn(),
+  setPlatformPaused: vi.fn(),
   connectionStore: vi.fn(),
 }));
 
@@ -15,7 +16,10 @@ vi.mock("@/features/channel-calendar-sync/store", () => ({
   getChannelConnectionStore: mocks.connectionStore,
 }));
 
-import { createBookingChannelConnectionAction } from "@/features/channel-calendar-sync/actions";
+import {
+  createBookingChannelConnectionAction,
+  setChannelPlatformPausedAction,
+} from "@/features/channel-calendar-sync/actions";
 
 describe("createBookingChannelConnectionAction", () => {
   beforeEach(() => {
@@ -67,5 +71,54 @@ describe("createBookingChannelConnectionAction", () => {
       createBookingChannelConnectionAction(new FormData())
     ).rejects.toThrow("Indica la habitación.");
     expect(mocks.createPendingConnection).not.toHaveBeenCalled();
+  });
+});
+
+describe("setChannelPlatformPausedAction", () => {
+  beforeEach(() => {
+    mocks.setPlatformPaused.mockClear();
+    mocks.requireAdministrator.mockResolvedValue({
+      user: { id: "admin-1" },
+    });
+    mocks.connectionStore.mockReturnValue({
+      setPlatformPaused: mocks.setPlatformPaused,
+    });
+    mocks.setPlatformPaused.mockResolvedValue({
+      platform: "airbnb",
+      paused: true,
+    });
+  });
+
+  it("requires administrator authorization before pausing anything", async () => {
+    mocks.requireAdministrator.mockRejectedValueOnce(new Error("unauthorized"));
+    const data = new FormData();
+    data.set("platform", "airbnb");
+    data.set("paused", "true");
+
+    await expect(setChannelPlatformPausedAction(data)).rejects.toThrow(
+      "unauthorized"
+    );
+    expect(mocks.setPlatformPaused).not.toHaveBeenCalled();
+  });
+
+  it("pauses the given platform", async () => {
+    const data = new FormData();
+    data.set("platform", "airbnb");
+    data.set("paused", "true");
+
+    await setChannelPlatformPausedAction(data);
+
+    expect(mocks.setPlatformPaused).toHaveBeenCalledWith("airbnb", true);
+  });
+
+  it("rejects an invalid platform", async () => {
+    const data = new FormData();
+    data.set("platform", "vrbo");
+    data.set("paused", "true");
+
+    await expect(setChannelPlatformPausedAction(data)).rejects.toThrow(
+      "Plataforma inválida"
+    );
+    expect(mocks.setPlatformPaused).not.toHaveBeenCalled();
   });
 });
