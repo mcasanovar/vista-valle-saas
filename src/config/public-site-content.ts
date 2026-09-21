@@ -13,6 +13,7 @@ export const publicSiteContent = {
     { href: "/habitaciones", label: "Habitaciones" },
     { href: "#nosotros", label: "Experiencia" },
     { href: "/ubicacion", label: "Ubicación" },
+    { href: "/cotizacion-empresa", label: "Cotizaciones" },
     { href: "#contacto", label: "Contacto" },
   ] satisfies readonly PublicNavigationItem[],
   hero: {
