@@ -22,6 +22,10 @@ alter table public.company_quotation_lines enable row level security;
 alter table public.room_occupancy_prices enable row level security;
 alter table public.payment_method_settings enable row level security;
 alter table public.reservation_hold_items enable row level security;
+alter table public.channel_platform_pauses enable row level security;
+alter table public.assistant_threads enable row level security;
+alter table public.assistant_messages enable row level security;
+alter table public.assistant_memory_facts enable row level security;
 
 alter table public.rooms force row level security;
 alter table public.room_images force row level security;
@@ -46,5 +50,9 @@ alter table public.company_quotation_lines force row level security;
 alter table public.room_occupancy_prices force row level security;
 alter table public.payment_method_settings force row level security;
 alter table public.reservation_hold_items force row level security;
+alter table public.channel_platform_pauses force row level security;
+alter table public.assistant_threads force row level security;
+alter table public.assistant_messages force row level security;
+alter table public.assistant_memory_facts force row level security;
 
-revoke all privileges on table public.rooms, public.room_images, public.amenities, public.room_amenities, public.guests, public.reservations, public.reservation_items, public.reservation_holds, public.room_blocks, public.payments, public.payment_events, public.channel_sync_tasks, public.channel_connections, public.audit_events, public.notification_outbox, public.company_quotation_breakfast_catalog, public.assistant_interactions, public.operational_alerts, public.company_quotations, public.company_quotation_lines, public.room_occupancy_prices, public.payment_method_settings, public.reservation_hold_items from anon, authenticated;
+revoke all privileges on table public.rooms, public.room_images, public.amenities, public.room_amenities, public.guests, public.reservations, public.reservation_items, public.reservation_holds, public.room_blocks, public.payments, public.payment_events, public.channel_sync_tasks, public.channel_connections, public.audit_events, public.notification_outbox, public.company_quotation_breakfast_catalog, public.assistant_interactions, public.operational_alerts, public.company_quotations, public.company_quotation_lines, public.room_occupancy_prices, public.payment_method_settings, public.reservation_hold_items, public.channel_platform_pauses, public.assistant_threads, public.assistant_messages, public.assistant_memory_facts from anon, authenticated;
