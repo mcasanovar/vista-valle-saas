@@ -403,5 +403,42 @@ export function createDrizzleReservationRepository(
         .where(eq(reservationItems.reservationId, updated.id));
       return toReservationRecord(updated, itemRows);
     },
+    updateInvoiceRequest: async (reservationId, invoiceRequest, actorUserId) => {
+      const [current] = await db
+        .select()
+        .from(reservations)
+        .where(eq(reservations.id, reservationId));
+      if (!current) throw new ReservationNotFoundError(reservationId);
+
+      const [updated] = await db
+        .update(reservations)
+        .set({
+          invoiceBusinessActivity: invoiceRequest?.businessActivity ?? null,
+          invoiceEmail: invoiceRequest?.email ?? null,
+          invoiceName: invoiceRequest?.name ?? null,
+          invoicePhone: invoiceRequest?.phone ?? null,
+          invoiceRequested: Boolean(invoiceRequest),
+          invoiceRut: invoiceRequest?.rut ?? null,
+          updatedAt: new Date(),
+        })
+        .where(eq(reservations.id, reservationId))
+        .returning();
+      if (!updated) throw new ReservationNotFoundError(reservationId);
+
+      await db.insert(auditEvents).values({
+        action: "reservation.invoice_changed",
+        actorUserId,
+        after: { invoiceRequested: Boolean(invoiceRequest) },
+        before: { invoiceRequested: current.invoiceRequested },
+        entityId: updated.id,
+        entityType: "reservation",
+      });
+
+      const itemRows = await db
+        .select()
+        .from(reservationItems)
+        .where(eq(reservationItems.reservationId, updated.id));
+      return toReservationRecord(updated, itemRows);
+    },
   });
 }
