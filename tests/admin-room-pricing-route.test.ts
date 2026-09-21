@@ -43,6 +43,14 @@ const individual = Object.freeze({
   slug: "individual",
 });
 
+const departamento = Object.freeze({
+  ...doble,
+  capacity: 3,
+  id: "room-departamento",
+  name: "Departamento Interior",
+  slug: "departamento-interior",
+});
+
 function paramsFor(roomId: string) {
   return { params: Promise.resolve({ roomId }) };
 }
@@ -55,7 +63,7 @@ describe("admin room pricing API route", () => {
     createDatabaseBoundary.mockReturnValue({ context: "mock" });
     getRoomReadSource.mockResolvedValue({
       getActiveBySlug: () => null,
-      listActive: () => [doble, individual],
+      listActive: () => [doble, individual, departamento],
     });
     requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
   });
@@ -80,30 +88,28 @@ describe("admin room pricing API route", () => {
     expect(response.status).toBe(404);
   });
 
-  it("resolves the base price for both occupancies when no tariff is configured yet", async () => {
+  it("resolves the base price for every occupancy tier when no tariff is configured yet", async () => {
     const response = await GET(
       new Request("http://localhost/api/admin/habitaciones/room-doble/tarifas"),
       paramsFor("room-doble")
     );
 
     expect(await response.json()).toMatchObject({
-      priceOneGuestClp: 70_000,
-      priceTwoGuestsClp: 70_000,
+      prices: [70_000, 70_000],
     });
   });
 
   it("saves a valid differentiated tariff and reflects it on the next GET", async () => {
     const putResponse = await PUT(
       new Request("http://localhost/api/admin/habitaciones/room-doble/tarifas", {
-        body: JSON.stringify({ priceOneGuestClp: 55_000, priceTwoGuestsClp: 70_000 }),
+        body: JSON.stringify({ prices: [55_000, 70_000] }),
         method: "PUT",
       }),
       paramsFor("room-doble")
     );
     expect(putResponse.status).toBe(200);
     expect(await putResponse.json()).toMatchObject({
-      priceOneGuestClp: 55_000,
-      priceTwoGuestsClp: 70_000,
+      prices: [55_000, 70_000],
     });
 
     const getResponse = await GET(
@@ -111,15 +117,26 @@ describe("admin room pricing API route", () => {
       paramsFor("room-doble")
     );
     expect(await getResponse.json()).toMatchObject({
-      priceOneGuestClp: 55_000,
-      priceTwoGuestsClp: 70_000,
+      prices: [55_000, 70_000],
     });
   });
 
   it("rejects an invalid price without saving", async () => {
     const response = await PUT(
       new Request("http://localhost/api/admin/habitaciones/room-doble/tarifas", {
-        body: JSON.stringify({ priceOneGuestClp: -5, priceTwoGuestsClp: 70_000 }),
+        body: JSON.stringify({ prices: [-5, 70_000] }),
+        method: "PUT",
+      }),
+      paramsFor("room-doble")
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("rejects a price list whose length doesn't match the room's capacity", async () => {
+    const response = await PUT(
+      new Request("http://localhost/api/admin/habitaciones/room-doble/tarifas", {
+        body: JSON.stringify({ prices: [55_000] }),
         method: "PUT",
       }),
       paramsFor("room-doble")
@@ -133,10 +150,7 @@ describe("admin room pricing API route", () => {
       new Request(
         "http://localhost/api/admin/habitaciones/room-individual/tarifas",
         {
-          body: JSON.stringify({
-            priceOneGuestClp: 45_000,
-            priceTwoGuestsClp: 45_000,
-          }),
+          body: JSON.stringify({ prices: [45_000] }),
           method: "PUT",
         }
       ),
@@ -144,16 +158,44 @@ describe("admin room pricing API route", () => {
     );
 
     expect(await putResponse.json()).toMatchObject({
-      priceOneGuestClp: 45_000,
-      priceTwoGuestsClp: 45_000,
+      prices: [45_000],
     });
     expect(
       getCanonicalMockRoomPricingRepository()
         .audits()
         .some(
           (event) =>
-            event.roomId === "room-individual" && event.priceTwoGuestsClp === null
+            event.roomId === "room-individual" &&
+            event.prices.length === 1
         )
     ).toBe(true);
+  });
+
+  it("saves three differentiated tariffs for a capacity-3 room", async () => {
+    const putResponse = await PUT(
+      new Request(
+        "http://localhost/api/admin/habitaciones/room-departamento/tarifas",
+        {
+          body: JSON.stringify({ prices: [60_000, 80_000, 95_000] }),
+          method: "PUT",
+        }
+      ),
+      paramsFor("room-departamento")
+    );
+
+    expect(putResponse.status).toBe(200);
+    expect(await putResponse.json()).toMatchObject({
+      prices: [60_000, 80_000, 95_000],
+    });
+
+    const getResponse = await GET(
+      new Request(
+        "http://localhost/api/admin/habitaciones/room-departamento/tarifas"
+      ),
+      paramsFor("room-departamento")
+    );
+    expect(await getResponse.json()).toMatchObject({
+      prices: [60_000, 80_000, 95_000],
+    });
   });
 });

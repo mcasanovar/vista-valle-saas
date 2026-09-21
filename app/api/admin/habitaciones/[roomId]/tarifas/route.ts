@@ -78,16 +78,14 @@ export async function PUT(
 
   try {
     const user = await requireAdministrator();
-    const input = normalizeRoomPricingInput(await request.json());
+    const input = normalizeRoomPricingInput(await request.json(), room.capacity);
     const { repository } = getRepository();
     await repository.update(room, input, user.user.id);
     return Response.json({
       roomId: room.id,
       name: room.name,
       capacity: room.capacity,
-      priceOneGuestClp: input.priceOneGuestClp,
-      priceTwoGuestsClp:
-        room.capacity > 1 ? input.priceTwoGuestsClp : input.priceOneGuestClp,
+      prices: input.prices,
     });
   } catch (error) {
     if (error instanceof RoomPricingInputError) {

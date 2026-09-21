@@ -8,16 +8,18 @@ type RoomPricingRecord = Readonly<{
   roomId: string;
   name: string;
   capacity: number;
-  priceOneGuestClp: number;
-  priceTwoGuestsClp: number;
+  prices: readonly number[];
 }>;
+
+function guestLabel(occupancy: number) {
+  return `Precio para ${occupancy} ${occupancy === 1 ? "persona" : "personas"}`;
+}
 
 export function RoomPricingSettings({
   roomId,
 }: Readonly<{ roomId: string }>) {
   const [record, setRecord] = useState<RoomPricingRecord | null>(null);
-  const [priceOneGuestClp, setPriceOneGuestClp] = useState("");
-  const [priceTwoGuestsClp, setPriceTwoGuestsClp] = useState("");
+  const [prices, setPrices] = useState<readonly string[]>([]);
   const [samePrice, setSamePrice] = useState(true);
   const [error, setError] = useState<string>();
   const [status, setStatus] = useState<
@@ -36,9 +38,8 @@ export function RoomPricingSettings({
       .then((data) => {
         if (cancelled) return;
         setRecord(data);
-        setPriceOneGuestClp(String(data.priceOneGuestClp));
-        setPriceTwoGuestsClp(String(data.priceTwoGuestsClp));
-        setSamePrice(data.priceOneGuestClp === data.priceTwoGuestsClp);
+        setPrices(data.prices.map(String));
+        setSamePrice(data.prices.every((price) => price === data.prices[0]));
         setStatus("idle");
       })
       .catch(() => {
@@ -51,21 +52,18 @@ export function RoomPricingSettings({
 
   const hasOccupancyChoice = (record?.capacity ?? 1) > 1;
 
+  function setPriceAt(index: number, value: string) {
+    setPrices((current) => {
+      if (samePrice) return current.map(() => value);
+      return current.map((price, i) => (i === index ? value : price));
+    });
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!record || status === "saving") return;
-    const priceOneGuestClpValue = Number(priceOneGuestClp);
-    const priceTwoGuestsClpValue = hasOccupancyChoice
-      ? samePrice
-        ? priceOneGuestClpValue
-        : Number(priceTwoGuestsClp)
-      : priceOneGuestClpValue;
-    if (
-      !Number.isSafeInteger(priceOneGuestClpValue) ||
-      priceOneGuestClpValue <= 0 ||
-      !Number.isSafeInteger(priceTwoGuestsClpValue) ||
-      priceTwoGuestsClpValue <= 0
-    ) {
+    const parsed = prices.map((price) => Number(price));
+    if (parsed.some((price) => !Number.isSafeInteger(price) || price <= 0)) {
       setError("Indica precios válidos en CLP.");
       setStatus("error");
       return;
@@ -75,10 +73,7 @@ export function RoomPricingSettings({
     setError(undefined);
     try {
       const response = await fetch(`/api/admin/habitaciones/${roomId}/tarifas`, {
-        body: JSON.stringify({
-          priceOneGuestClp: priceOneGuestClpValue,
-          priceTwoGuestsClp: priceTwoGuestsClpValue,
-        }),
+        body: JSON.stringify({ prices: parsed }),
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         method: "PUT",
@@ -86,8 +81,7 @@ export function RoomPricingSettings({
       if (!response.ok) throw new Error("No pudimos guardar la tarifa.");
       const updated = (await response.json()) as RoomPricingRecord;
       setRecord(updated);
-      setPriceOneGuestClp(String(updated.priceOneGuestClp));
-      setPriceTwoGuestsClp(String(updated.priceTwoGuestsClp));
+      setPrices(updated.prices.map(String));
       setStatus("saved");
     } catch {
       setError("No pudimos guardar la tarifa.");
@@ -117,39 +111,34 @@ export function RoomPricingSettings({
             <input
               type="checkbox"
               checked={samePrice}
-              onChange={(event) => setSamePrice(event.target.checked)}
+              onChange={(event) => {
+                const checked = event.target.checked;
+                setSamePrice(checked);
+                if (checked) setPrices((current) => current.map(() => current[0] ?? ""));
+              }}
             />
-            Cobrar el mismo precio para 1 o 2 personas
+            Cobrar el mismo precio para cualquier cantidad de personas
           </label>
         ) : null}
-        <FormField
-          id="room-pricing-one"
-          label={hasOccupancyChoice ? "Precio para 1 persona" : "Precio por noche"}
-          required
-          inputProps={{
-            min: 0,
-            onChange: (event) => {
-              setPriceOneGuestClp(event.target.value);
-              if (samePrice) setPriceTwoGuestsClp(event.target.value);
-            },
-            type: "number",
-            value: priceOneGuestClp,
-          }}
-        />
-        {hasOccupancyChoice ? (
-          <FormField
-            id="room-pricing-two"
-            label="Precio para 2 personas"
-            required
-            inputProps={{
-              disabled: samePrice,
-              min: 0,
-              onChange: (event) => setPriceTwoGuestsClp(event.target.value),
-              type: "number",
-              value: samePrice ? priceOneGuestClp : priceTwoGuestsClp,
-            }}
-          />
-        ) : null}
+        {prices.map((price, index) => {
+          if (samePrice && index > 0) return null;
+          return (
+            <FormField
+              key={index}
+              id={`room-pricing-${index + 1}`}
+              label={
+                hasOccupancyChoice ? guestLabel(index + 1) : "Precio por noche"
+              }
+              required
+              inputProps={{
+                min: 0,
+                onChange: (event) => setPriceAt(index, event.target.value),
+                type: "number",
+                value: price,
+              }}
+            />
+          );
+        })}
         {error ? (
           <Feedback variant="error" title="No pudimos guardar">
             {error}

@@ -9,37 +9,39 @@ export type RoomPricingRecord = Readonly<{
   roomId: string;
   name: string;
   capacity: number;
-  priceOneGuestClp: number;
-  /** Equal to `priceOneGuestClp` for a capacity-1 room, which has no second occupancy tier. */
-  priceTwoGuestsClp: number;
+  /** One price per occupancy tier, `prices[0]` = 1 guest through `prices[capacity - 1]` = full capacity. */
+  prices: readonly number[];
 }>;
 
 export type RoomPricingUpdateInput = Readonly<{
-  priceOneGuestClp: number;
-  priceTwoGuestsClp: number;
+  prices: readonly number[];
 }>;
 
-/** Validates an admin-submitted tariff update (see `admin-room-pricing` spec). */
+/** Validates an admin-submitted tariff update: exactly one positive-integer price per occupancy tier, from 1 guest through the room's capacity (see `admin-room-pricing` spec). */
 export function normalizeRoomPricingInput(
-  candidate: unknown
+  candidate: unknown,
+  capacity: number
 ): RoomPricingUpdateInput {
   if (!candidate || typeof candidate !== "object") {
     throw new RoomPricingInputError("Datos de tarifa inválidos.");
   }
   const value = candidate as Record<string, unknown>;
-  const priceOneGuestClp = Number(value.priceOneGuestClp);
-  const priceTwoGuestsClp = Number(value.priceTwoGuestsClp);
-  if (!Number.isSafeInteger(priceOneGuestClp) || priceOneGuestClp <= 0) {
+  const rawPrices = value.prices;
+  if (!Array.isArray(rawPrices) || rawPrices.length !== capacity) {
     throw new RoomPricingInputError(
-      "Indica un precio válido para 1 persona."
+      `Indica un precio para cada cantidad de huéspedes (1 a ${capacity}).`
     );
   }
-  if (!Number.isSafeInteger(priceTwoGuestsClp) || priceTwoGuestsClp <= 0) {
-    throw new RoomPricingInputError(
-      "Indica un precio válido para 2 personas."
-    );
-  }
-  return Object.freeze({ priceOneGuestClp, priceTwoGuestsClp });
+  const prices = rawPrices.map((rawPrice, index) => {
+    const price = Number(rawPrice);
+    if (!Number.isSafeInteger(price) || price <= 0) {
+      throw new RoomPricingInputError(
+        `Indica un precio válido para ${index + 1} ${index === 0 ? "persona" : "personas"}.`
+      );
+    }
+    return price;
+  });
+  return Object.freeze({ prices: Object.freeze(prices) });
 }
 
 /** Resolves a room's current tariff record for the admin editor, from whatever occupancy prices it has today. */
@@ -48,11 +50,11 @@ export function resolveRoomPricingRecord(room: RoomReadModel): RoomPricingRecord
     roomId: room.id,
     name: room.name,
     capacity: room.capacity,
-    priceOneGuestClp: resolveRoomNightlyPrice(room, room.occupancyPrices, 1),
-    priceTwoGuestsClp:
-      room.capacity > 1
-        ? resolveRoomNightlyPrice(room, room.occupancyPrices, 2)
-        : resolveRoomNightlyPrice(room, room.occupancyPrices, 1),
+    prices: Object.freeze(
+      Array.from({ length: room.capacity }, (_, index) =>
+        resolveRoomNightlyPrice(room, room.occupancyPrices, index + 1)
+      )
+    ),
   });
 }
 
@@ -62,12 +64,7 @@ export function applyRoomPricingOverride(
   override: RoomPricingUpdateInput | undefined
 ): RoomPricingRecord {
   if (!override) return record;
-  return Object.freeze({
-    ...record,
-    priceOneGuestClp: override.priceOneGuestClp,
-    priceTwoGuestsClp:
-      record.capacity > 1 ? override.priceTwoGuestsClp : override.priceOneGuestClp,
-  });
+  return Object.freeze({ ...record, prices: override.prices });
 }
 
 export type RoomPricingRepository = Readonly<{
@@ -81,8 +78,7 @@ export type RoomPricingRepository = Readonly<{
 export type RoomPricingAuditEvent = Readonly<{
   actorUserId: string;
   occurredAt: Date;
-  priceOneGuestClp: number;
-  priceTwoGuestsClp: number | null;
+  prices: readonly number[];
   roomId: string;
 }>;
 
@@ -102,8 +98,7 @@ export function createMockRoomPricingRepository(): RoomPricingRepository & {
         Object.freeze({
           actorUserId,
           occurredAt: new Date(),
-          priceOneGuestClp: input.priceOneGuestClp,
-          priceTwoGuestsClp: room.capacity > 1 ? input.priceTwoGuestsClp : null,
+          prices: input.prices,
           roomId: room.id,
         })
       );
