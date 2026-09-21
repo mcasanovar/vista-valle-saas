@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt } from "drizzle-orm";
 import type { RoomPricingRepository } from "@/features/rooms";
 import { auditEvents, roomOccupancyPrices } from "@/persistence/schema";
 import type { ProductionDatabase } from "./client";
@@ -21,9 +21,10 @@ async function upsertOccupancyPrice(
 }
 
 /**
- * Writes both occupancy tiers atomically (design.md decision 1: a
- * capacity-1 room only ever gets its occupancy-1 row) and records one
- * audit event per update - see `admin-room-pricing` spec.
+ * Writes one row per occupancy tier (1 guest through the room's capacity)
+ * atomically, dropping any stale tier left over from a larger capacity the
+ * room used to have, and records one audit event per update - see
+ * `admin-room-pricing` spec.
  */
 export function createDrizzleRoomPricingRepository(
   db: ProductionDatabase
@@ -31,27 +32,21 @@ export function createDrizzleRoomPricingRepository(
   return Object.freeze({
     update: async (room, input, actorUserId) => {
       await db.transaction(async (tx) => {
-        await upsertOccupancyPrice(tx, room.id, 1, input.priceOneGuestClp);
-        if (room.capacity > 1) {
-          await upsertOccupancyPrice(tx, room.id, 2, input.priceTwoGuestsClp);
-        } else {
-          await tx
-            .delete(roomOccupancyPrices)
-            .where(
-              and(
-                eq(roomOccupancyPrices.roomId, room.id),
-                eq(roomOccupancyPrices.occupancy, 2)
-              )
-            );
+        for (const [index, priceClp] of input.prices.entries()) {
+          await upsertOccupancyPrice(tx, room.id, index + 1, priceClp);
         }
+        await tx
+          .delete(roomOccupancyPrices)
+          .where(
+            and(
+              eq(roomOccupancyPrices.roomId, room.id),
+              gt(roomOccupancyPrices.occupancy, input.prices.length)
+            )
+          );
         await tx.insert(auditEvents).values({
           action: "room_pricing.updated",
           actorUserId,
-          after: {
-            priceOneGuestClp: input.priceOneGuestClp,
-            priceTwoGuestsClp:
-              room.capacity > 1 ? input.priceTwoGuestsClp : null,
-          },
+          after: { prices: input.prices },
           entityId: room.id,
           entityType: "room",
         });

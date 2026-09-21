@@ -16,6 +16,8 @@ import { MarkPaymentPaidForm } from "@/features/payments/mark-payment-paid-form"
 import { AdminBackLink } from "@/features/admin/admin-back-link";
 import { editReservationGuestContactAction } from "@/features/admin/edit-reservation-guest-contact-action";
 import { EditReservationGuestContactForm } from "@/features/admin/edit-reservation-guest-contact-form";
+import { editReservationInvoiceAction } from "@/features/admin/edit-reservation-invoice-action";
+import { EditReservationInvoiceForm } from "@/features/admin/edit-reservation-invoice-form";
 
 const currency = new Intl.NumberFormat("es-CL", {
   currency: "CLP",
@@ -225,37 +227,18 @@ export default async function ReservationDetail({
         </section>
       ) : null}
 
-      {reservation.invoiceRequest ? (
-        <section aria-labelledby="invoice-heading" className="rounded-xl border border-border bg-card p-4">
-          <h2 id="invoice-heading" className="font-heading text-lg">
-            Factura
-          </h2>
-          <dl className="mt-2 grid gap-2 tablet:grid-cols-2">
-            <div>
-              <dt className="text-xs text-muted-foreground">
-                Razón social
-              </dt>
-              <dd>{reservation.invoiceRequest.name}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">RUT</dt>
-              <dd>{reservation.invoiceRequest.rut}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Giro</dt>
-              <dd>{reservation.invoiceRequest.businessActivity}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Teléfono</dt>
-              <dd>{reservation.invoiceRequest.phone}</dd>
-            </div>
-            <div>
-              <dt className="text-xs text-muted-foreground">Email</dt>
-              <dd>{reservation.invoiceRequest.email}</dd>
-            </div>
-          </dl>
-        </section>
-      ) : null}
+      <section aria-labelledby="invoice-heading" className="rounded-xl border border-border bg-card p-4">
+        <h2 id="invoice-heading" className="font-heading text-lg">
+          Facturación
+        </h2>
+        <div className="mt-2">
+          <EditReservationInvoiceForm
+            action={editReservationInvoiceAction}
+            invoice={reservation.invoiceRequest}
+            reservationId={reservation.id}
+          />
+        </div>
+      </section>
 
       <section aria-labelledby="payments-heading" className="rounded-xl border border-border bg-card p-4">
         <h2 id="payments-heading" className="font-heading text-lg">

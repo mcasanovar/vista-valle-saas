@@ -267,6 +267,18 @@ export type ReservationRepository<TContext> = Readonly<{
     context: TContext,
     input: EditReservationDatesTransactionInput
   ) => Promise<ReservationRecord>;
+  /**
+   * Non-transactional add/edit/remove of a reservation's invoice request
+   * (`invoiceRequest: null` clears it) - see
+   * `@/features/reservations/edit-reservation-invoice`. Like
+   * `GuestRepository.updateGuest`, this never touches dates, pricing, or
+   * status, so it needs no room lock and no `TContext`.
+   */
+  updateInvoiceRequest?: (
+    reservationId: string,
+    invoiceRequest: InvoiceRequest | null,
+    actorUserId?: string
+  ) => Promise<ReservationRecord>;
 }>;
 
 type MockReservationStorage = Readonly<{
@@ -638,6 +650,20 @@ export function createMockReservationRepository(
         }
       }
 
+      return updated;
+    },
+    // `actorUserId` is accepted only to match the production adapter's
+    // signature - this in-memory double keeps no audit trail.
+    updateInvoiceRequest: async (reservationId, invoiceRequest) => {
+      const current = storage.reservationsById.get(reservationId);
+      if (!current) throw new ReservationNotFoundError(reservationId);
+
+      const updated: ReservationRecord = Object.freeze({
+        ...current,
+        invoiceRequest: invoiceRequest ?? undefined,
+        updatedAt: new Date(),
+      });
+      storage.reservationsById.set(updated.id, updated);
       return updated;
     },
   });

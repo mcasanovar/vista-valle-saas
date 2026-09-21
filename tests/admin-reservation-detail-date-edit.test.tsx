@@ -36,6 +36,12 @@ vi.mock("@/features/admin/edit-reservation-guest-contact-form", () => ({
     <form aria-label="Editar datos del huésped" />
   ),
 }));
+vi.mock("@/features/admin/edit-reservation-invoice-action", () => ({
+  editReservationInvoiceAction: vi.fn(),
+}));
+vi.mock("@/features/admin/edit-reservation-invoice-form", () => ({
+  EditReservationInvoiceForm: () => <form aria-label="Editar facturación" />,
+}));
 vi.mock("@/features/admin/pay-at-property-admin-collect-action", () => ({
   collectPayAtPropertyAdminAction: vi.fn(),
 }));
