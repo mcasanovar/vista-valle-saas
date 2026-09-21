@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getRoomReadSource } from "@/features/rooms";
+import { getRoomDraftSource, getRoomReadSource } from "@/features/rooms";
 import { listRoomImages } from "@/features/room-images";
 import { RoomImagesManager } from "@/features/room-images/room-images-manager";
 import {
@@ -16,7 +16,9 @@ export default async function RoomPhotosPage({
 }: Readonly<{ params: Promise<{ roomId: string }> }>) {
   const { roomId } = await params;
   const source = await getRoomReadSource();
-  const room = source.listActive().find((candidate) => candidate.id === roomId);
+  const room =
+    source.listActive().find((candidate) => candidate.id === roomId) ??
+    (await getRoomDraftSource()).find((candidate) => candidate.id === roomId);
   if (!room) notFound();
 
   const photos = await listRoomImages(roomId);

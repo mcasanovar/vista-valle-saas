@@ -2,6 +2,7 @@ import "server-only";
 import { getServerEnvironment } from "@/config/server";
 import { createProductionDatabase } from "@/infrastructure/database/client";
 import { createDrizzleRoomImageRepository } from "@/infrastructure/database/room-image-repository";
+import { createDrizzleRoomCreationRepository } from "@/infrastructure/database/room-creation-repository";
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
 import {
   allowedRoomImageMimeTypes,
@@ -10,7 +11,10 @@ import {
   type RoomImageUpload,
 } from "@/infrastructure/storage/contracts";
 import { createRoomImageStorage } from "@/infrastructure/storage/server";
-import { getRoomReadSource } from "@/features/rooms";
+import {
+  getCanonicalMockRoomCreationRepository,
+  mockDemoRooms,
+} from "@/features/rooms";
 
 export type RoomImageRecord = Readonly<{
   altText: string;
@@ -74,10 +78,24 @@ function byPosition(a: RoomImageRecord, b: RoomImageRecord) {
   return a.position - b.position;
 }
 
+/**
+ * "Exists" - not "is publishable": a freshly created draft room (`active:
+ * false`, incomplete) must accept photos too, so this checks the room
+ * table/mock store directly instead of `getRoomReadSource().listActive()`,
+ * which only returns active+complete rooms. Every room that previously
+ * passed (active+complete) still exists in the same store, so this is a
+ * strict superset of the old check.
+ */
 async function assertRoomExists(roomId: string) {
-  const source = await getRoomReadSource();
-  if (!source.listActive().some((room) => room.id === roomId))
-    throw new RoomImageInputError("Selecciona una habitación válida.");
+  const boundary = createDatabaseBoundary();
+  const exists =
+    boundary.context === "mock"
+      ? mockDemoRooms.some((room) => room.id === roomId) ||
+        (await getCanonicalMockRoomCreationRepository().roomExists(roomId))
+      : await createDrizzleRoomCreationRepository(
+          createProductionDatabase(boundary)
+        ).roomExists(roomId);
+  if (!exists) throw new RoomImageInputError("Selecciona una habitación válida.");
 }
 
 function extensionFor(contentType: string) {

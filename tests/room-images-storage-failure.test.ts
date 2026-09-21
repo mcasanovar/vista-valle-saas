@@ -23,6 +23,11 @@ vi.mock("@/infrastructure/database/server", () => ({
 vi.mock("@/infrastructure/database/client", () => ({
   createProductionDatabase: () => ({ transaction }),
 }));
+vi.mock("@/infrastructure/database/room-creation-repository", () => ({
+  createDrizzleRoomCreationRepository: () => ({
+    roomExists: async () => true,
+  }),
+}));
 
 import { uploadRoomImages } from "@/features/room-images";
 
