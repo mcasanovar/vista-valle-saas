@@ -55,6 +55,20 @@ const nextConfig: NextConfig = {
   ...(devTunnelOrigin
     ? { allowedDevOrigins: [devTunnelOrigin] }
     : {}),
+  experimental: {
+    serverActions: {
+      // Next.js defaults Server Action request bodies to 1MB, which is
+      // below `maxRoomImageBytes` (5MB, src/infrastructure/storage/contracts.ts)
+      // and blocks room photo uploads before that check ever runs. Sized to
+      // fit a small multi-file batch of near-max-size photos.
+      bodySizeLimit: "20mb",
+    },
+    // `proxy.ts` (matcher: /admin/:path*) intercepts every admin request,
+    // including photo uploads, and Next.js separately caps the body size of
+    // requests that pass through it (default 10MB) - independent of the
+    // `serverActions.bodySizeLimit` above, so both must be raised together.
+    proxyClientMaxBodySize: "20mb",
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
