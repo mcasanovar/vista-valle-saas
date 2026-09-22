@@ -729,6 +729,7 @@ export const companyQuotationLines = pgTable(
     capacitySnapshot: integer("capacity_snapshot").notNull(),
     nightlyPriceClpSnapshot: integer("nightly_price_clp_snapshot").notNull(),
     quantity: integer("quantity").notNull(),
+    guestCount: integer("guest_count").notNull(),
     nights: integer("nights").notNull(),
     subtotalClp: integer("subtotal_clp").notNull(),
     createdAt: createdAt(),
@@ -746,6 +747,10 @@ export const companyQuotationLines = pgTable(
     check(
       "company_quotation_lines_quantity_positive",
       sql`${table.quantity} > 0`
+    ),
+    check(
+      "company_quotation_lines_guest_count_within_capacity",
+      sql`${table.guestCount} > 0 AND ${table.guestCount} <= ${table.capacitySnapshot} * ${table.quantity}`
     ),
     check("company_quotation_lines_nights_positive", sql`${table.nights} > 0`),
     check(

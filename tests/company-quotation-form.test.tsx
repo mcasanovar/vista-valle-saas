@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,6 +12,7 @@ const rooms = [
     capacity: 1,
     name: "Habitación Individual",
     nightlyPriceClp: 55000,
+    occupancyPrices: [],
     slug: "individual",
   },
   {
@@ -19,6 +20,10 @@ const rooms = [
     capacity: 2,
     name: "Habitación Doble",
     nightlyPriceClp: 70000,
+    occupancyPrices: [
+      { occupancy: 1, priceClp: 60000 },
+      { occupancy: 2, priceClp: 70000 },
+    ],
     slug: "doble",
   },
 ] as const;
@@ -28,14 +33,35 @@ const breakfast = {
   unitPriceClp: 8000,
 } as const;
 
-async function fillRequiredFields(user: ReturnType<typeof userEvent.setup>) {
+function roomCard(roomName: string) {
+  return screen
+    .getAllByText(roomName)
+    .find((el) => el.tagName === "H4")!
+    .closest("div.vv-quotation-room-option")! as HTMLElement;
+}
+
+async function selectRoom(
+  user: ReturnType<typeof userEvent.setup>,
+  roomName: string
+) {
   await user.click(
-    screen
-      .getAllByRole("button", { name: "Seleccionar" })
-      .find((button) =>
-        button.closest("div")?.textContent?.includes("Habitación Doble")
-      )!
+    within(roomCard(roomName)).getByRole("button", { name: "Seleccionar" })
   );
+}
+
+async function setRoomGuestCount(
+  user: ReturnType<typeof userEvent.setup>,
+  roomName: string,
+  guestCount: number
+) {
+  await user.click(
+    within(roomCard(roomName)).getByRole("button", {
+      name: String(guestCount),
+    })
+  );
+}
+
+async function fillContactFields(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText(/Empresa/), "Empresa demo");
   await user.type(screen.getByLabelText(/Persona de contacto/), "Ana Pérez");
   await user.type(
@@ -54,7 +80,7 @@ describe("CompanyQuotationForm", () => {
         breakfast={breakfast}
         checkIn="2026-10-05"
         checkOut="2026-10-08"
-        guestCount={5}
+        guestCount={2}
         rooms={rooms}
       />
     );
@@ -69,13 +95,7 @@ describe("CompanyQuotationForm", () => {
       screen.queryByRole("button", { name: "Generar y enviar cotización" })
     ).not.toBeInTheDocument();
 
-    await user.click(
-      screen
-        .getAllByRole("button", { name: "Seleccionar" })
-        .find((button) =>
-          button.closest("div")?.textContent?.includes("Habitación Doble")
-        )!
-    );
+    await selectRoom(user, "Habitación Doble");
 
     expect(
       screen.queryByText(
@@ -88,49 +108,108 @@ describe("CompanyQuotationForm", () => {
     ).toBeVisible();
   });
 
-  it("toggles a room selection between Seleccionar/Seleccionado and recalculates capacity", async () => {
+  it("disables the submit button while the assigned guests are incomplete and enables it once they match exactly", async () => {
     const user = userEvent.setup();
     render(
       <CompanyQuotationForm
         breakfast={breakfast}
         checkIn="2026-10-05"
         checkOut="2026-10-08"
-        guestCount={5}
+        guestCount={2}
         rooms={rooms}
       />
     );
 
-    const toggle = screen
-      .getAllByRole("button", { name: "Seleccionar" })
-      .find((button) =>
-        button.closest("div")?.textContent?.includes("Habitación Doble")
-      )!;
-    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    await selectRoom(user, "Habitación Individual");
+    expect(screen.getByText(/Huéspedes asignados: 1 de 2/)).toBeVisible();
     expect(
-      screen.getByText(/Capacidad seleccionada: 0 personas/)
-    ).toBeVisible();
+      screen.getByRole("button", { name: "Generar y enviar cotización" })
+    ).toBeDisabled();
 
-    await user.click(toggle);
+    await selectRoom(user, "Habitación Doble");
+    expect(screen.getByText(/Huéspedes asignados: 2 de 2/)).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Seleccionado" })
-    ).toHaveAttribute("aria-pressed", "true");
-    expect(
-      screen.getByText(/Capacidad seleccionada: 2 personas/)
-    ).toBeVisible();
+      screen.getByRole("button", { name: "Generar y enviar cotización" })
+    ).toBeEnabled();
+  });
 
-    await user.click(screen.getByRole("button", { name: "Seleccionado" }));
-    expect(
-      screen.queryByRole("button", { name: "Seleccionado" })
-    ).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Seleccionar" })).toHaveLength(
-      2
+  it("updates the displayed nightly price to match the selected occupancy tier", async () => {
+    const user = userEvent.setup();
+    render(
+      <CompanyQuotationForm
+        breakfast={breakfast}
+        checkIn="2026-10-05"
+        checkOut="2026-10-08"
+        guestCount={2}
+        rooms={rooms}
+      />
     );
+
+    await selectRoom(user, "Habitación Doble");
     expect(
-      screen.getByText(/Capacidad seleccionada: 0 personas/)
+      within(roomCard("Habitación Doble")).getByText("$60.000")
+    ).toBeVisible();
+
+    await setRoomGuestCount(user, "Habitación Doble", 2);
+    expect(
+      within(roomCard("Habitación Doble")).getByText("$70.000")
     ).toBeVisible();
   });
 
-  it("allows submitting a partial quotation when selected capacity falls short of guests", async () => {
+  it("blocks assigning more guests than a room's capacity and blocks selecting more rooms once the total is reached", async () => {
+    const user = userEvent.setup();
+    render(
+      <CompanyQuotationForm
+        breakfast={breakfast}
+        checkIn="2026-10-05"
+        checkOut="2026-10-08"
+        guestCount={1}
+        rooms={rooms}
+      />
+    );
+
+    // Individual's own capacity (1) already caps its guest-count options,
+    // so exercise the cross-room block on Doble instead.
+    await selectRoom(user, "Habitación Doble");
+    expect(
+      within(roomCard("Habitación Doble")).getByRole("button", { name: "2" })
+    ).toBeDisabled();
+    expect(
+      within(roomCard("Habitación Doble")).getByRole("button", { name: "1" })
+    ).toBeEnabled();
+
+    expect(screen.getByText(/Huéspedes asignados: 1 de 1/)).toBeVisible();
+    expect(
+      within(roomCard("Habitación Individual")).getByRole("button", {
+        name: "Seleccionar",
+      })
+    ).toBeDisabled();
+  });
+
+  it("lets the remaining guest count be assigned to any other selected room", async () => {
+    const user = userEvent.setup();
+    render(
+      <CompanyQuotationForm
+        breakfast={breakfast}
+        checkIn="2026-10-05"
+        checkOut="2026-10-08"
+        guestCount={3}
+        rooms={rooms}
+      />
+    );
+
+    await selectRoom(user, "Habitación Doble");
+    await setRoomGuestCount(user, "Habitación Doble", 2);
+    expect(screen.getByText(/Huéspedes asignados: 2 de 3/)).toBeVisible();
+
+    await selectRoom(user, "Habitación Individual");
+    expect(screen.getByText(/Huéspedes asignados: 3 de 3/)).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "Generar y enviar cotización" })
+    ).toBeEnabled();
+  });
+
+  it("submits with a per-room guestCount once the distribution is complete", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -139,6 +218,7 @@ describe("CompanyQuotationForm", () => {
           lines: [
             {
               capacity: 2,
+              guestCount: 2,
               name: "Habitación Doble",
               nightlyPriceClp: 70000,
               nights: 3,
@@ -159,17 +239,14 @@ describe("CompanyQuotationForm", () => {
         breakfast={breakfast}
         checkIn="2026-10-05"
         checkOut="2026-10-08"
-        guestCount={5}
+        guestCount={2}
         rooms={rooms}
       />
     );
 
-    await fillRequiredFields(user);
-    expect(
-      screen.getByText(
-        "Faltan 3 personas de capacidad. Puedes enviar igualmente una cotización parcial."
-      )
-    ).toBeVisible();
+    await selectRoom(user, "Habitación Doble");
+    await setRoomGuestCount(user, "Habitación Doble", 2);
+    await fillContactFields(user);
 
     await user.click(
       screen.getByRole("button", { name: "Generar y enviar cotización" })
@@ -183,20 +260,14 @@ describe("CompanyQuotationForm", () => {
       breakfastRequested: false,
       checkIn: "2026-10-05",
       checkOut: "2026-10-08",
-      guestCount: 5,
+      guestCount: 2,
       requireParking: true,
+      rooms: [{ guestCount: 2, quantity: 1, slug: "doble" }],
     });
     const dialog = await screen.findByRole("dialog", {
       name: "Cotización enviada",
     });
     expect(dialog).toBeVisible();
-    expect(screen.queryByText(/\$210\.000/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Total/)).not.toBeInTheDocument();
-    expect(
-      screen.getByText(
-        "Faltan 3 personas de capacidad. Puedes enviar igualmente una cotización parcial."
-      )
-    ).toBeVisible();
   });
 
   it("requires an explicit parking answer before submitting", async () => {
@@ -212,13 +283,8 @@ describe("CompanyQuotationForm", () => {
       />
     );
 
-    await user.click(
-      screen
-        .getAllByRole("button", { name: "Seleccionar" })
-        .find((button) =>
-          button.closest("div")?.textContent?.includes("Habitación Doble")
-        )!
-    );
+    await selectRoom(user, "Habitación Doble");
+    await setRoomGuestCount(user, "Habitación Doble", 2);
     await user.type(screen.getByLabelText(/Empresa/), "Empresa demo");
     await user.type(screen.getByLabelText(/Persona de contacto/), "Ana Pérez");
     await user.type(
@@ -248,19 +314,14 @@ describe("CompanyQuotationForm", () => {
         rooms={rooms}
       />
     );
-    await user.click(
-      screen
-        .getAllByRole("button", { name: "Seleccionar" })
-        .find((button) =>
-          button.closest("div")?.textContent?.includes("Habitación Doble")
-        )!
-    );
+    await selectRoom(user, "Habitación Doble");
+    await setRoomGuestCount(user, "Habitación Doble", 2);
 
     expect(screen.queryByText(breakfast.description)).not.toBeInTheDocument();
 
     await user.click(document.getElementById("quotation-breakfast-yes")!);
     expect(screen.getByText(breakfast.description)).toBeVisible();
-    expect(screen.getByLabelText(/Cantidad de desayunos/)).toBeVisible();
+    expect(screen.getByLabelText(/Desayunos por noche/)).toBeVisible();
 
     await user.click(document.getElementById("quotation-parking-yes")!);
     await user.type(screen.getByLabelText(/Empresa/), "Empresa demo");

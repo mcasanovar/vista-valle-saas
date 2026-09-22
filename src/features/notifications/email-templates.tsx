@@ -135,26 +135,14 @@ export function ReservationDatesChangedAdminEmail(
   );
 }
 
-function CompanyQuotationCoverageNotice({
-  capacity,
-  guestCount,
-}: Readonly<{ capacity: number; guestCount: number }>) {
-  if (capacity >= guestCount) return null;
-  return (
-    <p>
-      <strong>Cobertura parcial:</strong> esta cotización cubre a {capacity} de
-      las {guestCount} personas solicitadas.
-    </p>
-  );
-}
-
 function CompanyQuotationBreakfastLine({
   props,
 }: Readonly<{ props: CompanyQuotationEmailData }>) {
   if (!props.breakfastRequested) return null;
   return (
     <p>
-      {props.breakfastQuantity} × Desayuno:{" "}
+      {props.breakfastQuantity} × Desayuno × {props.nights}{" "}
+      {props.nights === 1 ? "noche" : "noches"}:{" "}
       {formatClp(props.breakfastSubtotalClp)}
     </p>
   );
@@ -174,10 +162,6 @@ export function CompanyQuotationCustomerEmail(
         <p>Salida: {props.checkOut}</p>
         <p>Personas: {props.guestCount}</p>
         <p>Estacionamiento: {props.requireParking ? "Sí" : "No"}</p>
-        <CompanyQuotationCoverageNotice
-          capacity={props.capacity}
-          guestCount={props.guestCount}
-        />
         {props.lines.map((line) => (
           <p key={line.slug}>
             {line.quantity} × {line.name}: {formatClp(line.subtotalClp)}
@@ -204,10 +188,6 @@ export function CompanyQuotationAdminEmail(props: CompanyQuotationEmailData) {
         <p>Entrada: {props.checkIn}</p>
         <p>Salida: {props.checkOut}</p>
         <p>Personas: {props.guestCount}</p>
-        <CompanyQuotationCoverageNotice
-          capacity={props.capacity}
-          guestCount={props.guestCount}
-        />
         {props.lines.map((line) => (
           <p key={line.slug}>
             {line.quantity} × {line.name}: {formatClp(line.subtotalClp)}

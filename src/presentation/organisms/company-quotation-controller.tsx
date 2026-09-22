@@ -69,11 +69,17 @@ function addCalendarDays(date: string, amount: number) {
   return next.toISOString().slice(0, 10);
 }
 
+type AvailabilityRoomOccupancyPrice = Readonly<{
+  occupancy: number;
+  priceClp: number;
+}>;
+
 type AvailabilityRoom = Readonly<{
   availableUnits: number;
   capacity: number;
   name: string;
   nightlyPriceClp: number;
+  occupancyPrices: readonly AvailabilityRoomOccupancyPrice[];
   slug: string;
 }>;
 
@@ -322,9 +328,9 @@ export function CompanyQuotationController() {
                     )}{" "}
                     para alojar a las {formatCapacity(availability.guestCount)}{" "}
                     solicitadas. Con lo disponible alcanzamos para{" "}
-                    {formatCapacity(availability.totalAvailableCapacity)}.
-                    Puedes continuar con una cotización parcial o ajustar tu
-                    búsqueda.
+                    {formatCapacity(availability.totalAvailableCapacity)}. No
+                    es posible generar una cotización para el total
+                    solicitado con esta disponibilidad; ajusta tu búsqueda.
                   </p>
                 ) : null}
               </div>
@@ -366,7 +372,7 @@ export function CompanyQuotationController() {
               })}
             </ul>
           </div>
-          {availability.rooms.length > 0 ? (
+          {availability.rooms.length > 0 && availability.coversGuestCount ? (
             <CompanyQuotationForm
               breakfast={availability.breakfast}
               checkIn={availability.checkIn}
