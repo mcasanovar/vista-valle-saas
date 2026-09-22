@@ -18,7 +18,7 @@ const quotation = calculateCompanyQuotation(
     guestCount: 2,
     message: "Mensaje",
     requireParking: false,
-    rooms: [{ quantity: 2, slug: "habitacion-valle-demo" }],
+    rooms: [{ guestCount: 2, quantity: 2, slug: "habitacion-valle-demo" }],
   }),
   mockDemoRooms
 );

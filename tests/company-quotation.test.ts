@@ -19,8 +19,8 @@ const validInput = {
   phone: "+56 9 1111 1111",
   requireParking: true,
   rooms: [
-    { quantity: 2, slug: "habitacion-valle-demo" },
-    { quantity: 1, slug: "habitacion-terra-demo" },
+    { guestCount: 2, quantity: 2, slug: "habitacion-valle-demo" },
+    { guestCount: 2, quantity: 1, slug: "habitacion-terra-demo" },
   ],
 };
 
@@ -50,6 +50,23 @@ describe("company quotation", () => {
     ]);
   });
 
+  it("prices a single-unit line by its occupancy tier for the selected guest count, not the flat rate", () => {
+    const input = normalizeCompanyQuotationInput({
+      ...validInput,
+      guestCount: 1,
+      rooms: [{ guestCount: 1, quantity: 1, slug: "habitacion-terra-demo" }],
+    });
+    const quote = calculateCompanyQuotation(input, mockDemoRooms);
+
+    // habitacion-terra-demo: flat nightlyPriceClp 70000, but its
+    // occupancyPrices tier for 1 guest is 55000 - the resolved price must
+    // reflect the tier, not the flat rate.
+    expect(quote.lines[0]).toMatchObject({
+      nightlyPriceClp: 55000,
+      subtotalClp: 165000,
+    });
+  });
+
   it("rejects invalid dates, quantities and missing room selections", () => {
     expect(() =>
       normalizeCompanyQuotationInput({
@@ -66,15 +83,27 @@ describe("company quotation", () => {
     ).toThrow(CompanyQuotationInputError);
   });
 
-  it("calculates a partial quotation when total people exceed selected capacity, without rejecting it", () => {
+  it("rejects a quotation when the assigned guests do not add up to the requested total", () => {
     const input = normalizeCompanyQuotationInput({
       ...validInput,
       guestCount: 5,
     });
-    const quote = calculateCompanyQuotation(input, mockDemoRooms);
 
-    expect(quote.guestCount).toBe(5);
-    expect(quote.capacity).toBe(4);
+    expect(() => calculateCompanyQuotation(input, mockDemoRooms)).toThrow(
+      CompanyQuotationInputError
+    );
+  });
+
+  it("rejects a line whose assigned guests exceed its capacity", () => {
+    const input = normalizeCompanyQuotationInput({
+      ...validInput,
+      rooms: [{ guestCount: 3, quantity: 2, slug: "habitacion-valle-demo" }],
+      guestCount: 3,
+    });
+
+    expect(() => calculateCompanyQuotation(input, mockDemoRooms)).toThrow(
+      CompanyQuotationInputError
+    );
   });
 
   it("does not trust client-provided derived values", () => {
@@ -82,7 +111,7 @@ describe("company quotation", () => {
       ...validInput,
       guestCount: 2,
       totalClp: 1,
-      rooms: [{ quantity: 1, slug: "habitacion-terra-demo" }],
+      rooms: [{ guestCount: 2, quantity: 1, slug: "habitacion-terra-demo" }],
     });
     const quote = calculateCompanyQuotation(input, mockDemoRooms);
 
@@ -118,9 +147,9 @@ describe("company quotation", () => {
       breakfastCatalog
     );
 
-    expect(quote.breakfastSubtotalClp).toBe(24000);
+    expect(quote.breakfastSubtotalClp).toBe(72000);
     expect(quote.breakfastUnitPriceClp).toBe(8000);
-    expect(quote.totalClp).toBe(540000 + 24000);
+    expect(quote.totalClp).toBe(540000 + 72000);
   });
 
   it("rejects a breakfast request when no catalog is available", () => {

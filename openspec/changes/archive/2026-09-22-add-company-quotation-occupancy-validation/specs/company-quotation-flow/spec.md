@@ -1,25 +1,4 @@
-# company-quotation-flow Specification
-
-## Purpose
-
-Permitir que empresas soliciten una cotización automática para múltiples habitaciones y reciban por correo un resumen calculado con valores transparentes, manteniendo una base segura para persistencia y entrega real.
-
-## Requirements
-
-### Requirement: Página dedicada de cotización empresarial
-El sistema SHALL ofrecer la cotización empresarial en `/cotizacion-empresa` y SHALL mantener el landing limitado a la sección empresarial con su botón “Solicitar cotización”. Cuando la cotización empresarial esté habilitada, el CTA SHALL estar disponible también bajo el contexto productivo y SHALL navegar a la página dedicada, independientemente de que exista un canal genérico de contacto para empresas.
-
-#### Scenario: Acceso desde el landing
-- **WHEN** el visitante activa “Solicitar cotización” en el landing
-- **THEN** el sistema navega a `/cotizacion-empresa` y no muestra el formulario completo dentro del landing
-
-#### Scenario: CTA productivo sin canal genérico
-- **WHEN** la cotización empresarial está habilitada en producción y no existe un canal genérico de contacto configurado
-- **THEN** el landing mantiene visible el CTA “Solicitar cotización” y lo dirige a `/cotizacion-empresa`
-
-#### Scenario: Apertura directa
-- **WHEN** el visitante abre `/cotizacion-empresa` directamente
-- **THEN** el sistema presenta una página pública con navegación, contexto de la cotización, formulario y pie de página consistentes con Vista Valle
+## MODIFIED Requirements
 
 ### Requirement: Verificación de disponibilidad previa al formulario
 El sistema SHALL solicitar primero la fecha de entrada, la fecha de salida y la cantidad total de personas, SHALL resolver la disponibilidad real de habitaciones para ese rango antes de habilitar la selección de habitaciones, y SHALL informar siempre la cantidad de habitaciones disponibles y la capacidad total que representan, sin importar si la disponibilidad es total, parcial o nula.
@@ -87,36 +66,6 @@ El sistema SHALL permitir indicar la cantidad total de personas y, para cada tip
 - **WHEN** una solicitud indica cantidades de personas por habitación negativas, fraccionarias o no válidas (por ejemplo, enviadas directamente a la API sin pasar por el control de asignación)
 - **THEN** el sistema marca el campo correspondiente y no calcula ni envía una cotización válida
 
-### Requirement: Selector de estacionamiento
-El sistema SHALL solicitar en el formulario de datos de empresa si la empresa requiere estacionamiento mediante un selector booleano Sí/No, sin aceptar texto libre, SHALL exigir una respuesta explícita antes de enviar la cotización, y SHALL persistir la respuesta en la cotización.
-
-#### Scenario: Selección de estacionamiento
-- **WHEN** el visitante completa el formulario de datos de empresa
-- **THEN** el sistema presenta un selector Sí/No para "¿Requiere estacionamiento?" en lugar de un campo de texto libre
-
-#### Scenario: Estacionamiento sin responder
-- **WHEN** el visitante intenta enviar la cotización sin seleccionar una opción de estacionamiento
-- **THEN** el sistema marca el campo como obligatorio y no envía la cotización
-
-#### Scenario: Persistencia de la respuesta
-- **WHEN** la cotización se guarda correctamente
-- **THEN** el sistema conserva si la empresa requiere estacionamiento como parte de la cotización registrada
-
-### Requirement: Selector y detalle de desayunos
-El sistema SHALL ofrecer en el formulario un selector booleano "¿Desea desayunos?" con valor por defecto "No". Cuando el visitante seleccione "No", el resto del flujo SHALL continuar sin cambios y el sistema SHALL registrar la solicitud de desayuno como no solicitada. Cuando el visitante seleccione "Sí", el sistema SHALL mostrar un bloque con la descripción vigente de lo que incluye el desayuno, su precio unitario en CLP y un campo numérico obligatorio para indicar la cantidad de desayunos deseados por noche, ambos obtenidos del catálogo de desayuno administrable.
-
-#### Scenario: Desayuno no solicitado
-- **WHEN** el visitante deja o selecciona "No" en "¿Desea desayunos?"
-- **THEN** el sistema no muestra el bloque de detalle de desayuno y registra la cotización sin desayuno
-
-#### Scenario: Desayuno solicitado
-- **WHEN** el visitante selecciona "Sí" en "¿Desea desayunos?"
-- **THEN** el sistema despliega la descripción vigente del desayuno, su precio unitario en CLP y un campo numérico para la cantidad deseada por noche
-
-#### Scenario: Cantidad de desayunos inválida
-- **WHEN** el visitante selecciona "Sí" pero indica una cantidad de desayunos por noche ausente, cero, negativa o fraccionaria
-- **THEN** el sistema marca el campo como obligatorio y no envía la cotización
-
 ### Requirement: Cálculo autoritativo de cotización
 El sistema SHALL calcular noches, precio por noche, subtotales y total en el servidor usando habitaciones activas, precios y capacidades autorizados, SHALL conservar el detalle calculado como snapshot de la cotización, y SHALL rechazar la solicitud si alguna línea de habitación excede su capacidad autorizada o si la suma de personas asignadas por habitación no es exactamente igual al total de personas de la solicitud.
 
@@ -143,36 +92,6 @@ El sistema SHALL calcular noches, precio por noche, subtotales y total en el ser
 #### Scenario: Distribución de personas incompleta o excedida
 - **WHEN** la suma de personas asignadas por habitación en la solicitud es distinta al total de personas indicado
 - **THEN** el sistema rechaza la solicitud con un error específico y no genera una cotización parcial
-
-### Requirement: Cálculo y snapshot del desayuno en la cotización
-El sistema SHALL calcular, en el servidor, el subtotal del desayuno como la cantidad solicitada por noche multiplicada por el precio unitario vigente del catálogo de desayuno y por la cantidad de noches de la cotización, SHALL sumar ese subtotal al total de la cotización cuando el desayuno fue solicitado, y SHALL conservar como snapshot la cantidad por noche, el precio unitario y el subtotal del desayuno usados en el cálculo, de forma que cambios posteriores en el precio del catálogo no alteren cotizaciones ya guardadas.
-
-#### Scenario: Total con desayuno incluido
-- **WHEN** una cotización válida solicita desayuno con una cantidad por noche determinada
-- **THEN** el sistema calcula el subtotal del desayuno como esa cantidad por el precio unitario vigente del catálogo por la cantidad de noches, y lo incluye en el total de la cotización
-
-#### Scenario: Total sin desayuno
-- **WHEN** una cotización válida no solicita desayuno
-- **THEN** el sistema calcula el total sin ningún monto de desayuno
-
-#### Scenario: Precio del catálogo cambia después de emitida la cotización
-- **WHEN** el precio del desayuno en el catálogo cambia después de que una cotización con desayuno fue guardada
-- **THEN** la cotización registrada conserva el precio unitario y el subtotal de desayuno con los que fue calculada originalmente
-
-### Requirement: Persistencia preparada para PostgreSQL
-El sistema SHALL guardar la solicitud, sus líneas, datos de contacto y snapshot de precios, capacidades, noches y total mediante un contrato de persistencia que permita usar PostgreSQL como fuente durable.
-
-#### Scenario: Creación de solicitud
-- **WHEN** la cotización supera las validaciones y el envío es aceptado
-- **THEN** el sistema registra una solicitud identificable con sus líneas de habitación y valores calculados
-
-#### Scenario: Reutilización posterior de datos
-- **WHEN** cambian posteriormente el nombre, capacidad o precio de una habitación
-- **THEN** la cotización registrada conserva los valores snapshot con los que fue calculada
-
-#### Scenario: Persistencia no disponible
-- **WHEN** el repositorio no puede guardar la solicitud
-- **THEN** el sistema no confirma la cotización como enviada y comunica un error recuperable sin exponer detalles internos
 
 ### Requirement: Correos de cotización
 El sistema SHALL generar un correo de confirmación para el cliente con el resumen y valores de la cotización y SHALL generar un correo operativo para Vista Valle con los datos necesarios para revisar la solicitud. Dado que toda cotización guardada cubre exactamente el total de personas solicitado, el sistema SHALL indicar al cliente que debe responder al mismo correo confirmando los días cotizados para que Vista Valle pueda generar la reserva.
@@ -205,55 +124,3 @@ El sistema SHALL generar un correo de confirmación para el cliente con el resum
 - **WHEN** una cotización se guarda correctamente
 - **THEN** ninguno de los dos correos menciona cobertura parcial, porque la validación de distribución de personas ya garantizó que la cotización cubre exactamente el total de personas solicitado
 
-### Requirement: Confirmación de envío mediante modal
-El sistema SHALL mostrar un modal de confirmación cuando la cotización se envíe exitosamente, SHALL omitir montos, habitaciones y cantidades en ese modal, SHALL mostrar en el modal un contador visible con los segundos restantes hasta el cierre automático, actualizado cada segundo, SHALL permitir cerrarlo mediante un botón, un clic fuera del modal o la tecla Escape, SHALL cerrarlo automáticamente cuando el contador llegue a cero, y SHALL redirigir a la página de inicio del sitio cada vez que el modal se cierre, sin importar el medio de cierre.
-
-#### Scenario: Envío exitoso
-- **WHEN** la cotización se envía exitosamente
-- **THEN** el sistema muestra un modal de confirmación indicando que la cotización fue enviada al correo del usuario, sin mostrar habitaciones, cantidades ni montos
-
-#### Scenario: Contador visible
-- **WHEN** el modal de confirmación está abierto
-- **THEN** el sistema muestra un contador que indica cuántos segundos faltan para el cierre automático y lo actualiza cada segundo hasta llegar a cero
-
-#### Scenario: Cierre mediante botón
-- **WHEN** el visitante activa el botón de cierre del modal
-- **THEN** el sistema cierra el modal y redirige a la página de inicio
-
-#### Scenario: Cierre mediante clic en el fondo
-- **WHEN** el visitante hace clic fuera del contenido del modal
-- **THEN** el sistema cierra el modal y redirige a la página de inicio
-
-#### Scenario: Cierre mediante tecla Escape
-- **WHEN** el visitante presiona Escape mientras el modal está abierto
-- **THEN** el sistema cierra el modal y redirige a la página de inicio
-
-#### Scenario: Cierre automático por temporizador
-- **WHEN** transcurren 5 segundos desde que se muestra el modal sin que el visitante lo cierre antes
-- **THEN** el sistema cierra el modal y redirige a la página de inicio
-
-### Requirement: Entrega idempotente y estados recuperables
-El sistema SHALL evitar correos duplicados para una misma solicitud y SHALL conservar estados de entrega, errores seguros y reintentos para fallos transitorios.
-
-#### Scenario: Reintento de la misma solicitud
-- **WHEN** una solicitud o evento de entrega se procesa más de una vez
-- **THEN** el sistema conserva una sola cotización y no duplica las notificaciones asociadas
-
-#### Scenario: Fallo transitorio de correo
-- **WHEN** el proveedor de correo devuelve un fallo transitorio
-- **THEN** el sistema registra un estado reintentable sin exponer datos personales en logs
-
-#### Scenario: Fallo permanente
-- **WHEN** el proveedor devuelve un fallo permanente o la plantilla no puede construirse con datos válidos
-- **THEN** el sistema marca la entrega como fallida, conserva la solicitud y muestra un estado recuperable al usuario
-
-### Requirement: Experiencia accesible y segura
-La página SHALL mantener labels visibles, validación asociada a campos, foco identificable, controles táctiles accesibles, resumen comprensible y protección de secretos y datos personales.
-
-#### Scenario: Operación con teclado
-- **WHEN** el visitante completa la solicitud sin ratón
-- **THEN** puede modificar fechas, personas, cantidades y enviar el formulario siguiendo un orden de foco visible
-
-#### Scenario: Datos sensibles
-- **WHEN** el sistema registra o reporta una solicitud
-- **THEN** mantiene las credenciales server-only y evita incluir correo, teléfono o mensaje completo en logs operativos
