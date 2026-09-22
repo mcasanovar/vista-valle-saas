@@ -18,7 +18,7 @@ const body = {
   guestCount: 1,
   message: "Mensaje",
   requireParking: false,
-  rooms: [{ quantity: 1, slug: "habitacion-valle-demo" }],
+  rooms: [{ guestCount: 1, quantity: 1, slug: "habitacion-valle-demo" }],
 };
 
 function request(overrides: Partial<typeof body> = {}, idempotencyKey = "x") {

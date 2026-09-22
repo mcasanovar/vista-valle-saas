@@ -4,7 +4,11 @@ import {
   type AvailabilityRepository,
   type LodgingInterval,
 } from "@/features/availability";
-import type { RoomReadModel, RoomReadSource } from "@/features/rooms";
+import type {
+  RoomOccupancyPrice,
+  RoomReadModel,
+  RoomReadSource,
+} from "@/features/rooms";
 import type {
   CompanyQuotationBreakfastCatalog,
   CompanyQuotationRoomSelection,
@@ -15,6 +19,7 @@ export type CompanyQuotationAvailableRoom = Readonly<{
   capacity: number;
   name: string;
   nightlyPriceClp: number;
+  occupancyPrices: readonly RoomOccupancyPrice[];
   slug: string;
 }>;
 
@@ -136,6 +141,7 @@ export async function resolveCompanyQuotationAvailability(
           capacity: representative!.capacity,
           name: representative!.name,
           nightlyPriceClp: representative!.nightlyPriceClp,
+          occupancyPrices: representative!.occupancyPrices,
           slug: representative!.slug,
         });
       })
@@ -163,8 +169,13 @@ export async function resolveCompanyQuotationAvailability(
     (sum, room) => sum + room.availableUnits,
     0
   );
+  // Capped at one unit per type: the quotation form never lets a visitor
+  // select more than one unit of the same room type (see
+  // "Máximo una unidad por tipo"), so the capacity actually achievable
+  // through the form is bounded by each type's own capacity, not by how
+  // many free units of it exist.
   const totalAvailableCapacity = rooms.reduce(
-    (sum, room) => sum + room.capacity * room.availableUnits,
+    (sum, room) => sum + room.capacity,
     0
   );
 

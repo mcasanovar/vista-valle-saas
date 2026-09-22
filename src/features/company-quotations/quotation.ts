@@ -3,9 +3,10 @@ import {
   type LodgingInterval,
   nights,
 } from "@/features/availability";
-import type { RoomReadModel } from "@/features/rooms";
+import { resolveRoomNightlyPrice, type RoomReadModel } from "@/features/rooms";
 
 export type CompanyQuotationRoomSelection = Readonly<{
+  guestCount: number;
   quantity: number;
   slug: string;
 }>;
@@ -32,6 +33,7 @@ export type CompanyQuotationInput = Readonly<{
 
 export type CompanyQuotationLine = Readonly<{
   capacity: number;
+  guestCount: number;
   name: string;
   nightlyPriceClp: number;
   nights: number;
@@ -110,6 +112,10 @@ export function normalizeCompanyQuotationInput(
   const issues: CompanyQuotationIssue[] = [];
   const rooms = Array.isArray(candidate.rooms)
     ? candidate.rooms.map((room) => ({
+        guestCount:
+          typeof room === "object" && room !== null
+            ? (room as Record<string, unknown>).guestCount
+            : undefined,
         quantity:
           typeof room === "object" && room !== null
             ? (room as Record<string, unknown>).quantity
@@ -180,6 +186,12 @@ export function normalizeCompanyQuotationInput(
         message: "Indique una cantidad válida de habitaciones.",
       });
     }
+    if (!positiveInteger(room.guestCount)) {
+      issues.push({
+        field: `rooms.${index}.guestCount`,
+        message: "Indique una cantidad válida de personas para esta habitación.",
+      });
+    }
   });
   if (issues.length)
     throw new CompanyQuotationInputError(Object.freeze(issues));
@@ -227,15 +239,39 @@ export function calculateCompanyQuotation(
   const lines = input.rooms.map((selection) => {
     const room = roomBySlug.get(selection.slug);
     if (!room) throw new CompanyQuotationRoomError(selection.slug);
-    const subtotalClp = selection.quantity * room.nightlyPriceClp * stayNights;
+    if (selection.guestCount > selection.quantity * room.capacity) {
+      throw new CompanyQuotationInputError([
+        {
+          field: "rooms",
+          message:
+            "La cantidad de personas asignada a una habitación excede su capacidad.",
+        },
+      ]);
+    }
+    // Occupancy-based pricing (see `room-occupancy-pricing` spec) only
+    // resolves a price for a single unit's guest count. A multi-unit line
+    // (quantity > 1, never produced by the quotation form itself, only by
+    // direct API use - see design.md decision in
+    // add-company-quotation-occupancy-validation) has no per-unit
+    // breakdown to resolve against, so it keeps the room's flat price.
+    const nightlyPriceClp =
+      selection.quantity === 1
+        ? resolveRoomNightlyPrice(
+            room,
+            room.occupancyPrices,
+            selection.guestCount
+          )
+        : room.nightlyPriceClp;
+    const subtotalClp = selection.quantity * nightlyPriceClp * stayNights;
     if (!Number.isSafeInteger(subtotalClp))
       throw new CompanyQuotationInputError([
         { field: "rooms", message: "El total calculado no es válido." },
       ]);
     return Object.freeze({
       capacity: room.capacity,
+      guestCount: selection.guestCount,
       name: room.name,
-      nightlyPriceClp: room.nightlyPriceClp,
+      nightlyPriceClp,
       nights: stayNights,
       quantity: selection.quantity,
       slug: room.slug,
@@ -246,6 +282,16 @@ export function calculateCompanyQuotation(
     (sum, line) => sum + line.capacity * line.quantity,
     0
   );
+  const assignedGuests = lines.reduce((sum, line) => sum + line.guestCount, 0);
+  if (assignedGuests !== input.guestCount) {
+    throw new CompanyQuotationInputError([
+      {
+        field: "rooms",
+        message:
+          "La suma de personas asignadas por habitación debe ser igual al total de personas.",
+      },
+    ]);
+  }
 
   if (input.breakfastRequested && !breakfastCatalog) {
     throw new CompanyQuotationInputError([
@@ -256,7 +302,9 @@ export function calculateCompanyQuotation(
     ]);
   }
   const breakfastSubtotalClp = input.breakfastRequested
-    ? (input.breakfastQuantity as number) * breakfastCatalog!.unitPriceClp
+    ? (input.breakfastQuantity as number) *
+      breakfastCatalog!.unitPriceClp *
+      stayNights
     : 0;
   if (!Number.isSafeInteger(breakfastSubtotalClp))
     throw new CompanyQuotationInputError([

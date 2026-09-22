@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   calculateCompanyQuotation,
+  CompanyQuotationInputError,
   createMockCompanyQuotationRepository,
   normalizeCompanyQuotationInput,
 } from "@/features/company-quotations";
@@ -36,7 +37,7 @@ describe("company quotation notifications", () => {
         message: "Mensaje",
         breakfastRequested: false,
         requireParking: true,
-        rooms: [{ quantity: 2, slug: "habitacion-valle-demo" }],
+        rooms: [{ guestCount: 2, quantity: 2, slug: "habitacion-valle-demo" }],
       }),
       mockDemoRooms
     );
@@ -64,7 +65,7 @@ describe("company quotation notifications", () => {
     expect(text).not.toContain("Tu reserva está confirmada");
   });
 
-  it("keeps the complete operational snapshot and partial coverage in both quotation emails", async () => {
+  it("keeps the complete operational snapshot in both quotation emails without any partial-coverage mention", async () => {
     const quotation = calculateCompanyQuotation(
       normalizeCompanyQuotationInput({
         checkIn: "2026-10-05",
@@ -72,11 +73,11 @@ describe("company quotation notifications", () => {
         company: "Empresa demo",
         contact: "Ana Pérez",
         email: "ana@example.com",
-        guestCount: 5,
+        guestCount: 2,
         message: "Mensaje privado",
         breakfastRequested: false,
         requireParking: true,
-        rooms: [{ quantity: 2, slug: "habitacion-valle-demo" }],
+        rooms: [{ guestCount: 2, quantity: 2, slug: "habitacion-valle-demo" }],
       }),
       mockDemoRooms
     );
@@ -93,10 +94,7 @@ describe("company quotation notifications", () => {
     expect(textContent(admin)).toContain("Mensaje privado");
     expect(textContent(admin)).toContain("CLP 330.000");
     for (const html of [customer, admin]) {
-      expect(textContent(html)).toContain("Cobertura parcial:");
-      expect(textContent(html)).toContain(
-        "esta cotización cubre a 2 de las 5 personas solicitadas."
-      );
+      expect(textContent(html)).not.toContain("Cobertura parcial");
       expect(textContent(html)).not.toContain("Tu reserva está confirmada");
     }
   });
@@ -114,7 +112,7 @@ describe("company quotation notifications", () => {
         guestCount: 2,
         message: "Mensaje",
         requireParking: false,
-        rooms: [{ quantity: 2, slug: "habitacion-valle-demo" }],
+        rooms: [{ guestCount: 2, quantity: 2, slug: "habitacion-valle-demo" }],
       }),
       mockDemoRooms,
       { description: "Desayuno demo", unitPriceClp: 8000 }
@@ -128,7 +126,7 @@ describe("company quotation notifications", () => {
 
     for (const html of [customer, admin]) {
       expect(textContent(html)).toContain("3 × Desayuno");
-      expect(textContent(html)).toContain("CLP 24.000");
+      expect(textContent(html)).toContain("CLP 72.000");
     }
   });
 
@@ -144,7 +142,7 @@ describe("company quotation notifications", () => {
         guestCount: 2,
         message: "Mensaje",
         requireParking: false,
-        rooms: [{ quantity: 2, slug: "habitacion-valle-demo" }],
+        rooms: [{ guestCount: 2, quantity: 2, slug: "habitacion-valle-demo" }],
       }),
       mockDemoRooms
     );
@@ -169,7 +167,7 @@ describe("company quotation notifications", () => {
         message: "Mensaje privado",
         breakfastRequested: false,
         requireParking: true,
-        rooms: [{ quantity: 2, slug: "habitacion-valle-demo" }],
+        rooms: [{ guestCount: 2, quantity: 2, slug: "habitacion-valle-demo" }],
       }),
       mockDemoRooms
     );
@@ -223,49 +221,22 @@ describe("company quotation notifications", () => {
     ).toBe(true);
   });
 
-  it("declares partial coverage in both emails when capacity falls short of guests", async () => {
-    const quotation = calculateCompanyQuotation(
-      normalizeCompanyQuotationInput({
-        checkIn: "2026-10-05",
-        checkOut: "2026-10-08",
-        company: "Empresa demo",
-        contact: "Ana Pérez",
-        email: "ana@example.com",
-        guestCount: 5,
-        message: "Mensaje privado",
-        breakfastRequested: false,
-        requireParking: true,
-        rooms: [{ quantity: 2, slug: "habitacion-valle-demo" }],
-      }),
-      mockDemoRooms
-    );
-    const quotationRepository = createMockCompanyQuotationRepository();
-    const record = await quotationRepository.create(
-      quotation,
-      "notification-quote-partial"
-    );
-    const outbox = createMockNotificationOutbox();
-    await outbox.writeCompanyQuotationRequested(undefined, {
-      quotation: record,
+  it("never builds a quotation whose assigned guests fall short of the requested total, so no partial-coverage email can ever be generated", () => {
+    const input = normalizeCompanyQuotationInput({
+      checkIn: "2026-10-05",
+      checkOut: "2026-10-08",
+      company: "Empresa demo",
+      contact: "Ana Pérez",
+      email: "ana@example.com",
+      guestCount: 5,
+      message: "Mensaje privado",
+      breakfastRequested: false,
+      requireParking: true,
+      rooms: [{ guestCount: 2, quantity: 2, slug: "habitacion-valle-demo" }],
     });
 
-    const adapter = createMockResendEmailAdapter();
-    const worker = createNotificationDeliveryWorker(outbox, adapter, {
-      getReservationEmailData: async () => null,
-      getCompanyQuotationEmailData: async (id) =>
-        quotationRepository.getById(id),
-    });
-    await worker.processReady();
-
-    const delivered = adapter.listDelivered();
-    expect(delivered).toHaveLength(2);
-    expect(
-      delivered.every((email) => email.html.includes("Cobertura parcial"))
-    ).toBe(true);
-    expect(
-      delivered.every((email) =>
-        email.html.includes("cubre a 2 de las 5 personas")
-      )
-    ).toBe(true);
+    expect(() => calculateCompanyQuotation(input, mockDemoRooms)).toThrow(
+      CompanyQuotationInputError
+    );
   });
 });

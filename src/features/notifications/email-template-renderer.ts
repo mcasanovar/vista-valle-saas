@@ -81,11 +81,6 @@ export function renderPaymentCollectedAdminEmail(reservationId: string) {
   );
 }
 
-function quotationCoverageNotice(data: CompanyQuotationEmailData) {
-  if (data.capacity >= data.guestCount) return "";
-  return `<tr><td style="padding:16px 24px;background:#fff4e5;color:#6b3f12;font:14px/1.5 Arial,sans-serif"><strong>Cobertura parcial:</strong> esta cotización cubre a ${escapeHtml(data.capacity)} de las ${escapeHtml(data.guestCount)} personas solicitadas.</td></tr>`;
-}
-
 function quotationLines(data: CompanyQuotationEmailData) {
   return data.lines
     .map(
@@ -97,7 +92,7 @@ function quotationLines(data: CompanyQuotationEmailData) {
 
 function quotationBreakfastRow(data: CompanyQuotationEmailData) {
   if (!data.breakfastRequested) return "";
-  return `<tr><td style="padding:12px;border-bottom:1px solid #e7dfd5;font:14px Arial,sans-serif">${escapeHtml(data.breakfastQuantity ?? 0)} × Desayuno</td><td style="padding:12px;border-bottom:1px solid #e7dfd5;text-align:right;font:14px Arial,sans-serif">${escapeHtml(formatClp(data.breakfastUnitPriceClp ?? 0))}</td><td style="padding:12px;border-bottom:1px solid #e7dfd5;text-align:right;font:14px Arial,sans-serif">${escapeHtml(formatClp(data.breakfastSubtotalClp))}</td></tr>`;
+  return `<tr><td style="padding:12px;border-bottom:1px solid #e7dfd5;font:14px Arial,sans-serif">${escapeHtml(data.breakfastQuantity ?? 0)} × Desayuno × ${escapeHtml(data.nights)} ${data.nights === 1 ? "noche" : "noches"}</td><td style="padding:12px;border-bottom:1px solid #e7dfd5;text-align:right;font:14px Arial,sans-serif">${escapeHtml(formatClp(data.breakfastUnitPriceClp ?? 0))}</td><td style="padding:12px;border-bottom:1px solid #e7dfd5;text-align:right;font:14px Arial,sans-serif">${escapeHtml(formatClp(data.breakfastSubtotalClp))}</td></tr>`;
 }
 
 function quotationLogoUrl() {
@@ -138,7 +133,7 @@ export function renderCompanyQuotationCustomerEmail(
 ) {
   return quotationShell(
     "Tu cotización para empresas",
-    `<tr><td style="padding:8px 24px 16px;color:#3f352d;font:15px/1.55 Arial,sans-serif">Hola ${escapeHtml(data.contact)}, hemos preparado el resumen de alojamiento solicitado.</td></tr>${quotationStaySummary(data)}${quotationCoverageNotice(data)}${quotationParkingNotice(data)}${quotationPriceTable(data)}<tr><td style="padding:18px 24px;background:#fff4e5;border-top:4px solid #9a6b22;color:#4a3013;font:15px/1.55 Arial,sans-serif"><strong>IMPORTANTE:</strong> responde a este mismo correo confirmando los días cotizados para que podamos generar la reserva. Esta cotización no crea una reserva automáticamente.</td></tr><tr><td style="padding:20px 24px 28px;color:#665b52;font:13px/1.5 Arial,sans-serif">Este documento es una cotización de alojamiento y no confirma una reserva.</td></tr>`
+    `<tr><td style="padding:8px 24px 16px;color:#3f352d;font:15px/1.55 Arial,sans-serif">Hola ${escapeHtml(data.contact)}, hemos preparado el resumen de alojamiento solicitado.</td></tr>${quotationStaySummary(data)}${quotationParkingNotice(data)}${quotationPriceTable(data)}<tr><td style="padding:18px 24px;background:#fff4e5;border-top:4px solid #9a6b22;color:#4a3013;font:15px/1.55 Arial,sans-serif"><strong>IMPORTANTE:</strong> responde a este mismo correo confirmando los días cotizados para que podamos generar la reserva. Esta cotización no crea una reserva automáticamente.</td></tr><tr><td style="padding:20px 24px 28px;color:#665b52;font:13px/1.5 Arial,sans-serif">Este documento es una cotización de alojamiento y no confirma una reserva.</td></tr>`
   );
 }
 
@@ -147,6 +142,6 @@ export function renderCompanyQuotationAdminEmail(
 ) {
   return quotationShell(
     "Nueva cotización empresarial",
-    `<tr><td style="padding:8px 24px 16px;color:#3f352d;font:15px/1.55 Arial,sans-serif">Revisa los datos y confirma operativamente los días antes de generar una reserva.</td></tr><tr><td style="padding:8px 24px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f5f1eb"><tr><td style="padding:12px;font:14px Arial,sans-serif"><strong>Empresa</strong><br />${escapeHtml(data.company)}</td><td style="padding:12px;font:14px Arial,sans-serif"><strong>Contacto</strong><br />${escapeHtml(data.contact)}</td></tr><tr><td style="padding:12px;font:14px Arial,sans-serif"><strong>Correo</strong><br />${escapeHtml(data.email)}</td><td style="padding:12px;font:14px Arial,sans-serif"><strong>Teléfono</strong><br />${escapeHtml(data.phone || "No informado")}</td></tr></table></td></tr>${quotationStaySummary(data)}${quotationCoverageNotice(data)}<tr><td style="padding:8px 24px;color:#211c18;font:14px/1.55 Arial,sans-serif"><strong>Estacionamiento:</strong> ${data.requireParking ? "Sí" : "No"}</td></tr><tr><td style="padding:8px 24px 16px;color:#211c18;font:14px/1.55 Arial,sans-serif"><strong>Mensaje:</strong><br />${escapeHtml(data.message)}</td></tr>${quotationPriceTable(data)}<tr><td style="padding:20px 24px 28px;color:#665b52;font:13px/1.5 Arial,sans-serif">Esta cotización no es una reserva confirmada.</td></tr>`
+    `<tr><td style="padding:8px 24px 16px;color:#3f352d;font:15px/1.55 Arial,sans-serif">Revisa los datos y confirma operativamente los días antes de generar una reserva.</td></tr><tr><td style="padding:8px 24px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f5f1eb"><tr><td style="padding:12px;font:14px Arial,sans-serif"><strong>Empresa</strong><br />${escapeHtml(data.company)}</td><td style="padding:12px;font:14px Arial,sans-serif"><strong>Contacto</strong><br />${escapeHtml(data.contact)}</td></tr><tr><td style="padding:12px;font:14px Arial,sans-serif"><strong>Correo</strong><br />${escapeHtml(data.email)}</td><td style="padding:12px;font:14px Arial,sans-serif"><strong>Teléfono</strong><br />${escapeHtml(data.phone || "No informado")}</td></tr></table></td></tr>${quotationStaySummary(data)}<tr><td style="padding:8px 24px;color:#211c18;font:14px/1.55 Arial,sans-serif"><strong>Estacionamiento:</strong> ${data.requireParking ? "Sí" : "No"}</td></tr><tr><td style="padding:8px 24px 16px;color:#211c18;font:14px/1.55 Arial,sans-serif"><strong>Mensaje:</strong><br />${escapeHtml(data.message)}</td></tr>${quotationPriceTable(data)}<tr><td style="padding:20px 24px 28px;color:#665b52;font:13px/1.5 Arial,sans-serif">Esta cotización no es una reserva confirmada.</td></tr>`
   );
 }

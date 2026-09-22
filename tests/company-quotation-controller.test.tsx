@@ -104,6 +104,7 @@ describe("CompanyQuotationController", () => {
           capacity: 2,
           name: "Habitación Doble",
           nightlyPriceClp: 70000,
+          occupancyPrices: [],
           slug: "doble",
         },
       ],
@@ -147,6 +148,7 @@ describe("CompanyQuotationController", () => {
           capacity: 1,
           name: "Habitación Individual",
           nightlyPriceClp: 55000,
+          occupancyPrices: [],
           slug: "individual",
         },
       ],
@@ -193,6 +195,7 @@ describe("CompanyQuotationController", () => {
           capacity: 2,
           name: "Habitación Doble",
           nightlyPriceClp: 70000,
+          occupancyPrices: [],
           slug: "doble",
         },
       ],
@@ -230,7 +233,7 @@ describe("CompanyQuotationController", () => {
     ).toBeInTheDocument();
   });
 
-  it("informs partial insufficient availability, the shortfall, and still shows the form", async () => {
+  it("informs partial insufficient availability, the shortfall, and hides the form", async () => {
     mockFetchOnce({
       checkIn: "2026-10-05",
       checkOut: "2026-10-08",
@@ -242,6 +245,7 @@ describe("CompanyQuotationController", () => {
           capacity: 1,
           name: "Habitación Individual",
           nightlyPriceClp: 55000,
+          occupancyPrices: [],
           slug: "individual",
         },
       ],
@@ -268,10 +272,10 @@ describe("CompanyQuotationController", () => {
 
     expect(await screen.findByText(/Faltan 4 personas/)).toBeVisible();
     expect(
-      screen.getByRole("form", {
+      screen.queryByRole("form", {
         name: "Formulario de cotización para empresas",
       })
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
   });
 
   it("informs zero availability and hides the quotation form", async () => {
@@ -324,6 +328,7 @@ describe("CompanyQuotationController", () => {
           capacity: 1,
           name: "Habitación Individual",
           nightlyPriceClp: 55000,
+          occupancyPrices: [],
           slug: "individual",
         },
       ],

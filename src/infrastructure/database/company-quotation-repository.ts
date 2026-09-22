@@ -43,6 +43,7 @@ async function withLines(
       lines.map((line) =>
         Object.freeze({
           capacity: line.capacitySnapshot,
+          guestCount: line.guestCount,
           name: line.roomNameSnapshot,
           nightlyPriceClp: line.nightlyPriceClpSnapshot,
           nights: line.nights,
@@ -106,6 +107,7 @@ async function insertQuotation(
   await transaction.insert(companyQuotationLines).values(
     quotation.lines.map((line) => ({
       capacitySnapshot: line.capacity,
+      guestCount: line.guestCount,
       nightlyPriceClpSnapshot: line.nightlyPriceClp,
       nights: line.nights,
       quantity: line.quantity,
@@ -194,6 +196,7 @@ export function createDrizzleCompanyQuotationRepository(
         await transaction.insert(companyQuotationLines).values(
           quotation.lines.map((line) => ({
             capacitySnapshot: line.capacity,
+            guestCount: line.guestCount,
             nightlyPriceClpSnapshot: line.nightlyPriceClp,
             nights: line.nights,
             quantity: line.quantity,

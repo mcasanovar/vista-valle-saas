@@ -7,6 +7,26 @@ import {
   publicApiResponseError,
   safePublicErrorMessage,
 } from "@/presentation/public-api-message";
+// Reuses the reservation flow's guest-distribution rules so the quotation
+// form enforces the exact same per-room capacity and total-guest blocking.
+// Imported from the deep module path (not the feature's public barrel)
+// because the barrel also re-exports server-only reservation modules, which
+// would otherwise get pulled into this client bundle.
+// eslint-disable-next-line architecture/feature-public-api, architecture/presentation-boundaries
+import {
+  computeGuestAllocation,
+  describeGuestAllocation,
+  isOccupancySelectable,
+} from "@/features/reservations/guest-allocation";
+// eslint-disable-next-line architecture/feature-public-api, architecture/presentation-boundaries
+import type { RoomOccupancySelection } from "@/features/reservations/room-selection-codec";
+// Resolves the same occupancy-based nightly price the server uses to
+// calculate the quotation, so the displayed price updates with the guest
+// count instead of staying frozen at the room's flat rate.
+// eslint-disable-next-line architecture/feature-public-api, architecture/presentation-boundaries
+import { resolveDisplayRoomNightlyPrice } from "@/features/rooms/occupancy-pricing";
+// eslint-disable-next-line architecture/feature-public-api, architecture/presentation-boundaries
+import type { RoomOccupancyPrice } from "@/features/rooms/read-model";
 import { CompanyQuotationConfirmationModal } from "./company-quotation-confirmation-modal";
 
 type AvailableRoomOption = Readonly<{
@@ -14,6 +34,7 @@ type AvailableRoomOption = Readonly<{
   capacity: number;
   name: string;
   nightlyPriceClp: number;
+  occupancyPrices: readonly RoomOccupancyPrice[];
   slug: string;
 }>;
 
@@ -52,6 +73,10 @@ function formatUnits(value: number) {
   return `${value} ${value === 1 ? "disponible" : "disponibles"}`;
 }
 
+function selectableOccupanciesUpTo(capacity: number) {
+  return Array.from({ length: Math.max(0, capacity) }, (_, index) => index + 1);
+}
+
 export function CompanyQuotationForm({
   breakfast,
   checkIn,
@@ -66,21 +91,25 @@ export function CompanyQuotationForm({
   rooms: readonly AvailableRoomOption[];
 }>) {
   const [values, setValues] = useState<FormValues>(initialValues);
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
+  const [guestCounts, setGuestCounts] = useState<Record<string, number>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<
     "idle" | "submitting" | "success" | "error"
   >("idle");
 
   const selectedRooms = useMemo(
-    () => rooms.filter((room) => (quantities[room.slug] ?? 0) > 0),
-    [quantities, rooms]
+    () => rooms.filter((room) => (guestCounts[room.slug] ?? 0) > 0),
+    [guestCounts, rooms]
   );
-  const capacity = selectedRooms.reduce(
-    (total, room) => total + room.capacity * (quantities[room.slug] ?? 0),
-    0
+  const selections: readonly RoomOccupancySelection[] = useMemo(
+    () =>
+      selectedRooms.map((room) => ({
+        guestCount: guestCounts[room.slug] ?? 0,
+        roomId: room.slug,
+      })),
+    [guestCounts, selectedRooms]
   );
-  const capacityShortfall = guestCount > capacity ? guestCount - capacity : 0;
+  const allocation = computeGuestAllocation(guestCount, selections);
 
   function update<K extends keyof FormValues>(field: K, value: FormValues[K]) {
     setValues((current) => ({ ...current, [field]: value }));
@@ -88,11 +117,24 @@ export function CompanyQuotationForm({
     setStatus("idle");
   }
 
-  function toggleRoom(slug: string) {
-    setQuantities((current) => ({
-      ...current,
-      [slug]: (current[slug] ?? 0) > 0 ? 0 : 1,
-    }));
+  function selectRoom(slug: string) {
+    setGuestCounts((current) => ({ ...current, [slug]: 1 }));
+    setErrors((current) => ({ ...current, rooms: "" }));
+    setStatus("idle");
+  }
+
+  function removeRoom(slug: string) {
+    setGuestCounts((current) => {
+      const next = { ...current };
+      delete next[slug];
+      return next;
+    });
+    setErrors((current) => ({ ...current, rooms: "" }));
+    setStatus("idle");
+  }
+
+  function setRoomGuestCount(slug: string, value: number) {
+    setGuestCounts((current) => ({ ...current, [slug]: value }));
     setErrors((current) => ({ ...current, rooms: "" }));
     setStatus("idle");
   }
@@ -105,8 +147,11 @@ export function CompanyQuotationForm({
     if (!values.contact) nextErrors.contact = "Este campo es obligatorio.";
     if (!/^\S+@\S+\.\S+$/.test(values.email))
       nextErrors.email = "Ingrese un correo válido.";
-    if (!selectedRooms.length)
+    if (!selectedRooms.length) {
       nextErrors.rooms = "Seleccione al menos una habitación.";
+    } else if (!allocation.isComplete) {
+      nextErrors.rooms = describeGuestAllocation(allocation);
+    }
     if (values.requireParking === undefined)
       nextErrors.requireParking = "Este campo es obligatorio.";
     const breakfastQuantity = Number(values.breakfastQuantity);
@@ -136,7 +181,8 @@ export function CompanyQuotationForm({
           checkOut,
           guestCount,
           rooms: selectedRooms.map((room) => ({
-            quantity: quantities[room.slug],
+            guestCount: guestCounts[room.slug],
+            quantity: 1,
             slug: room.slug,
           })),
         }),
@@ -214,7 +260,21 @@ export function CompanyQuotationForm({
             </div>
             <div className="grid gap-3 tablet:grid-cols-3">
               {rooms.map((room) => {
-                const selected = (quantities[room.slug] ?? 0) > 0;
+                const selectedGuestCount = guestCounts[room.slug] ?? 0;
+                const selected = selectedGuestCount > 0;
+                const canSelect = !selected && allocation.remainingGuests > 0;
+                const displayedPrice = selected
+                  ? resolveDisplayRoomNightlyPrice(
+                      room,
+                      room.occupancyPrices,
+                      selectedGuestCount
+                    )
+                  : room.occupancyPrices.length
+                    ? Math.min(
+                        room.nightlyPriceClp,
+                        ...room.occupancyPrices.map((entry) => entry.priceClp)
+                      )
+                    : room.nightlyPriceClp;
                 return (
                   <div
                     key={room.slug}
@@ -230,45 +290,91 @@ export function CompanyQuotationForm({
                       <p className="text-sm text-muted-foreground">
                         {formatUnits(room.availableUnits)}
                       </p>
-                      <Price amount={room.nightlyPriceClp} suffix="/ noche" />
+                      <Price amount={displayedPrice} suffix="/ noche" />
                     </div>
-                    <Button
-                      aria-pressed={selected}
-                      onClick={() => toggleRoom(room.slug)}
-                      type="button"
-                      variant={selected ? "primary" : "secondary"}
-                      className="w-full"
-                    >
-                      {selected ? "Seleccionado" : "Seleccionar"}
-                    </Button>
+                    {selected ? (
+                      <div className="space-y-2">
+                        <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                          Personas en esta habitación
+                        </span>
+                        <div
+                          role="group"
+                          aria-label={`Cantidad de personas para ${room.name}`}
+                          className="flex flex-wrap gap-1 rounded-full border border-border bg-muted p-1"
+                        >
+                          {selectableOccupanciesUpTo(room.capacity).map(
+                            (value) => {
+                              const active = guestCounts[room.slug] === value;
+                              const disabled =
+                                !active &&
+                                !isOccupancySelectable(
+                                  guestCount,
+                                  selections,
+                                  room.slug,
+                                  value
+                                );
+                              return (
+                                <button
+                                  key={value}
+                                  type="button"
+                                  aria-pressed={active}
+                                  disabled={disabled}
+                                  onClick={() =>
+                                    setRoomGuestCount(room.slug, value)
+                                  }
+                                  className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors ${
+                                    active
+                                      ? "bg-foreground text-background"
+                                      : "text-muted-foreground"
+                                  } disabled:cursor-not-allowed disabled:opacity-40`}
+                                >
+                                  {value}
+                                </button>
+                              );
+                            }
+                          )}
+                        </div>
+                        <Button
+                          onClick={() => removeRoom(room.slug)}
+                          type="button"
+                          variant="secondary"
+                          className="w-full"
+                        >
+                          Quitar habitación
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        aria-pressed={false}
+                        disabled={!canSelect}
+                        onClick={() => selectRoom(room.slug)}
+                        type="button"
+                        variant="secondary"
+                        className="w-full"
+                      >
+                        Seleccionar
+                      </Button>
+                    )}
                   </div>
                 );
               })}
             </div>
             <div
               aria-live="polite"
-                className={`vv-quotation-capacity rounded-md border p-4 ${capacityShortfall ? "border-destructive bg-destructive/10" : "border-border bg-muted"}`}
+              className={`vv-quotation-capacity rounded-md border p-4 ${allocation.isComplete ? "border-border bg-muted" : "border-destructive bg-destructive/10"}`}
             >
-              <p className="font-semibold">
-                Capacidad seleccionada: {formatCapacity(capacity)}
-              </p>
-              <p className="text-sm">
-                Personas a alojar: {formatCapacity(guestCount)}
-              </p>
-              {capacityShortfall ? (
+              <p className="font-semibold">{describeGuestAllocation(allocation)}</p>
+              {!allocation.isComplete ? (
                 <p
                   id="quotation-rooms-error"
                   role="alert"
                   className="mt-1 text-sm text-destructive"
                 >
-                  Faltan {formatCapacity(capacityShortfall)} de capacidad.
-                  Puedes enviar igualmente una cotización parcial.
+                  Debes asignar exactamente {formatCapacity(guestCount)} en
+                  las habitaciones seleccionadas antes de poder enviar la
+                  cotización.
                 </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  La capacidad se validará nuevamente al enviar.
-                </p>
-              )}
+              ) : null}
             </div>
             {errors.rooms ? (
               <p role="alert" className="text-body text-destructive">
@@ -432,7 +538,7 @@ export function CompanyQuotationForm({
                   <Price amount={breakfast.unitPriceClp} suffix="/ desayuno" />
                   <FormField
                     id="quotation-breakfast-quantity"
-                    label="Cantidad de desayunos"
+                    label="Desayunos por noche"
                     required
                     error={errors.breakfastQuantity}
                     inputProps={{
@@ -479,7 +585,7 @@ export function CompanyQuotationForm({
               </Feedback>
             ) : null}
             <Button
-              disabled={status === "submitting"}
+              disabled={status === "submitting" || !allocation.isComplete}
               loading={status === "submitting"}
               type="submit"
             >

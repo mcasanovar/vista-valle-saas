@@ -13,8 +13,8 @@ const body = {
   message: "Mensaje",
   requireParking: false,
   rooms: [
-    { quantity: 1, slug: "habitacion-valle-demo" },
-    { quantity: 1, slug: "habitacion-terra-demo" },
+    { guestCount: 1, quantity: 1, slug: "habitacion-valle-demo" },
+    { guestCount: 2, quantity: 1, slug: "habitacion-terra-demo" },
   ],
 };
 
@@ -41,13 +41,15 @@ describe("company quotation route", () => {
     expect(repeatedBody.id).toBe(firstBody.id);
   });
 
-  it("accepts and persists a partial quotation when capacity falls short of guests", async () => {
+  it("rejects a partial quotation when the assigned guests fall short of the requested total", async () => {
     const response = await POST(
       new Request("http://localhost/api/company-quotations", {
         body: JSON.stringify({
           ...body,
           guestCount: 3,
-          rooms: [{ quantity: 1, slug: "habitacion-valle-demo" }],
+          rooms: [
+            { guestCount: 1, quantity: 1, slug: "habitacion-valle-demo" },
+          ],
         }),
         headers: {
           "Content-Type": "application/json",
@@ -56,10 +58,7 @@ describe("company quotation route", () => {
         method: "POST",
       })
     );
-    const responseBody = (await response.json()) as Record<string, unknown>;
 
-    expect(response.status).toBe(201);
-    expect(responseBody.capacity).toBe(1);
-    expect(responseBody.guestCount).toBe(3);
+    expect(response.status).toBe(400);
   });
 });
