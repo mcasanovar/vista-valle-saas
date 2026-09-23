@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { Button, Feedback, Heading, Label, Text } from "@/presentation/atoms";
-import { FormField, Price } from "@/presentation/molecules";
+import { Button, Feedback, Heading, Icon, Label, Text } from "@/presentation/atoms";
+import { FormField, GuestAllocationMeter, Price } from "@/presentation/molecules";
 import {
   publicApiResponseError,
   safePublicErrorMessage,
@@ -17,6 +17,7 @@ import {
   computeGuestAllocation,
   describeGuestAllocation,
   isOccupancySelectable,
+  remainingGuestsExcludingRoom,
 } from "@/features/reservations/guest-allocation";
 // eslint-disable-next-line architecture/feature-public-api, architecture/presentation-boundaries
 import type { RoomOccupancySelection } from "@/features/reservations/room-selection-codec";
@@ -42,6 +43,8 @@ type BreakfastCatalog = Readonly<{
   description: string;
   unitPriceClp: number;
 }>;
+
+export type CompanyQuotationFormStep = "rooms" | "company";
 
 type FormValues = Readonly<{
   breakfastQuantity: string;
@@ -82,32 +85,38 @@ export function CompanyQuotationForm({
   checkIn,
   checkOut,
   guestCount,
+  onAdvanceStep,
   rooms,
+  step,
 }: Readonly<{
   breakfast: BreakfastCatalog | null;
   checkIn: string;
   checkOut: string;
   guestCount: number;
+  onAdvanceStep: () => void;
   rooms: readonly AvailableRoomOption[];
+  step: CompanyQuotationFormStep;
 }>) {
   const [values, setValues] = useState<FormValues>(initialValues);
-  const [guestCounts, setGuestCounts] = useState<Record<string, number>>({});
+  const [addedRooms, setAddedRooms] = useState<Record<string, number>>({});
+  const [pendingRoomSlug, setPendingRoomSlug] = useState<string | null>(null);
+  const [pendingGuestCount, setPendingGuestCount] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<
     "idle" | "submitting" | "success" | "error"
   >("idle");
 
   const selectedRooms = useMemo(
-    () => rooms.filter((room) => (guestCounts[room.slug] ?? 0) > 0),
-    [guestCounts, rooms]
+    () => rooms.filter((room) => (addedRooms[room.slug] ?? 0) > 0),
+    [addedRooms, rooms]
   );
   const selections: readonly RoomOccupancySelection[] = useMemo(
     () =>
       selectedRooms.map((room) => ({
-        guestCount: guestCounts[room.slug] ?? 0,
+        guestCount: addedRooms[room.slug] ?? 0,
         roomId: room.slug,
       })),
-    [guestCounts, selectedRooms]
+    [addedRooms, selectedRooms]
   );
   const allocation = computeGuestAllocation(guestCount, selections);
 
@@ -117,26 +126,35 @@ export function CompanyQuotationForm({
     setStatus("idle");
   }
 
-  function selectRoom(slug: string) {
-    setGuestCounts((current) => ({ ...current, [slug]: 1 }));
-    setErrors((current) => ({ ...current, rooms: "" }));
-    setStatus("idle");
+  function beginConfiguringRoom(room: AvailableRoomOption) {
+    const remaining = remainingGuestsExcludingRoom(
+      guestCount,
+      selections,
+      room.slug
+    );
+    setPendingRoomSlug(room.slug);
+    setPendingGuestCount(Math.min(room.capacity, Math.max(remaining, 1)));
+  }
+
+  function cancelPendingRoom() {
+    setPendingRoomSlug(null);
+  }
+
+  function confirmPendingRoom() {
+    if (!pendingRoomSlug) return;
+    setAddedRooms((current) => ({
+      ...current,
+      [pendingRoomSlug]: pendingGuestCount,
+    }));
+    setPendingRoomSlug(null);
   }
 
   function removeRoom(slug: string) {
-    setGuestCounts((current) => {
+    setAddedRooms((current) => {
       const next = { ...current };
       delete next[slug];
       return next;
     });
-    setErrors((current) => ({ ...current, rooms: "" }));
-    setStatus("idle");
-  }
-
-  function setRoomGuestCount(slug: string, value: number) {
-    setGuestCounts((current) => ({ ...current, [slug]: value }));
-    setErrors((current) => ({ ...current, rooms: "" }));
-    setStatus("idle");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -147,11 +165,6 @@ export function CompanyQuotationForm({
     if (!values.contact) nextErrors.contact = "Este campo es obligatorio.";
     if (!/^\S+@\S+\.\S+$/.test(values.email))
       nextErrors.email = "Ingrese un correo válido.";
-    if (!selectedRooms.length) {
-      nextErrors.rooms = "Seleccione al menos una habitación.";
-    } else if (!allocation.isComplete) {
-      nextErrors.rooms = describeGuestAllocation(allocation);
-    }
     if (values.requireParking === undefined)
       nextErrors.requireParking = "Este campo es obligatorio.";
     const breakfastQuantity = Number(values.breakfastQuantity);
@@ -181,7 +194,7 @@ export function CompanyQuotationForm({
           checkOut,
           guestCount,
           rooms: selectedRooms.map((room) => ({
-            guestCount: guestCounts[room.slug],
+            guestCount: addedRooms[room.slug],
             quantity: 1,
             slug: room.slug,
           })),
@@ -229,168 +242,173 @@ export function CompanyQuotationForm({
         onSubmit={submit}
         className="space-y-8"
       >
-        <section
-          aria-labelledby="quotation-stay-heading"
-          className="vv-quotation-panel space-y-5"
-        >
-          <div>
-            <h2
-              id="quotation-stay-heading"
-              className="font-heading text-title font-normal text-foreground"
-            >
-              Habitaciones disponibles
-            </h2>
-            <Text className="mt-2 text-muted-foreground">
-              Elige la combinación de habitaciones que necesitas para tus
-              fechas. Solo se muestran las habitaciones libres.
-            </Text>
-          </div>
-          <div
-            className="space-y-3"
-            aria-describedby={
-              errors.rooms ? "quotation-rooms-error" : undefined
-            }
+        {step === "rooms" ? (
+          <section
+            aria-labelledby="quotation-stay-heading"
+            className="vv-quotation-panel space-y-5"
           >
             <div>
-              <Heading level={3}>Habitaciones</Heading>
-              <Text className="mt-1 text-sm text-muted-foreground">
-                La capacidad máxima y las unidades disponibles se muestran antes
-                de seleccionar.
+              <h2
+                id="quotation-stay-heading"
+                className="font-heading text-title font-normal text-foreground"
+              >
+                Habitaciones disponibles
+              </h2>
+              <Text className="mt-2 text-muted-foreground">
+                Elige la combinación de habitaciones que necesitas para tus
+                fechas. Solo se muestran las habitaciones libres.
               </Text>
             </div>
-            <div className="grid gap-3 tablet:grid-cols-3">
-              {rooms.map((room) => {
-                const selectedGuestCount = guestCounts[room.slug] ?? 0;
-                const selected = selectedGuestCount > 0;
-                const canSelect = !selected && allocation.remainingGuests > 0;
-                const displayedPrice = selected
-                  ? resolveDisplayRoomNightlyPrice(
-                      room,
-                      room.occupancyPrices,
-                      selectedGuestCount
-                    )
-                  : room.occupancyPrices.length
-                    ? Math.min(
-                        room.nightlyPriceClp,
-                        ...room.occupancyPrices.map((entry) => entry.priceClp)
-                      )
-                    : room.nightlyPriceClp;
-                return (
-                  <div
-                    key={room.slug}
-                    className="vv-quotation-room-option space-y-3 rounded-lg border border-border p-4"
-                  >
-                    <div>
-                      <h4 className="font-heading text-lg text-foreground">
-                        {room.name}
-                      </h4>
-                      <p className="text-sm text-muted-foreground">
-                        Capacidad máxima: {formatCapacity(room.capacity)}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatUnits(room.availableUnits)}
-                      </p>
-                      <Price amount={displayedPrice} suffix="/ noche" />
-                    </div>
-                    {selected ? (
-                      <div className="space-y-2">
-                        <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-                          Personas en esta habitación
-                        </span>
-                        <div
-                          role="group"
-                          aria-label={`Cantidad de personas para ${room.name}`}
-                          className="flex flex-wrap gap-1 rounded-full border border-border bg-muted p-1"
-                        >
-                          {selectableOccupanciesUpTo(room.capacity).map(
-                            (value) => {
-                              const active = guestCounts[room.slug] === value;
-                              const disabled =
-                                !active &&
-                                !isOccupancySelectable(
-                                  guestCount,
-                                  selections,
-                                  room.slug,
-                                  value
+            <div className="space-y-3">
+              <Heading level={3}>Habitaciones</Heading>
+              <div className="grid gap-3 tablet:grid-cols-3">
+                {rooms.map((room) => {
+                  const addedCount = addedRooms[room.slug];
+                  const isAdded = addedCount !== undefined;
+                  const isPending = pendingRoomSlug === room.slug;
+                  const activeCount = isAdded
+                    ? addedCount
+                    : isPending
+                      ? pendingGuestCount
+                      : undefined;
+                  const canChoose =
+                    !isAdded &&
+                    pendingRoomSlug === null &&
+                    allocation.remainingGuests > 0;
+                  const displayedPrice =
+                    activeCount !== undefined
+                      ? resolveDisplayRoomNightlyPrice(
+                          room,
+                          room.occupancyPrices,
+                          activeCount
+                        )
+                      : room.occupancyPrices.length
+                        ? Math.min(
+                            room.nightlyPriceClp,
+                            ...room.occupancyPrices.map(
+                              (entry) => entry.priceClp
+                            )
+                          )
+                        : room.nightlyPriceClp;
+                  return (
+                    <div
+                      key={room.slug}
+                      className="vv-quotation-room-option space-y-3 rounded-lg border border-border p-4"
+                    >
+                      <div>
+                        <h4 className="font-heading text-lg text-foreground">
+                          {room.name}
+                        </h4>
+                        <p className="text-sm text-muted-foreground">
+                          Capacidad máxima: {formatCapacity(room.capacity)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatUnits(room.availableUnits)}
+                        </p>
+                        <Price amount={displayedPrice} suffix="/ noche" />
+                      </div>
+                      {isPending ? (
+                        <div className="space-y-2">
+                          <span className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                            Personas en esta habitación
+                          </span>
+                          <div
+                            role="group"
+                            aria-label={`Cantidad de personas para ${room.name}`}
+                            className="flex flex-wrap gap-1 rounded-full border border-border bg-muted p-1"
+                          >
+                            {selectableOccupanciesUpTo(room.capacity).map(
+                              (value) => {
+                                const active = pendingGuestCount === value;
+                                const disabled =
+                                  !active &&
+                                  !isOccupancySelectable(
+                                    guestCount,
+                                    selections,
+                                    room.slug,
+                                    value
+                                  );
+                                return (
+                                  <button
+                                    key={value}
+                                    type="button"
+                                    aria-pressed={active}
+                                    disabled={disabled}
+                                    onClick={() => setPendingGuestCount(value)}
+                                    className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors ${
+                                      active
+                                        ? "bg-foreground text-background"
+                                        : "text-muted-foreground"
+                                    } disabled:cursor-not-allowed disabled:opacity-40`}
+                                  >
+                                    {value}
+                                  </button>
                                 );
-                              return (
-                                <button
-                                  key={value}
-                                  type="button"
-                                  aria-pressed={active}
-                                  disabled={disabled}
-                                  onClick={() =>
-                                    setRoomGuestCount(room.slug, value)
-                                  }
-                                  className={`inline-flex min-h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-semibold transition-colors ${
-                                    active
-                                      ? "bg-foreground text-background"
-                                      : "text-muted-foreground"
-                                  } disabled:cursor-not-allowed disabled:opacity-40`}
-                                >
-                                  {value}
-                                </button>
-                              );
-                            }
-                          )}
+                              }
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={confirmPendingRoom}
+                              className="flex-1"
+                            >
+                              <Icon decorative name="Plus" className="size-4" />
+                              Agregar habitación
+                            </Button>
+                            <Button
+                              onClick={cancelPendingRoom}
+                              variant="secondary"
+                              className="flex-1"
+                            >
+                              Cancelar
+                            </Button>
+                          </div>
                         </div>
+                      ) : isAdded ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2">
+                            <Icon
+                              decorative
+                              name="Check"
+                              className="size-4 text-primary"
+                            />
+                            <Text className="text-foreground">
+                              {formatCapacity(addedCount)} asignadas
+                            </Text>
+                          </div>
+                          <Button
+                            onClick={() => removeRoom(room.slug)}
+                            variant="secondary"
+                            className="w-full"
+                          >
+                            Quitar
+                          </Button>
+                        </div>
+                      ) : (
                         <Button
-                          onClick={() => removeRoom(room.slug)}
-                          type="button"
+                          disabled={!canChoose}
+                          onClick={() => beginConfiguringRoom(room)}
                           variant="secondary"
                           className="w-full"
                         >
-                          Quitar habitación
+                          Elegir habitación
                         </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        aria-pressed={false}
-                        disabled={!canSelect}
-                        onClick={() => selectRoom(room.slug)}
-                        type="button"
-                        variant="secondary"
-                        className="w-full"
-                      >
-                        Seleccionar
-                      </Button>
-                    )}
-                  </div>
-                );
-              })}
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <GuestAllocationMeter
+                assigned={allocation.assignedGuests}
+                total={allocation.targetGuests}
+                label={describeGuestAllocation(allocation)}
+              />
             </div>
-            <div
-              aria-live="polite"
-              className={`vv-quotation-capacity rounded-md border p-4 ${allocation.isComplete ? "border-border bg-muted" : "border-destructive bg-destructive/10"}`}
-            >
-              <p className="font-semibold">{describeGuestAllocation(allocation)}</p>
-              {!allocation.isComplete ? (
-                <p
-                  id="quotation-rooms-error"
-                  role="alert"
-                  className="mt-1 text-sm text-destructive"
-                >
-                  Debes asignar exactamente {formatCapacity(guestCount)} en
-                  las habitaciones seleccionadas antes de poder enviar la
-                  cotización.
-                </p>
-              ) : null}
-            </div>
-            {errors.rooms ? (
-              <p role="alert" className="text-body text-destructive">
-                {errors.rooms}
-              </p>
-            ) : null}
-            {!selectedRooms.length ? (
-              <p className="text-sm text-foreground">
-                Selecciona una o más habitaciones para continuar con tu
-                cotización.
-              </p>
-            ) : null}
-          </div>
-        </section>
-
-        {selectedRooms.length ? (
+            <Button disabled={!allocation.isComplete} onClick={onAdvanceStep}>
+              Continuar
+            </Button>
+          </section>
+        ) : (
           <section
             aria-labelledby="quotation-contact-heading"
             className="vv-quotation-panel space-y-5"
@@ -473,7 +491,6 @@ export function CompanyQuotationForm({
                   id="quotation-parking-yes"
                   aria-pressed={values.requireParking === true}
                   onClick={() => update("requireParking", true)}
-                  type="button"
                   variant={
                     values.requireParking === true ? "primary" : "secondary"
                   }
@@ -483,7 +500,6 @@ export function CompanyQuotationForm({
                 <Button
                   aria-pressed={values.requireParking === false}
                   onClick={() => update("requireParking", false)}
-                  type="button"
                   variant={
                     values.requireParking === false ? "primary" : "secondary"
                   }
@@ -513,7 +529,6 @@ export function CompanyQuotationForm({
                   id="quotation-breakfast-yes"
                   aria-pressed={values.breakfastRequested}
                   onClick={() => update("breakfastRequested", true)}
-                  type="button"
                   variant={values.breakfastRequested ? "primary" : "secondary"}
                 >
                   Sí
@@ -524,7 +539,6 @@ export function CompanyQuotationForm({
                     update("breakfastRequested", false);
                     update("breakfastQuantity", "");
                   }}
-                  type="button"
                   variant={!values.breakfastRequested ? "primary" : "secondary"}
                 >
                   No
@@ -541,6 +555,7 @@ export function CompanyQuotationForm({
                     label="Desayunos por noche"
                     required
                     error={errors.breakfastQuantity}
+                    hint="Esta cantidad se multiplica por la cantidad de noches de tu estadía para calcular el total de desayunos."
                     inputProps={{
                       min: 1,
                       onChange: (event) =>
@@ -592,7 +607,7 @@ export function CompanyQuotationForm({
               Generar y enviar cotización
             </Button>
           </section>
-        ) : null}
+        )}
       </form>
       {status === "success" ? <CompanyQuotationConfirmationModal /> : null}
     </>

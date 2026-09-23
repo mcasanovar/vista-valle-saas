@@ -26,6 +26,36 @@ async function fillSearch(
   }
 }
 
+const oneIndividualRoomAvailable = {
+  checkIn: "2026-10-05",
+  checkOut: "2026-10-08",
+  coversGuestCount: true,
+  guestCount: 1,
+  rooms: [
+    {
+      availableUnits: 1,
+      capacity: 1,
+      name: "Habitación Individual",
+      nightlyPriceClp: 55000,
+      occupancyPrices: [],
+      slug: "individual",
+    },
+  ],
+  roomTypes: [
+    {
+      availableUnits: 1,
+      capacity: 1,
+      name: "Habitación Individual",
+      nightlyPriceClp: 55000,
+      slug: "individual",
+      totalUnits: 1,
+    },
+  ],
+  totalActiveRooms: 1,
+  totalAvailableCapacity: 1,
+  totalAvailableRooms: 1,
+};
+
 describe("CompanyQuotationController", () => {
   it("shows a safe Spanish recovery message when availability fails unexpectedly", async () => {
     vi.stubGlobal(
@@ -138,44 +168,17 @@ describe("CompanyQuotationController", () => {
 
   it("informs full availability and shows the quotation form when every room is free", async () => {
     mockFetchOnce({
-      checkIn: "2026-10-05",
-      checkOut: "2026-10-08",
-      coversGuestCount: true,
+      ...oneIndividualRoomAvailable,
       guestCount: 2,
-      rooms: [
-        {
-          availableUnits: 1,
-          capacity: 1,
-          name: "Habitación Individual",
-          nightlyPriceClp: 55000,
-          occupancyPrices: [],
-          slug: "individual",
-        },
-      ],
-      roomTypes: [
-        {
-          availableUnits: 1,
-          capacity: 1,
-          name: "Habitación Individual",
-          nightlyPriceClp: 55000,
-          slug: "individual",
-          totalUnits: 1,
-        },
-      ],
       totalActiveRooms: 1,
-      totalAvailableCapacity: 1,
-      totalAvailableRooms: 1,
     });
     const user = userEvent.setup();
     render(<CompanyQuotationController />);
-    await fillSearch(user);
+    await fillSearch(user, { guests: "2" });
     await user.click(
       screen.getByRole("button", { name: "Consultar disponibilidad" })
     );
 
-    expect(
-      await screen.findByText(/Todas las habitaciones están disponibles/)
-    ).toBeVisible();
     expect(
       screen.getByRole("form", {
         name: "Formulario de cotización para empresas",
@@ -183,54 +186,68 @@ describe("CompanyQuotationController", () => {
     ).toBeInTheDocument();
   });
 
-  it("informs partial but sufficient availability and still shows the form", async () => {
-    mockFetchOnce({
-      checkIn: "2026-10-05",
-      checkOut: "2026-10-08",
-      coversGuestCount: true,
-      guestCount: 2,
-      rooms: [
-        {
-          availableUnits: 1,
-          capacity: 2,
-          name: "Habitación Doble",
-          nightlyPriceClp: 70000,
-          occupancyPrices: [],
-          slug: "doble",
-        },
-      ],
-      roomTypes: [
-        {
-          availableUnits: 1,
-          capacity: 2,
-          name: "Habitación Doble",
-          nightlyPriceClp: 70000,
-          slug: "doble",
-          totalUnits: 1,
-        },
-      ],
-      totalActiveRooms: 3,
-      totalAvailableCapacity: 2,
-      totalAvailableRooms: 1,
-    });
+  it("hides the search panel once the rooms step is reached, and Atrás returns to it", async () => {
+    mockFetchOnce(oneIndividualRoomAvailable);
     const user = userEvent.setup();
     render(<CompanyQuotationController />);
-    await fillSearch(user);
+    await fillSearch(user, { guests: "1" });
     await user.click(
       screen.getByRole("button", { name: "Consultar disponibilidad" })
     );
+    await screen.findByRole("form", {
+      name: "Formulario de cotización para empresas",
+    });
 
     expect(
-      await screen.findByText(/Hay 1 habitación disponible/)
-    ).toBeVisible();
-    expect(
-      screen.queryByText(/Todas las habitaciones están disponibles/)
+      screen.queryByLabelText(/Fecha de entrada/)
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("form", {
+      screen.queryByRole("button", { name: "Editar fechas y personas" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Atrás" })).toBeVisible();
+
+    await user.click(screen.getByRole("button", { name: "Atrás" }));
+    expect(screen.getByLabelText(/Fecha de entrada/)).toHaveValue(
+      "2026-10-05"
+    );
+    expect(
+      screen.queryByRole("form", {
         name: "Formulario de cotización para empresas",
       })
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Atrás" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("returns from the company step to the rooms step via Atrás, without a room-specific edit button", async () => {
+    mockFetchOnce(oneIndividualRoomAvailable);
+    const user = userEvent.setup();
+    render(<CompanyQuotationController />);
+    await fillSearch(user, { guests: "1" });
+    await user.click(
+      screen.getByRole("button", { name: "Consultar disponibilidad" })
+    );
+    await screen.findByRole("form", {
+      name: "Formulario de cotización para empresas",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Elegir habitación" }));
+    await user.click(screen.getByRole("button", { name: "1" }));
+    await user.click(
+      screen.getByRole("button", { name: "Agregar habitación" })
+    );
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+    expect(screen.getByLabelText(/Empresa/)).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Editar habitaciones" })
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Atrás" }));
+    expect(
+      screen.getByRole("heading", { name: "Habitaciones disponibles" })
+    ).toBeVisible();
   });
 
   it("informs partial insufficient availability, the shortfall, and hides the form", async () => {
@@ -276,6 +293,8 @@ describe("CompanyQuotationController", () => {
         name: "Formulario de cotización para empresas",
       })
     ).not.toBeInTheDocument();
+    // Insufficient availability keeps the search panel visible (step 1).
+    expect(screen.getByLabelText(/Fecha de entrada/)).toBeVisible();
   });
 
   it("informs zero availability and hides the quotation form", async () => {
@@ -316,46 +335,54 @@ describe("CompanyQuotationController", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("replaces the previous result when the search is run again with different criteria", async () => {
-    mockFetchOnce({
-      checkIn: "2026-10-05",
-      checkOut: "2026-10-08",
-      coversGuestCount: true,
-      guestCount: 2,
-      rooms: [
-        {
-          availableUnits: 1,
-          capacity: 1,
-          name: "Habitación Individual",
-          nightlyPriceClp: 55000,
-          occupancyPrices: [],
-          slug: "individual",
-        },
-      ],
-      roomTypes: [
-        {
-          availableUnits: 1,
-          capacity: 1,
-          name: "Habitación Individual",
-          nightlyPriceClp: 55000,
-          slug: "individual",
-          totalUnits: 1,
-        },
-      ],
-      totalActiveRooms: 1,
-      totalAvailableCapacity: 1,
-      totalAvailableRooms: 1,
-    });
+  it("shows a persistent 3-step progress indicator that reflects the current step", async () => {
+    mockFetchOnce(oneIndividualRoomAvailable);
     const user = userEvent.setup();
     render(<CompanyQuotationController />);
-    await fillSearch(user);
+
+    const nav = screen.getByRole("navigation", {
+      name: "Progreso de la cotización",
+    });
+    expect(nav.querySelector('[aria-current="step"]')).toHaveTextContent(
+      "Fechas y personas"
+    );
+
+    await fillSearch(user, { guests: "1" });
     await user.click(
       screen.getByRole("button", { name: "Consultar disponibilidad" })
     );
-    expect(
-      await screen.findByText(/Todas las habitaciones están disponibles/)
-    ).toBeVisible();
+    await screen.findByRole("form", {
+      name: "Formulario de cotización para empresas",
+    });
+    expect(nav.querySelector('[aria-current="step"]')).toHaveTextContent(
+      "Habitaciones"
+    );
 
+    await user.click(screen.getByRole("button", { name: "Elegir habitación" }));
+    await user.click(screen.getByRole("button", { name: "1" }));
+    await user.click(
+      screen.getByRole("button", { name: "Agregar habitación" })
+    );
+    await user.click(screen.getByRole("button", { name: "Continuar" }));
+
+    expect(nav.querySelector('[aria-current="step"]')).toHaveTextContent(
+      "Datos de empresa y desayunos"
+    );
+  });
+
+  it("replaces the previous result when the search is run again with different criteria", async () => {
+    mockFetchOnce(oneIndividualRoomAvailable);
+    const user = userEvent.setup();
+    render(<CompanyQuotationController />);
+    await fillSearch(user, { guests: "1" });
+    await user.click(
+      screen.getByRole("button", { name: "Consultar disponibilidad" })
+    );
+    await screen.findByRole("form", {
+      name: "Formulario de cotización para empresas",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Atrás" }));
     mockFetchOnce({
       checkIn: "2026-11-01",
       checkOut: "2026-11-03",
@@ -380,6 +407,8 @@ describe("CompanyQuotationController", () => {
     await user.type(screen.getByLabelText(/Fecha de entrada/), "2026-11-01");
     await user.clear(screen.getByLabelText(/Fecha de salida/));
     await user.type(screen.getByLabelText(/Fecha de salida/), "2026-11-03");
+    await user.clear(screen.getByLabelText(/Personas a alojar/));
+    await user.type(screen.getByLabelText(/Personas a alojar/), "2");
     await user.click(
       screen.getByRole("button", { name: "Consultar disponibilidad" })
     );
@@ -388,7 +417,9 @@ describe("CompanyQuotationController", () => {
       await screen.findByText(/No hay habitaciones disponibles/)
     ).toBeVisible();
     expect(
-      screen.queryByText(/Todas las habitaciones están disponibles/)
+      screen.queryByRole("form", {
+        name: "Formulario de cotización para empresas",
+      })
     ).not.toBeInTheDocument();
   });
 });

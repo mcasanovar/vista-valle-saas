@@ -1,13 +1,16 @@
 "use client";
 
 import { useMemo, useState, type FormEvent } from "react";
-import { Button, Feedback, Text } from "@/presentation/atoms";
-import { DateField, FormField } from "@/presentation/molecules";
+import { Button, Feedback, Icon, Text } from "@/presentation/atoms";
+import { DateField, FormField, QuotationProgress } from "@/presentation/molecules";
 import {
   publicApiResponseError,
   safePublicErrorMessage,
 } from "@/presentation/public-api-message";
-import { CompanyQuotationForm } from "./company-quotation-form";
+import {
+  CompanyQuotationForm,
+  type CompanyQuotationFormStep,
+} from "./company-quotation-form";
 
 // Vista Valle's stay dates are always calendar days in this time zone,
 // regardless of the visitor's own device time zone (kept in sync with the
@@ -134,6 +137,12 @@ function formatAvailableRoomCount(value: number) {
   return `${value} ${value === 1 ? "habitación disponible" : "habitaciones disponibles"}`;
 }
 
+const QUOTATION_STEPS = [
+  "Fechas y personas",
+  "Habitaciones",
+  "Datos de empresa y desayunos",
+] as const;
+
 export function CompanyQuotationController() {
   const [values, setValues] = useState<SearchValues>(initialSearch);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -141,6 +150,9 @@ export function CompanyQuotationController() {
   const [availability, setAvailability] = useState<AvailabilityResult | null>(
     null
   );
+  const [viewingSearch, setViewingSearch] = useState(true);
+  const [formStep, setFormStep] =
+    useState<CompanyQuotationFormStep>("rooms");
 
   const dateMinimums = useMemo(() => {
     const checkIn = todayInLodgingTimeZone();
@@ -186,6 +198,7 @@ export function CompanyQuotationController() {
     setStatus("loading");
     setErrors({});
     setAvailability(null);
+    setFormStep("rooms");
     try {
       const search = new URLSearchParams({
         checkIn: values.checkIn,
@@ -206,6 +219,7 @@ export function CompanyQuotationController() {
       }
       setAvailability(body);
       setStatus("idle");
+      setViewingSearch(false);
     } catch (error) {
       setErrors({
         form: safePublicErrorMessage(
@@ -222,166 +236,210 @@ export function CompanyQuotationController() {
     availability.totalAvailableRooms === availability.totalActiveRooms &&
     availability.totalActiveRooms > 0;
 
+  const showsRoomForm =
+    availability !== null &&
+    availability.rooms.length > 0 &&
+    availability.coversGuestCount;
+  const showsSearchPanel = !showsRoomForm || viewingSearch;
+  const activeStepIndex = showsSearchPanel ? 0 : formStep === "rooms" ? 1 : 2;
+
+  function goBack() {
+    if (formStep === "company") {
+      setFormStep("rooms");
+    } else {
+      setViewingSearch(true);
+    }
+  }
+
   return (
     <div className="space-y-8">
-      <section
-        aria-labelledby="quotation-search-heading"
-        className="vv-quotation-panel space-y-5"
-      >
-        <div>
-          <h2
-            id="quotation-search-heading"
-            className="font-heading text-title font-normal text-foreground"
-          >
-            Fechas y personas
-          </h2>
-          <Text className="mt-2 text-muted-foreground">
-            Indica tus fechas y la cantidad de personas para revisar la
-            disponibilidad antes de cotizar.
-          </Text>
-        </div>
-        <form
-          aria-label="Consulta de disponibilidad para cotización"
-          noValidate
-          onSubmit={submit}
-          className="vv-quotation-search-form grid gap-5 tablet:grid-cols-4 tablet:items-end"
-        >
-          <DateField
-            id="quotation-search-check-in"
-            label="Fecha de entrada"
-            required
-            value={values.checkIn}
-            min={dateMinimums.checkIn}
-            onChange={(event) => update("checkIn", event.target.value)}
-            error={errors.checkIn}
-          />
-          <DateField
-            id="quotation-search-check-out"
-            label="Fecha de salida"
-            required
-            value={values.checkOut}
-            min={checkOutMin}
-            onChange={(event) => update("checkOut", event.target.value)}
-            error={errors.checkOut}
-          />
-          <FormField
-            id="quotation-search-guests"
-            label="Personas a alojar"
-            required
-            error={errors.guestCount}
-            inputProps={{
-              min: 1,
-              name: "guestCount",
-              onChange: (event) => update("guestCount", event.target.value),
-              type: "number",
-              value: values.guestCount,
-            }}
-          />
-          <Button
-            disabled={status === "loading"}
-            loading={status === "loading"}
-            type="submit"
-          >
-            Consultar disponibilidad
-          </Button>
-        </form>
-        {selectedNights ? (
-          <Text aria-live="polite" className="text-foreground">
-            Estás seleccionando {formatNights(selectedNights)}.
-          </Text>
-        ) : null}
-        {errors.form ? (
-          <Feedback variant="error" title="No pudimos consultar disponibilidad">
-            {errors.form}
-          </Feedback>
-        ) : null}
-      </section>
+      <QuotationProgress activeIndex={activeStepIndex} steps={QUOTATION_STEPS} />
 
-      {availability ? (
-        <section aria-live="polite" className="space-y-6">
-          <div
-            className={`vv-quotation-status rounded-lg border p-4 ${
-              availability.rooms.length === 0
-                ? "border-destructive bg-destructive/10"
-                : "border-accent/40 bg-accent/10"
-            }`}
-          >
-            {availability.rooms.length === 0 ? (
-              <p className="text-sm text-foreground">
-                No hay habitaciones disponibles para esas fechas. Revisa el
-                detalle abajo para ver qué habitaciones están ocupadas, o ajusta
-                las fechas y vuelve a consultar.
-              </p>
-            ) : (
-              <div className="space-y-1 text-sm text-foreground">
-                <p>
-                  {showsFullAvailability
-                    ? `Todas las habitaciones están disponibles para tus fechas: ${formatRoomCount(availability.totalAvailableRooms)}, con capacidad para ${formatCapacity(availability.totalAvailableCapacity)}.`
-                    : `Hay ${formatAvailableRoomCount(availability.totalAvailableRooms)} para tus fechas, con capacidad para ${formatCapacity(availability.totalAvailableCapacity)}.`}
-                </p>
-                {!availability.coversGuestCount ? (
-                  <p className="font-semibold text-destructive">
-                    Faltan{" "}
-                    {formatCapacity(
-                      availability.guestCount -
-                        availability.totalAvailableCapacity
-                    )}{" "}
-                    para alojar a las {formatCapacity(availability.guestCount)}{" "}
-                    solicitadas. Con lo disponible alcanzamos para{" "}
-                    {formatCapacity(availability.totalAvailableCapacity)}. No
-                    es posible generar una cotización para el total
-                    solicitado con esta disponibilidad; ajusta tu búsqueda.
-                  </p>
-                ) : null}
-              </div>
-            )}
-          </div>
-          <div className="space-y-2">
-            <Text className="font-semibold text-foreground">
-              Detalle por tipo de habitación
+      {activeStepIndex > 0 ? (
+        <Button onClick={goBack} variant="secondary">
+          <Icon decorative name="ArrowLeft" className="size-4" />
+          Atrás
+        </Button>
+      ) : null}
+
+      {showsSearchPanel ? (
+        <section
+          aria-labelledby="quotation-search-heading"
+          className="vv-quotation-panel space-y-5"
+        >
+          <div>
+            <h2
+              id="quotation-search-heading"
+              className="font-heading text-title font-normal text-foreground"
+            >
+              Fechas y personas
+            </h2>
+            <Text className="mt-2 text-muted-foreground">
+              Indica tus fechas y la cantidad de personas para revisar la
+              disponibilidad antes de cotizar.
             </Text>
-            <ul className="grid gap-2 tablet:grid-cols-3">
-              {availability.roomTypes.map((type) => {
-                const isAvailable = type.availableUnits > 0;
-                return (
-                  <li
-                    key={type.slug}
-                    className={`vv-quotation-room-type space-y-1 rounded-md border p-3 text-sm ${
-                      isAvailable
-                        ? "border-border bg-card"
-                        : "border-destructive/40 bg-destructive/5"
-                    }`}
-                  >
-                    <p className="font-semibold text-foreground">{type.name}</p>
-                    <p className="text-muted-foreground">
-                      Capacidad por habitación: {formatCapacity(type.capacity)}
-                    </p>
-                    <p
-                      className={
-                        isAvailable
-                          ? "font-semibold text-foreground"
-                          : "font-semibold text-destructive"
-                      }
-                    >
-                      {isAvailable
-                        ? `${type.availableUnits} de ${type.totalUnits} disponible${type.totalUnits === 1 ? "" : "s"}`
-                        : "No disponible en estas fechas"}
-                    </p>
-                  </li>
-                );
-              })}
-            </ul>
           </div>
-          {availability.rooms.length > 0 && availability.coversGuestCount ? (
-            <CompanyQuotationForm
-              breakfast={availability.breakfast}
-              checkIn={availability.checkIn}
-              checkOut={availability.checkOut}
-              guestCount={availability.guestCount}
-              rooms={availability.rooms}
+          <form
+            aria-label="Consulta de disponibilidad para cotización"
+            noValidate
+            onSubmit={submit}
+            className="vv-quotation-search-form grid gap-5 tablet:grid-cols-4 tablet:items-end"
+          >
+            <DateField
+              id="quotation-search-check-in"
+              label="Fecha de entrada"
+              required
+              value={values.checkIn}
+              min={dateMinimums.checkIn}
+              onChange={(event) => update("checkIn", event.target.value)}
+              error={errors.checkIn}
             />
+            <DateField
+              id="quotation-search-check-out"
+              label="Fecha de salida"
+              required
+              value={values.checkOut}
+              min={checkOutMin}
+              onChange={(event) => update("checkOut", event.target.value)}
+              error={errors.checkOut}
+            />
+            <FormField
+              id="quotation-search-guests"
+              label="Personas a alojar"
+              required
+              error={errors.guestCount}
+              inputProps={{
+                min: 1,
+                name: "guestCount",
+                onChange: (event) => update("guestCount", event.target.value),
+                type: "number",
+                value: values.guestCount,
+              }}
+            />
+            <Button
+              disabled={status === "loading"}
+              loading={status === "loading"}
+              type="submit"
+            >
+              Consultar disponibilidad
+            </Button>
+          </form>
+          {selectedNights ? (
+            <Text aria-live="polite" className="text-foreground">
+              Estás seleccionando {formatNights(selectedNights)}.
+            </Text>
+          ) : null}
+          {errors.form ? (
+            <Feedback variant="error" title="No pudimos consultar disponibilidad">
+              {errors.form}
+            </Feedback>
+          ) : null}
+
+          {availability ? (
+            <div aria-live="polite" className="space-y-6">
+              <div
+                className={`vv-quotation-status rounded-lg border p-4 ${
+                  availability.rooms.length === 0
+                    ? "border-destructive bg-destructive/10"
+                    : "border-accent/40 bg-accent/10"
+                }`}
+              >
+                {availability.rooms.length === 0 ? (
+                  <p className="text-sm text-foreground">
+                    No hay habitaciones disponibles para esas fechas. Revisa
+                    el detalle abajo para ver qué habitaciones están
+                    ocupadas, o ajusta las fechas y vuelve a consultar.
+                  </p>
+                ) : (
+                  <div className="space-y-1 text-sm text-foreground">
+                    <p>
+                      {showsFullAvailability
+                        ? `Todas las habitaciones están disponibles para tus fechas: ${formatRoomCount(availability.totalAvailableRooms)}, con capacidad para ${formatCapacity(availability.totalAvailableCapacity)}.`
+                        : `Hay ${formatAvailableRoomCount(availability.totalAvailableRooms)} para tus fechas, con capacidad para ${formatCapacity(availability.totalAvailableCapacity)}.`}
+                    </p>
+                    {!availability.coversGuestCount ? (
+                      <p className="font-semibold text-destructive">
+                        Faltan{" "}
+                        {formatCapacity(
+                          availability.guestCount -
+                            availability.totalAvailableCapacity
+                        )}{" "}
+                        para alojar a las{" "}
+                        {formatCapacity(availability.guestCount)} solicitadas.
+                        Con lo disponible alcanzamos para{" "}
+                        {formatCapacity(availability.totalAvailableCapacity)}.
+                        No es posible generar una cotización para el total
+                        solicitado con esta disponibilidad; ajusta tu
+                        búsqueda.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Text className="font-semibold text-foreground">
+                  Detalle por tipo de habitación
+                </Text>
+                <ul className="grid gap-2 tablet:grid-cols-3">
+                  {availability.roomTypes.map((type) => {
+                    const isAvailable = type.availableUnits > 0;
+                    return (
+                      <li
+                        key={type.slug}
+                        className={`vv-quotation-room-type space-y-1 rounded-md border p-3 text-sm ${
+                          isAvailable
+                            ? "border-border bg-card"
+                            : "border-destructive/40 bg-destructive/5"
+                        }`}
+                      >
+                        <p className="font-semibold text-foreground">
+                          {type.name}
+                        </p>
+                        <p className="text-muted-foreground">
+                          Capacidad por habitación:{" "}
+                          {formatCapacity(type.capacity)}
+                        </p>
+                        <p
+                          className={
+                            isAvailable
+                              ? "font-semibold text-foreground"
+                              : "font-semibold text-destructive"
+                          }
+                        >
+                          {isAvailable
+                            ? `${type.availableUnits} de ${type.totalUnits} disponible${type.totalUnits === 1 ? "" : "s"}`
+                            : "No disponible en estas fechas"}
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
           ) : null}
         </section>
+      ) : (
+        availability && (
+          <div className="vv-quotation-panel">
+            <Text className="text-foreground">
+              {formatNights(selectedNights ?? 0)} para{" "}
+              {formatCapacity(availability.guestCount)} · {availability.checkIn}{" "}
+              a {availability.checkOut}
+            </Text>
+          </div>
+        )
+      )}
+
+      {availability && showsRoomForm && !showsSearchPanel ? (
+        <CompanyQuotationForm
+          breakfast={availability.breakfast}
+          checkIn={availability.checkIn}
+          checkOut={availability.checkOut}
+          guestCount={availability.guestCount}
+          onAdvanceStep={() => setFormStep("company")}
+          rooms={availability.rooms}
+          step={formStep}
+        />
       ) : null}
     </div>
   );

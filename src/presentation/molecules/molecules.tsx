@@ -248,6 +248,94 @@ export function ChatMessageBubble({
   );
 }
 
+type QuotationStepStatus = "active" | "completed" | "upcoming";
+
+const quotationStepStyles: Record<QuotationStepStatus, string> = {
+  active: "border-primary bg-primary text-on-primary",
+  completed: "border-primary bg-card text-foreground",
+  upcoming: "border-border bg-muted text-muted-foreground",
+};
+
+/**
+ * Persistent progress indicator for the company quotation flow's four
+ * sections. The flow itself stays a single page with conditional sections
+ * (no step routing); this only reflects, never drives, which section is
+ * currently reachable given state the caller already tracks.
+ */
+export function QuotationProgress({
+  activeIndex,
+  steps,
+}: Readonly<{ activeIndex: number; steps: readonly string[] }>) {
+  return (
+    <nav
+      aria-label="Progreso de la cotización"
+      className="vv-quotation-progress"
+    >
+      <Text className="text-sm font-semibold text-foreground tablet:hidden">
+        Paso {activeIndex + 1} de {steps.length}: {steps[activeIndex]}
+      </Text>
+      <ol className="hidden flex-wrap items-center gap-2 tablet:flex">
+        {steps.map((label, index) => {
+          const status: QuotationStepStatus =
+            index === activeIndex
+              ? "active"
+              : index < activeIndex
+                ? "completed"
+                : "upcoming";
+          return (
+            <li key={label} className="flex items-center gap-2">
+              <span
+                aria-current={status === "active" ? "step" : undefined}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${quotationStepStyles[status]}`}
+              >
+                <span aria-hidden="true">{index + 1}</span>
+                <span>{label}</span>
+              </span>
+              {index < steps.length - 1 ? (
+                <span aria-hidden="true" className="h-px w-6 bg-border" />
+              ) : null}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/**
+ * Visual dot meter for guest-allocation progress: one dot per person in the
+ * quotation's total, filled as rooms are added. The sentence-form summary
+ * (e.g. "4 de 6 personas asignadas") stays available to assistive tech via
+ * `aria-label` on the live region instead of being the primary visible cue.
+ */
+export function GuestAllocationMeter({
+  assigned,
+  label,
+  total,
+}: Readonly<{ assigned: number; label: string; total: number }>) {
+  return (
+    <div
+      aria-atomic="true"
+      aria-label={label}
+      aria-live="polite"
+      className="flex flex-wrap items-center gap-1.5"
+      role="status"
+    >
+      {Array.from({ length: total }, (_, index) => (
+        <span
+          key={index}
+          aria-hidden="true"
+          className={`size-3.5 rounded-full border-2 ${
+            index < assigned
+              ? "border-primary bg-primary"
+              : "border-border bg-transparent"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function StatusPresentation({
   label,
   description,
