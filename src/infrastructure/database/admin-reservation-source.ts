@@ -49,7 +49,7 @@ export type AdminReservationListFilter = Readonly<{
   pageSize?: number;
 }>;
 
-export type AdminReservationPaymentSummary = "paid" | "pending";
+export type AdminReservationPaymentSummary = "paid" | "pending" | "cancelled";
 
 export type AdminReservationListRow = Readonly<{
   id: string;
@@ -229,8 +229,15 @@ export async function listAdminReservations(
         id: detail.reservationId,
         invoiceRequested: detail.invoiceRequested,
         origin: detail.origin as ReservationOrigin,
+        // A cancelled reservation's payments are always cancelled too (see
+        // `transitionReservationState`'s cancellation branch), so its
+        // payment column reads "Cancelado" rather than "Pendiente" - never
+        // derived from `paymentStatusById`, which only distinguishes paid
+        // from not-yet-paid.
         paymentStatus:
-          paymentStatusById.get(detail.reservationId) ?? "pending",
+          detail.status === "cancelled"
+            ? "cancelled"
+            : (paymentStatusById.get(detail.reservationId) ?? "pending"),
         publicId: detail.publicId,
         rooms: roomNames,
         status: detail.status as ReservationStatus,

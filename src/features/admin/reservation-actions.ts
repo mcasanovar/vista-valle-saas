@@ -42,8 +42,11 @@ export type TransitionAdminReservationResult =
  * layer (`assertConfirmedTransition`) only requires the reservation to
  * still be `confirmed`, regardless of whether its check-in date has already
  * passed (see design.md decision 9). No additional date check is added
- * here. Never touches payment state — cancellations do not trigger refunds
- * (proposal.md "Cancelaciones sin reembolso").
+ * here. Cancelling also cancels every payment tied to the reservation,
+ * whatever its prior status — see `transitionReservationState`'s
+ * cancellation branch and `payment-processing/spec.md` "Cancelaciones
+ * cancelan el pago asociado" (cancel-reservation-cancels-payments
+ * proposal.md; this reverses the earlier "Cancelaciones sin reembolso").
  */
 export async function transitionAdminReservationWithResult(
   input: TransitionAdminReservationInput

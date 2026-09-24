@@ -7,7 +7,9 @@ import {
   type MockRoomLockOperationContext,
 } from "@/features/availability";
 import {
+  confirmPayNowReservationFromHold,
   createMockGuestRepository,
+  createMockHoldRepository,
   createMockReservationRepository,
   createMultiRoomPayAtPropertyReservation,
   createPayAtPropertyReservation,
@@ -229,5 +231,99 @@ describe("createPayAtPropertyReservation", () => {
         to: "completed",
       })
     ).rejects.toBeInstanceOf(ReservationStateTransitionError);
+  });
+
+  it("cancels the reservation's pending pay-at-property payment on cancellation", async () => {
+    const { guestRepository, reservationRepository, roomLockGateway } =
+      setUp();
+    const result = await createPayAtPropertyReservation({
+      guestCandidate: GUEST,
+      guestRepository,
+      interval: createLodgingInterval("2024-09-01", "2024-09-04"),
+      reservationRepository,
+      room: ROOM,
+      roomLockGateway,
+    });
+    expect(result.payment.status).toBe("pending");
+
+    await transitionReservationState({
+      actorUserId: "admin-1",
+      reservationId: result.reservation.id,
+      reservationRepository,
+      roomLockGateway,
+      to: "cancelled",
+    });
+
+    await expect(
+      reservationRepository.getPendingPayAtPropertyPaymentByReservationId!(
+        result.reservation.id
+      )
+    ).resolves.toBeNull();
+    expect(
+      await reservationRepository.getApprovedPaymentsTotalClp!(
+        result.reservation.id
+      )
+    ).toBe(0);
+  });
+
+  it("cancels the reservation's approved pay-now payment on cancellation", async () => {
+    const { guestRepository, reservationRepository, roomLockGateway } =
+      setUp();
+    const holdRepository = createMockHoldRepository();
+    const interval = createLodgingInterval("2024-10-01", "2024-10-03");
+    const hold = await roomLockGateway.runExclusive(
+      ROOM.id,
+      interval,
+      (context) =>
+        holdRepository.createHold(context, {
+          checkIn: interval.checkIn,
+          checkOut: interval.checkOut,
+          expiresAt: new Date(Date.now() + 60_000),
+          guestId: "guest-pay-now-cancel-test",
+          items: [
+            {
+              chargesClp: 0,
+              guestCount: 1,
+              nightlyPriceClp: ROOM.nightlyPriceClp,
+              nights: 2,
+              roomId: ROOM.id,
+              totalClp: 120_000,
+            },
+          ],
+          totalClp: 120_000,
+        })
+    );
+
+    const confirmed = await confirmPayNowReservationFromHold({
+      guestRepository,
+      hold,
+      holdRepository,
+      paymentExternalReference: "ext-ref-pay-now-cancel",
+      paymentId: "payment-pay-now-cancel",
+      paymentProvider: "fintoc",
+      providerPaymentId: "provider-payment-pay-now-cancel",
+      reservationRepository,
+      roomLockGateway,
+    });
+    expect(confirmed.payment.status).toBe("approved");
+    expect(
+      await reservationRepository.getApprovedPaymentsTotalClp!(
+        confirmed.reservation.id
+      )
+    ).toBe(120_000);
+
+    await transitionReservationState({
+      actorUserId: "admin-1",
+      reservationId: confirmed.reservation.id,
+      reservationRepository,
+      roomLockGateway,
+      to: "cancelled",
+    });
+
+    expect(
+      await reservationRepository.getApprovedPaymentsTotalClp!(
+        confirmed.reservation.id
+      )
+    ).toBe(0);
   });
 });
