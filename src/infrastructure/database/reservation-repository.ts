@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 
 import { nights as calculateNights } from "@/features/availability";
 import type {
@@ -397,6 +397,40 @@ export function createDrizzleReservationRepository(
         entityId: updated.id,
         entityType: "reservation",
       });
+
+      // Cancelling a reservation cancels every payment tied to it, whatever
+      // its prior status - see payment-processing/spec.md "Cancelaciones
+      // cancelan el pago asociado". The prior status is kept in each
+      // payment's own audit event, not in the reservation's.
+      if (transition.to === "cancelled") {
+        const paymentsToCancel = await tx
+          .select()
+          .from(payments)
+          .where(
+            and(
+              eq(payments.reservationId, updated.id),
+              ne(payments.status, "cancelled")
+            )
+          );
+        for (const payment of paymentsToCancel) {
+          const [cancelledPayment] = await tx
+            .update(payments)
+            .set({ status: "cancelled" })
+            .where(eq(payments.id, payment.id))
+            .returning();
+          if (!cancelledPayment)
+            throw new Error(`Failed to cancel payment ${payment.id}`);
+          await tx.insert(auditEvents).values({
+            action: "payment.cancelled",
+            actorUserId: transition.actorUserId,
+            after: { status: "cancelled" },
+            before: { status: payment.status },
+            entityId: payment.id,
+            entityType: "payment",
+          });
+        }
+      }
+
       const itemRows = await tx
         .select()
         .from(reservationItems)
