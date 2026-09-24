@@ -200,6 +200,15 @@
   --admin-reservation-pending-background: #fdf1e2;
   --admin-reservation-cancelled: #c25b4c;
   --admin-reservation-cancelled-background: #fbe9e7;
+  /* Calendar (calendar-color-by-payment-status): reservation chips are
+     colored by payment status, not reservation status, so they get their
+     own pair instead of reusing --admin-reservation-confirmed/-pending
+     above (those stay in use for the status badges elsewhere: dashboard,
+     reservations list, block form). */
+  --admin-reservation-paid: #2f8f5b;
+  --admin-reservation-paid-background: #e6f4ea;
+  --admin-reservation-unpaid: #a67c00;
+  --admin-reservation-unpaid-background: #fbf1d3;
   --admin-surface-border: #e6e8ef;
   /* Calendar (rebuild-admin-calendar-timeline): reservas ya cubiertas por
      --admin-reservation-*; hold/block son tipos de item nuevos, distintos

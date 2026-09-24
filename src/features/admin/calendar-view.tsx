@@ -120,14 +120,14 @@ function buildHref(
 function CalendarLegend() {
   const entries = [
     {
-      backgroundVar: "--admin-reservation-confirmed-background",
-      colorVar: "--admin-reservation-confirmed",
-      label: "Reserva confirmada",
+      backgroundVar: "--admin-reservation-paid-background",
+      colorVar: "--admin-reservation-paid",
+      label: "Pagada",
     },
     {
-      backgroundVar: "--admin-reservation-pending-background",
-      colorVar: "--admin-reservation-pending",
-      label: "No se presentó",
+      backgroundVar: "--admin-reservation-unpaid-background",
+      colorVar: "--admin-reservation-unpaid",
+      label: "No pagada",
     },
     {
       backgroundVar: "--admin-hold-background",

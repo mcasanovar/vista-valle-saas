@@ -26,7 +26,8 @@ El sistema SHALL presentar el calendario en las vistas Mes, Semana y 2 semanas c
 
 #### Scenario: Distinción visual por tipo
 - **WHEN** el calendario muestra una reserva, una retención y un bloqueo en el mismo rango
-- **THEN** cada uno usa un color y patrón distintos entre sí (reserva por estado, retención, bloqueo), y el color nunca es la única señal: cada tipo también se distingue por texto o ícono
+- **THEN** retención y bloqueo cada uno usa un color y patrón distintos entre sí y distintos de una reserva, y el color nunca es la única señal: cada tipo también se distingue por texto o ícono
+- **THEN** el chip de una reserva SHALL usar el color de pagada si tiene al menos un pago con estado `approved`, y el color de no pagada en cualquier otro caso (sin pagos, `pending`, `rejected`, `requires_action`, u otro estado distinto de `approved`)
 
 #### Scenario: Origen del canal
 - **WHEN** un chip corresponde a una reserva, que siempre tiene un origen registrado (website, airbnb, booking, phone, whatsapp, admin)
@@ -45,7 +46,8 @@ El sistema SHALL presentar el calendario en la vista Próximos 7 días como una 
 
 #### Scenario: Distinción visual por tipo
 - **WHEN** el timeline de Próximos 7 días muestra una reserva, una retención y un bloqueo
-- **THEN** cada uno usa un color y patrón distintos entre sí, con la misma semántica visual que la grilla de calendario clásica
+- **THEN** retención y bloqueo cada uno usa un color y patrón distintos entre sí y distintos de una reserva, con la misma semántica visual que la grilla de calendario clásica
+- **THEN** la barra de una reserva usa el mismo color de pagada/no pagada definido para la grilla de calendario clásica, según si tiene al menos un pago `approved`
 
 #### Scenario: Origen del canal
 - **WHEN** una barra corresponde a una reserva, que siempre tiene un origen registrado (website, airbnb, booking, phone, whatsapp, admin)
