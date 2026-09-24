@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gt, isNull, lt, ne, type SQL } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lt, ne, type SQL } from "drizzle-orm";
 import type { PgColumn } from "drizzle-orm/pg-core";
 
 import { createLodgingInterval } from "@/features/availability";
@@ -10,6 +10,7 @@ import type {
 } from "@/features/reservations";
 import {
   guests,
+  payments,
   reservationHoldItems,
   reservationHolds,
   reservationItems,
@@ -35,6 +36,8 @@ export type AdminCalendarItem = Readonly<{
   status?: ReservationStatus;
   guestName?: string;
   reason?: string;
+  /** Reservation items only: true if the reservation has at least one `approved` payment (see `admin-reservation-source.ts`'s `paymentStatusById` for the same rule). */
+  paid?: boolean;
 }>;
 
 export type AdminCalendarFilter = Readonly<{
@@ -155,6 +158,23 @@ export async function queryAdminCalendar(
       .where(and(...blockConditions)),
   ]);
 
+  const reservationIds = [...new Set(reservationRows.map((row) => row.id))];
+  const paidReservationIds = new Set<string>();
+  if (reservationIds.length > 0) {
+    const paymentRows = await db
+      .select({ reservationId: payments.reservationId })
+      .from(payments)
+      .where(
+        and(
+          inArray(payments.reservationId, reservationIds),
+          eq(payments.status, "approved")
+        )
+      );
+    for (const row of paymentRows) {
+      if (row.reservationId) paidReservationIds.add(row.reservationId);
+    }
+  }
+
   const items: AdminCalendarItem[] = [
     ...reservationRows.map(
       (row): AdminCalendarItem => ({
@@ -164,6 +184,7 @@ export async function queryAdminCalendar(
         id: `reservation-${row.id}-${row.roomId}`,
         kind: "reservation",
         origin: row.origin as ReservationOrigin,
+        paid: paidReservationIds.has(row.id),
         room: row.roomName ?? "",
         roomId: row.roomId,
         sourceId: row.id,

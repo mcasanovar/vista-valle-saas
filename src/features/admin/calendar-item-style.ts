@@ -7,38 +7,25 @@ export type CalendarItemStyle = Readonly<{
   label: string;
 }>;
 
-const reservationStatusStyle: Readonly<
-  Record<
-    NonNullable<AdminCalendarItem["status"]>,
-    Readonly<{ colorVar: string; backgroundVar: string; label: string }>
-  >
-> = {
-  cancelled: {
-    backgroundVar: "--admin-reservation-cancelled-background",
-    colorVar: "--admin-reservation-cancelled",
-    label: "Cancelada",
+const reservationPaymentStyle = {
+  paid: {
+    backgroundVar: "--admin-reservation-paid-background",
+    colorVar: "--admin-reservation-paid",
+    label: "Pagada",
   },
-  completed: {
-    backgroundVar: "--admin-reservation-confirmed-background",
-    colorVar: "--admin-reservation-confirmed",
-    label: "Completada",
+  unpaid: {
+    backgroundVar: "--admin-reservation-unpaid-background",
+    colorVar: "--admin-reservation-unpaid",
+    label: "No pagada",
   },
-  confirmed: {
-    backgroundVar: "--admin-reservation-confirmed-background",
-    colorVar: "--admin-reservation-confirmed",
-    label: "Confirmada",
-  },
-  no_show: {
-    backgroundVar: "--admin-reservation-pending-background",
-    colorVar: "--admin-reservation-pending",
-    label: "No se presentó",
-  },
-};
+} as const;
 
 /**
  * Visual identity per calendar item (spec: "Distinción visual por tipo").
  * Type is never color-only: hold adds a dashed border, block adds a
  * diagonal fill pattern (`.admin-calendar-block-pattern`, app/globals.css).
+ * A reservation's color reflects payment status (`item.paid`), not
+ * reservation status - see calendar-color-by-payment-status/design.md.
  */
 export function calendarItemStyle(item: AdminCalendarItem): CalendarItemStyle {
   if (item.kind === "hold") {
@@ -57,8 +44,8 @@ export function calendarItemStyle(item: AdminCalendarItem): CalendarItemStyle {
       label: "Bloqueo",
     };
   }
-  const meta =
-    reservationStatusStyle[item.status ?? "confirmed"] ??
-    reservationStatusStyle.confirmed;
+  const meta = item.paid
+    ? reservationPaymentStyle.paid
+    : reservationPaymentStyle.unpaid;
   return { ...meta, className: "" };
 }
