@@ -49,7 +49,8 @@ export type ApprovedPayNowPayment = Readonly<{
   provider: string;
   providerPaymentId: string;
   reservationId: string;
-  status: "approved";
+  /** `"cancelled"` only arises when the reservation it belongs to is cancelled - see `transitionReservationState`'s cancellation branch; it is never re-approved. */
+  status: "approved" | "cancelled";
 }>;
 
 export type ReservationRecord = Readonly<{
@@ -490,9 +491,10 @@ export function createMockReservationRepository(
       )
         .filter((payment) => payment.status === "approved")
         .reduce((sum, payment) => sum + payment.amountClp, 0);
+      const payNowPayment =
+        storage.payNowPaymentsByReservationId.get(reservationId);
       const payNowAmount =
-        storage.payNowPaymentsByReservationId.get(reservationId)?.amountClp ??
-        0;
+        payNowPayment?.status === "approved" ? payNowPayment.amountClp : 0;
       return payAtPropertyTotal + payNowAmount;
     },
     approvePayAtPropertyPayment: async (reservationId) => {
@@ -554,6 +556,31 @@ export function createMockReservationRepository(
       storage.reservationsById.set(updated.id, updated);
       for (const item of updated.items)
         context.removeOccupancy("reservation", updated.id, item.roomId);
+
+      // Mirrors the Drizzle adapter's cancellation branch (no audit trail
+      // here - this in-memory double keeps none, see line 656 below).
+      if (transition.to === "cancelled") {
+        const payAtPropertyPayments =
+          storage.paymentsByReservationId.get(updated.id) ?? [];
+        storage.paymentsByReservationId.set(
+          updated.id,
+          payAtPropertyPayments.map((payment) =>
+            payment.status === "cancelled"
+              ? payment
+              : Object.freeze({ ...payment, status: "cancelled" as const })
+          )
+        );
+        const payNowPayment = storage.payNowPaymentsByReservationId.get(
+          updated.id
+        );
+        if (payNowPayment && payNowPayment.status !== "cancelled") {
+          storage.payNowPaymentsByReservationId.set(
+            updated.id,
+            Object.freeze({ ...payNowPayment, status: "cancelled" as const })
+          );
+        }
+      }
+
       return updated;
     },
     editReservationDates: async (context, input) => {

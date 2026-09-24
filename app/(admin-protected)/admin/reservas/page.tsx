@@ -75,6 +75,24 @@ function statusMeta(status: AdminReservationListRow["status"]) {
   return meta[status];
 }
 
+function paymentStatusMeta(status: AdminReservationListRow["paymentStatus"]) {
+  const meta = {
+    cancelled: [
+      "Cancelado",
+      "bg-[var(--admin-reservation-cancelled-background)] text-[var(--admin-reservation-cancelled)]",
+    ],
+    paid: [
+      "Pagado",
+      "bg-[var(--admin-reservation-confirmed-background)] text-[var(--admin-reservation-confirmed)]",
+    ],
+    pending: [
+      "Pendiente",
+      "bg-[var(--admin-reservation-pending-background)] text-[var(--admin-reservation-pending)]",
+    ],
+  } as const;
+  return meta[status];
+}
+
 type SearchParams = Readonly<{
   search?: string;
   checkInFrom?: string;
@@ -205,13 +223,9 @@ export default async function ReservationsPage({
                     </td>
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
-                          row.paymentStatus === "paid"
-                            ? "bg-[var(--admin-reservation-confirmed-background)] text-[var(--admin-reservation-confirmed)]"
-                            : "bg-[var(--admin-reservation-pending-background)] text-[var(--admin-reservation-pending)]"
-                        }`}
+                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${paymentStatusMeta(row.paymentStatus)[1]}`}
                       >
-                        {row.paymentStatus === "paid" ? "Pagado" : "Pendiente"}
+                        {paymentStatusMeta(row.paymentStatus)[0]}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">

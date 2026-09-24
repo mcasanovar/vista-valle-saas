@@ -653,6 +653,45 @@ if (!enabled) {
         expect(paidResult.rows[0]?.paymentStatus).toBe("paid");
       });
 
+      it("reports the listing payment status as cancelled for a cancelled reservation, even if its payment was approved", async () => {
+        const room = "00000000-0000-4000-8000-000000000207";
+        await insertRoom(room);
+        const guest = await insertGuest({
+          email: "cancelled-listing@example.test",
+        });
+        const reservation = await insertReservation({
+          guestId: guest.id,
+          status: "cancelled",
+        });
+        await db.insert(reservationItems).values({
+          chargesClp: 0,
+          nightlyPriceClp: 60_000,
+          nights: 2,
+          reservationId: reservation.id,
+          roomId: room,
+          subtotalClp: 120_000,
+        });
+        await db.insert(payments).values({
+          amountClp: 120_000,
+          externalReference: `cancelled-${reservation.id}`,
+          mode: "pay_now",
+          provider: "fintoc",
+          providerPaymentId: `pi_${reservation.id}`,
+          reservationId: reservation.id,
+          // The reservation's own transition would have cancelled this too
+          // (see transitionReservationState) - inserted directly as
+          // "approved" here to isolate the listing's own override rule from
+          // that transition.
+          status: "approved",
+        });
+
+        const result = await listAdminReservations(db, {
+          page: 1,
+          search: "cancelled-listing@example.test",
+        });
+        expect(result.rows[0]?.paymentStatus).toBe("cancelled");
+      });
+
       it("combines check-in and check-out range filters with AND", async () => {
         const room = "00000000-0000-4000-8000-000000000204";
         await insertRoom(room);
@@ -900,6 +939,143 @@ if (!enabled) {
             recordedByUserId: adminActorId,
           })
         ).rejects.toBeInstanceOf(PendingPayAtPropertyPaymentNotFoundError);
+      });
+
+      it("cancels the reservation's approved payment and records its prior status in an audit event", async () => {
+        const approvedPaymentRoom = "00000000-0000-4000-8000-000000000305";
+        await insertRoom(approvedPaymentRoom);
+        const approvedGuest = await insertGuest({
+          email: "approved-cancel@example.test",
+        });
+        const reservation = await insertReservation({
+          guestId: approvedGuest.id,
+        });
+        await db.insert(reservationItems).values({
+          chargesClp: 0,
+          nightlyPriceClp: 60_000,
+          nights: 2,
+          reservationId: reservation.id,
+          roomId: approvedPaymentRoom,
+          subtotalClp: 100_000,
+        });
+        const [payment] = await db
+          .insert(payments)
+          .values({
+            amountClp: 100_000,
+            externalReference: `approved-${reservation.id}`,
+            mode: "pay_now",
+            provider: "fintoc",
+            providerPaymentId: `pi_${reservation.id}`,
+            reservationId: reservation.id,
+            status: "approved",
+          })
+          .returning();
+
+        await transitionReservationState({
+          actorUserId: adminActorId,
+          reservationId: reservation.id,
+          reservationRepository,
+          roomLockGateway,
+          to: "cancelled",
+        });
+
+        const [cancelledPayment] = await db
+          .select()
+          .from(payments)
+          .where(eq(payments.id, payment!.id));
+        expect(cancelledPayment!.status).toBe("cancelled");
+
+        const [paymentAuditEvent] = await db
+          .select()
+          .from(auditEvents)
+          .where(
+            and(
+              eq(auditEvents.entityType, "payment"),
+              eq(auditEvents.entityId, payment!.id)
+            )
+          );
+        expect(paymentAuditEvent!.action).toBe("payment.cancelled");
+        expect(paymentAuditEvent!.before).toEqual({ status: "approved" });
+        expect(paymentAuditEvent!.after).toEqual({ status: "cancelled" });
+      });
+
+      it("cancels every payment on a reservation with multiple payments, each with its own audit event", async () => {
+        const multiPaymentRoom = "00000000-0000-4000-8000-000000000306";
+        await insertRoom(multiPaymentRoom);
+        const multiPaymentGuest = await insertGuest({
+          email: "multi-payment-cancel@example.test",
+        });
+        const reservation = await insertReservation({
+          guestId: multiPaymentGuest.id,
+        });
+        await db.insert(reservationItems).values({
+          chargesClp: 0,
+          nightlyPriceClp: 60_000,
+          nights: 2,
+          reservationId: reservation.id,
+          roomId: multiPaymentRoom,
+          subtotalClp: 100_000,
+        });
+        const [rejectedPayment] = await db
+          .insert(payments)
+          .values({
+            amountClp: 100_000,
+            externalReference: `rejected-${reservation.id}`,
+            mode: "pay_now",
+            provider: "fintoc",
+            providerPaymentId: `pi_rejected_${reservation.id}`,
+            reservationId: reservation.id,
+            status: "rejected",
+          })
+          .returning();
+        const [approvedPayment] = await db
+          .insert(payments)
+          .values({
+            amountClp: 100_000,
+            externalReference: `approved-${reservation.id}`,
+            mode: "pay_now",
+            provider: "fintoc",
+            providerPaymentId: `pi_approved_${reservation.id}`,
+            reservationId: reservation.id,
+            status: "approved",
+          })
+          .returning();
+
+        await transitionReservationState({
+          actorUserId: adminActorId,
+          reservationId: reservation.id,
+          reservationRepository,
+          roomLockGateway,
+          to: "cancelled",
+        });
+
+        const reservationPayments = await db
+          .select()
+          .from(payments)
+          .where(eq(payments.reservationId, reservation.id));
+        expect(reservationPayments).toHaveLength(2);
+        for (const paymentRow of reservationPayments) {
+          expect(paymentRow.status).toBe("cancelled");
+        }
+
+        const paymentAuditEvents = await db
+          .select()
+          .from(auditEvents)
+          .where(
+            and(
+              eq(auditEvents.entityType, "payment"),
+              eq(auditEvents.action, "payment.cancelled")
+            )
+          );
+        const auditByEntityId = new Map(
+          paymentAuditEvents.map((event) => [event.entityId, event])
+        );
+        expect(auditByEntityId.get(rejectedPayment!.id)?.before).toEqual({
+          status: "rejected",
+        });
+        expect(auditByEntityId.get(approvedPayment!.id)?.before).toEqual({
+          status: "approved",
+        });
       });
     });
 

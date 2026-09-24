@@ -13,12 +13,20 @@ El sistema SHALL mantener estados de pago pendiente, aprobado, rechazado, cancel
 - **WHEN** se confirma una reserva bajo esa modalidad
 - **THEN** la reserva queda confirmada y el pago permanece pendiente
 
-### Requirement: Cancelaciones con pago aprobado
-El sistema SHALL preservar el pago aprobado al cancelar una reserva y SHALL indicar que cualquier devolución debe gestionarse y registrarse explícitamente según la política comercial vigente.
+### Requirement: Cancelaciones cancelan el pago asociado
+El sistema SHALL cancelar automáticamente todos los pagos asociados a una reserva cuando esa reserva se cancela, sin importar el estado previo del pago (`pending`, `approved`, `rejected`, `requires_action`, u otro), dejando cada pago en estado `cancelled`. El sistema SHALL registrar el estado anterior de cada pago junto con el nuevo estado como parte de la auditoría de la cancelación, de forma que un pago que estuvo `approved` antes de cancelarse quede identificable en el historial aunque su estado vigente ya no lo sea.
 
-#### Scenario: Cancelación pagada sin devolución registrada
-- **WHEN** se cancela una reserva con pago aprobado
-- **THEN** el pago continúa aprobado y el panel advierte que requiere resolución financiera
+#### Scenario: Cancelación de una reserva con pago aprobado
+- **WHEN** se cancela una reserva que tiene un pago con estado `approved`
+- **THEN** el pago pasa a estado `cancelled` y el evento de auditoría registra `approved` como estado anterior y `cancelled` como estado nuevo
+
+#### Scenario: Cancelación de una reserva con pago pendiente
+- **WHEN** se cancela una reserva que tiene un pago con estado `pending`
+- **THEN** el pago pasa a estado `cancelled`
+
+#### Scenario: Cancelación de una reserva con múltiples pagos
+- **WHEN** se cancela una reserva que tiene más de un pago asociado (por ejemplo, un intento rechazado y uno aprobado)
+- **THEN** todos los pagos asociados a esa reserva pasan a estado `cancelled`
 
 ### Requirement: Selección de modalidad de pago al confirmar reserva
 El sistema SHALL permitir al huésped elegir entre pago al llegar y pago en línea al confirmar una reserva de una o más habitaciones, restringido a los métodos que el administrador tenga habilitados en la configuración de métodos de pago. Cuando más de un método de pago en línea esté habilitado, SHALL permitir al huésped elegir entre ellos. El sistema SHALL registrar la modalidad elegida (`pay_at_property` o `pay_now`) junto con el proveedor de pago usado cuando la modalidad sea pago en línea. El sistema SHALL validar en el servidor, al recibir la solicitud de confirmación, que el método solicitado esté habilitado, además de ocultarlo en la interfaz cuando esté deshabilitado.
