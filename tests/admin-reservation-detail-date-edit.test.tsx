@@ -20,13 +20,18 @@ vi.mock("@/features/admin/reservation-actions", () => ({
 vi.mock("@/features/admin/reservation-transition-controls", () => ({
   ReservationTransitionControls: () => null,
 }));
-vi.mock("@/features/admin/edit-reservation-dates-action", () => ({
-  editAdminReservationDatesAction: vi.fn(),
+vi.mock("@/features/admin/edit-reservation-stay-action", () => ({
+  editAdminReservationStayAction: vi.fn(),
 }));
-vi.mock("@/features/admin/edit-reservation-dates-form", () => ({
-  EditReservationDatesForm: () => (
-    <form aria-label="Editar fechas de la reserva" />
+vi.mock("@/features/admin/edit-reservation-stay-form", () => ({
+  EditReservationStayForm: () => (
+    <form aria-label="Editar estadía de la reserva" />
   ),
+}));
+vi.mock("@/infrastructure/database/channel-connections-repository", () => ({
+  createDrizzleChannelConnectionRepository: () => ({
+    listActive: async () => [],
+  }),
 }));
 vi.mock("@/features/admin/edit-reservation-guest-contact-action", () => ({
   editReservationGuestContactAction: vi.fn(),
@@ -115,7 +120,7 @@ describe("admin reservation detail — date edit eligibility", () => {
     async (origin) => {
       await renderDetail({ origin });
       expect(
-        screen.getByRole("form", { name: "Editar fechas de la reserva" })
+        screen.getByRole("form", { name: "Editar estadía de la reserva" })
       ).toBeInTheDocument();
     }
   );
@@ -125,7 +130,7 @@ describe("admin reservation detail — date edit eligibility", () => {
     async (status) => {
       await renderDetail({ status, origin: "airbnb" });
       expect(
-        screen.getByRole("form", { name: "Editar fechas de la reserva" })
+        screen.getByRole("form", { name: "Editar estadía de la reserva" })
       ).toBeInTheDocument();
     }
   );

@@ -29,7 +29,11 @@ function reservationDetails(
   )
     .map(
       (item) =>
-        `<li>${escapeHtml(item.roomName)} — ${escapeHtml(formatClp(item.subtotalClp))}</li>`
+        `<li>${escapeHtml(item.roomName)}${
+          item.guestCount === undefined
+            ? ""
+            : ` — ${escapeHtml(item.guestCount)} ${item.guestCount === 1 ? "persona" : "personas"}`
+        } — ${escapeHtml(formatClp(item.subtotalClp))}</li>`
     )
     .join("");
   return `<dl><div><dt>Reserva</dt><dd>${escapeHtml(data.publicId)}</dd></div><div><dt>Entrada</dt><dd>${escapeHtml(data.checkIn)}</dd></div><div><dt>Salida</dt><dd>${escapeHtml(data.checkOut)}</dd></div><div><dt>Noches</dt><dd>${escapeHtml(data.nights)}</dd></div><div><dt>Total</dt><dd>${escapeHtml(formatClp(data.totalClp))}</dd></div></dl><ul>${items}</ul>`;
@@ -67,11 +71,50 @@ export function renderNewReservationAdminAlertEmail(
   );
 }
 
+/**
+ * What changed in a stay edit, already resolved to room names by the
+ * delivery worker so this renderer stays pure. `removedRooms` can only be
+ * built from the pre-edit snapshot carried on the intent, since the
+ * updated reservation no longer references those rooms.
+ */
+export type ReservationStayChangeEmailData = Readonly<{
+  addedRooms: readonly Readonly<{ guestCount: number; roomName: string }>[];
+  datesChanged: boolean;
+  previousCheckIn: string;
+  previousCheckOut: string;
+  removedRooms: readonly Readonly<{ roomName: string }>[];
+}>;
+
+function stayChangeSummary(change: ReservationStayChangeEmailData) {
+  const parts: string[] = [];
+  if (change.datesChanged) {
+    parts.push(
+      `<li>Fechas anteriores: ${escapeHtml(change.previousCheckIn)} — ${escapeHtml(change.previousCheckOut)}</li>`
+    );
+  }
+  for (const room of change.addedRooms) {
+    parts.push(
+      `<li>Habitación agregada: ${escapeHtml(room.roomName)} (${escapeHtml(room.guestCount)} ${room.guestCount === 1 ? "persona" : "personas"})</li>`
+    );
+  }
+  for (const room of change.removedRooms) {
+    parts.push(`<li>Habitación quitada: ${escapeHtml(room.roomName)}</li>`);
+  }
+  if (parts.length === 0) return "";
+  return `<h2>Qué cambió</h2><ul>${parts.join("")}</ul>`;
+}
+
+/**
+ * Administrative alert for a stay edit: dates, room set, and per-room
+ * occupancy. Sent only to the configured administrative recipient - the
+ * guest is never notified of a stay change.
+ */
 export function renderReservationDatesChangedAdminEmail(
-  data: PayAtPropertyConfirmationEmailData
+  data: PayAtPropertyConfirmationEmailData,
+  change?: ReservationStayChangeEmailData
 ) {
   return document(
-    `<h1>Fechas de reserva actualizadas</h1><p>Se modificaron las fechas de una reserva. El resumen refleja el estado actual.</p>${reservationDetails(data)}<p>Contacto: ${escapeHtml(data.contactEmail)}</p>`
+    `<h1>Estadía de reserva actualizada</h1><p>Se modificó la estadía de una reserva. El resumen refleja el estado actual.</p>${change ? stayChangeSummary(change) : ""}${reservationDetails(data)}<p>Contacto: ${escapeHtml(data.contactEmail)}</p>`
   );
 }
 

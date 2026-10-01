@@ -9,6 +9,18 @@ import type {
   ReservationRecord,
 } from "@/features/reservations";
 
+/**
+ * What a reservation's stay looked like before an edit: the interval and
+ * one entry per room with the occupancy it held. Carried on the intent so
+ * the administrative email can name the rooms that *left* the stay, which
+ * the reservation's current state no longer knows about.
+ */
+export type ReservationStaySnapshot = Readonly<{
+  checkIn: string;
+  checkOut: string;
+  rooms: readonly Readonly<{ guestCount: number; roomId: string }>[];
+}>;
+
 export type NotificationOutboxIntent = Readonly<{
   attempts: number;
   createdAt: Date;
@@ -21,6 +33,8 @@ export type NotificationOutboxIntent = Readonly<{
   recipient: string;
   reservationId?: string;
   status: "delivered" | "failed" | "pending" | "processing" | "retrying";
+  /** Set only on `reservation_dates_changed_admin`: the stay as it was before the edit. */
+  previousStay?: ReservationStaySnapshot;
   type:
     | "payment_collected_admin"
     | "reservation_confirmed_admin"
@@ -87,15 +101,21 @@ export type NotificationOutboxWriter<TContext> = Readonly<{
     input: Readonly<{ quotation: CompanyQuotationRecord }>
   ) => Promise<void>;
   /**
-   * Enqueues an idempotent operational alert once a reservation's dates are
-   * modified (`reservation-date-editing` design.md decision 5). The
-   * idempotency key includes the reservation's `updatedAt` so a retried
-   * edit of the exact same mutation dedupes, while a later, distinct edit
-   * still notifies.
+   * Enqueues an idempotent operational alert once a reservation's stay is
+   * modified - dates, rooms, or per-room occupancy. The idempotency key
+   * includes the reservation's `updatedAt` so a retried edit of the exact
+   * same mutation dedupes, while a later, distinct edit still notifies.
+   *
+   * `previousStay` is what the stay looked like before the edit. It is the
+   * only way the email can name a room that left the stay, since the
+   * updated reservation no longer carries it.
    */
   writeReservationDatesChanged: (
     context: TContext,
-    input: Readonly<{ reservation: ReservationRecord }>
+    input: Readonly<{
+      previousStay: ReservationStaySnapshot;
+      reservation: ReservationRecord;
+    }>
   ) => Promise<void>;
 }>;
 
@@ -200,6 +220,7 @@ export function createMockNotificationOutbox<TContext = unknown>(
         {
           key: `reservation:${input.reservation.id}:dates_changed:${input.reservation.updatedAt.getTime()}`,
           intent: createIntent({
+            previousStay: input.previousStay,
             recipient: getServerEnvironment().ADMIN_NOTIFICATION_EMAIL,
             reservationId: input.reservation.id,
             type: "reservation_dates_changed_admin",
