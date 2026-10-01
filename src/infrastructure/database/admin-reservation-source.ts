@@ -254,6 +254,8 @@ export async function listAdminReservations(
 }
 
 export type AdminReservationDetailItem = Readonly<{
+  /** Occupancy of this room line; the stay-edit form preselects it. */
+  guestCount: number;
   roomId: string;
   roomName: string;
   nights: number;
@@ -347,6 +349,7 @@ export async function getAdminReservationDetail(
       db
         .select({
           chargesClp: reservationItems.chargesClp,
+          guestCount: reservationItems.guestCount,
           nightlyPriceClp: reservationItems.nightlyPriceClp,
           nights: reservationItems.nights,
           roomId: reservationItems.roomId,
@@ -396,6 +399,7 @@ export async function getAdminReservationDetail(
       itemRows.map((item) =>
         Object.freeze({
           chargesClp: item.chargesClp,
+          guestCount: item.guestCount,
           nightlyPriceClp: item.nightlyPriceClp,
           nights: item.nights,
           roomId: item.roomId,

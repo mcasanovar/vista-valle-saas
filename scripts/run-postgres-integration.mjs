@@ -67,6 +67,7 @@ try {
       "tests/postgres-reservation-summary.integration.test.ts",
       "tests/postgres-alerts-end-to-end.integration.test.ts",
       "tests/postgres-assistant-interaction-audit.integration.test.ts",
+      "tests/postgres-edit-reservation-dates.integration.test.ts",
       "--environment",
       "node",
       // Every integration file shares one live Postgres database with no

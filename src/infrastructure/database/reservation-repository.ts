@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 
 import { nights as calculateNights } from "@/features/availability";
 import type {
@@ -274,12 +274,17 @@ export function createDrizzleReservationRepository(
         ? (Object.freeze(row) as unknown as PendingPayAtPropertyPayment)
         : null;
     },
-    editReservationDates: async (tx, input) => {
+    editReservationStay: async (tx, input) => {
       const [current] = await tx
         .select()
         .from(reservations)
         .where(eq(reservations.id, input.reservationId));
       if (!current) throw new ReservationNotFoundError(input.reservationId);
+
+      const currentItemRows = await tx
+        .select()
+        .from(reservationItems)
+        .where(eq(reservationItems.reservationId, input.reservationId));
 
       const totalClp = input.items.reduce(
         (total, item) => total + item.totalClp,
@@ -297,11 +302,40 @@ export function createDrizzleReservationRepository(
         .returning();
       if (!updated) throw new ReservationNotFoundError(input.reservationId);
 
+      // Three-way diff over the requested set (design.md "El diff de ítems
+      // se resuelve en tres vías"). The three groups are disjoint by
+      // construction - removed rooms are persisted ones absent from the
+      // request, added ones are requested rooms with no row yet - so an
+      // INSERT can never collide with a row this same edit is about to
+      // DELETE under `reservation_items_reservation_room_unique`. The
+      // delete-update-insert order is therefore for legibility, not
+      // correctness: it reads in the order the sets are reasoned about.
+      const requestedRoomIds = new Set(input.items.map((item) => item.roomId));
+      const persistedRoomIds = new Set(
+        currentItemRows.map((item) => item.roomId)
+      );
+      const removedRoomIds = currentItemRows
+        .map((item) => item.roomId)
+        .filter((roomId) => !requestedRoomIds.has(roomId));
+
+      if (removedRoomIds.length > 0) {
+        await tx
+          .delete(reservationItems)
+          .where(
+            and(
+              eq(reservationItems.reservationId, updated.id),
+              inArray(reservationItems.roomId, removedRoomIds)
+            )
+          );
+      }
+
       for (const item of input.items) {
+        if (!persistedRoomIds.has(item.roomId)) continue;
         await tx
           .update(reservationItems)
           .set({
             chargesClp: item.chargesClp,
+            guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
             nights: item.nights,
             subtotalClp: item.totalClp,
@@ -312,6 +346,23 @@ export function createDrizzleReservationRepository(
               eq(reservationItems.roomId, item.roomId)
             )
           );
+      }
+
+      const addedItems = input.items.filter(
+        (item) => !persistedRoomIds.has(item.roomId)
+      );
+      if (addedItems.length > 0) {
+        await tx.insert(reservationItems).values(
+          addedItems.map((item) => ({
+            chargesClp: item.chargesClp,
+            guestCount: item.guestCount,
+            nightlyPriceClp: item.nightlyPriceClp,
+            nights: item.nights,
+            reservationId: updated.id,
+            roomId: item.roomId,
+            subtotalClp: item.totalClp,
+          }))
+        );
       }
 
       if (input.paymentAction.type === "set_pending") {
@@ -341,10 +392,22 @@ export function createDrizzleReservationRepository(
           .where(eq(payments.id, input.pendingPayAtPropertyPaymentId));
       }
 
+      // One audit event covers all three axes of the stay edit: the dates,
+      // the room set (which rooms came in and which went out), and the
+      // per-room occupancy. The action name stays `reservation.dates_changed`
+      // so the existing audit history and its consumers keep resolving.
+      const auditRoomsOf = (
+        rows: readonly Readonly<{ guestCount: number; roomId: string }>[]
+      ) =>
+        rows
+          .map((row) => ({ guestCount: row.guestCount, roomId: row.roomId }))
+          .sort((left, right) => left.roomId.localeCompare(right.roomId));
+
       await tx.insert(auditEvents).values({
         action: "reservation.dates_changed",
         actorUserId: input.actorUserId,
         after: {
+          addedRoomIds: addedItems.map((item) => item.roomId).sort(),
           approvedPaymentsClp: input.approvedPaymentsClp,
           checkIn: input.checkIn,
           checkOut: input.checkOut,
@@ -354,12 +417,20 @@ export function createDrizzleReservationRepository(
             input.paymentAction.type === "set_pending"
               ? input.paymentAction.amountClp
               : 0,
+          removedRoomIds: [...removedRoomIds].sort(),
+          rooms: auditRoomsOf(
+            input.items.map((item) => ({
+              guestCount: item.guestCount,
+              roomId: item.roomId,
+            }))
+          ),
           totalClp,
         },
         before: {
           checkIn: current.checkIn,
           checkOut: current.checkOut,
           nights: calculateNights(current.checkIn, current.checkOut),
+          rooms: auditRoomsOf(currentItemRows),
           totalClp: current.totalClp,
         },
         entityId: updated.id,

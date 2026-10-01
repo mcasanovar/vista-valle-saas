@@ -4,6 +4,7 @@ import type {
   NotificationDeliveryOutbox,
   NotificationOutboxIntent,
   NotificationOutboxWriter,
+  ReservationStaySnapshot,
 } from "@/features/notifications";
 import { getServerEnvironment } from "@/config/server";
 import { notificationOutbox } from "@/persistence/schema";
@@ -16,7 +17,7 @@ import type {
 
 type NotificationInsert = Readonly<{
   idempotencyKey: string;
-  payload: Record<string, string>;
+  payload: Record<string, unknown>;
   quotationId?: string;
   recipient: string;
   reservationId?: string;
@@ -74,7 +75,10 @@ export function createDrizzleNotificationOutboxWriter(
       await writeIntents(tx, [
         {
           idempotencyKey: `reservation:${reservationId}:dates_changed:${input.reservation.updatedAt.getTime()}`,
-          payload: { reservationId },
+          // The previous stay rides along in the existing jsonb payload -
+          // no schema change - because the email must name the rooms that
+          // left, which the updated reservation no longer carries.
+          payload: { previousStay: input.previousStay, reservationId },
           recipient: adminRecipient,
           reservationId,
           type: "reservation_dates_changed_admin",
@@ -132,6 +136,12 @@ function toIntent(row: OutboxRow): NotificationOutboxIntent {
       typeof row.payload === "object" && row.payload
         ? ((row.payload as Record<string, unknown>).paymentId as
             | string
+            | undefined)
+        : undefined,
+    previousStay:
+      typeof row.payload === "object" && row.payload
+        ? ((row.payload as Record<string, unknown>).previousStay as
+            | ReservationStaySnapshot
             | undefined)
         : undefined,
     quotationId: row.quotationId ?? undefined,

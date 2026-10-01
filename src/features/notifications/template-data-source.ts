@@ -21,6 +21,8 @@ export function getMockNotificationTemplateDataSource(): NotificationTemplateDat
       if (!reservation) return null;
       const activeRooms = (await getRoomReadSource()).listActive();
       const items = reservation.items.map((item) => ({
+        guestCount: item.guestCount,
+        roomId: item.roomId,
         roomName:
           activeRooms.find((room) => room.id === item.roomId)?.name ??
           "Habitación",
@@ -41,5 +43,14 @@ export function getMockNotificationTemplateDataSource(): NotificationTemplateDat
     },
     getCompanyQuotationEmailData: async (quotationId) =>
       quotationRepository?.getById(quotationId) ?? null,
+    getRoomNamesByIds: async (roomIds) => {
+      const rooms = (await getRoomReadSource()).listActive();
+      return new Map(
+        roomIds.flatMap((roomId) => {
+          const room = rooms.find((candidate) => candidate.id === roomId);
+          return room ? [[roomId, room.name] as const] : [];
+        })
+      );
+    },
   });
 }

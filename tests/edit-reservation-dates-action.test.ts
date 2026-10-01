@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   createDrizzleReservationRepository: vi.fn(() => ({})),
   createDrizzleRoomLockGateway: vi.fn(() => ({})),
   queryProductionRooms: vi.fn(async () => []),
-  editReservationDates: vi.fn(),
+  editReservationStay: vi.fn(),
   revalidatePath: vi.fn(),
 }));
 
@@ -32,7 +32,7 @@ vi.mock("@/infrastructure/database/room-source", () => ({
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/features/reservations", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/features/reservations")>();
-  return { ...actual, editReservationDates: mocks.editReservationDates };
+  return { ...actual, editReservationStay: mocks.editReservationStay };
 });
 
 import { editAdminReservationDatesAction } from "@/features/admin/edit-reservation-dates-action";
@@ -56,7 +56,7 @@ describe("edit admin reservation dates action", () => {
         formData({ id: "r1", checkIn: "2030-01-01", checkOut: "2030-01-03" })
       )
     ).rejects.toThrow();
-    expect(mocks.editReservationDates).not.toHaveBeenCalled();
+    expect(mocks.editReservationStay).not.toHaveBeenCalled();
   });
 
   it("rejects a request missing required fields without touching the database", async () => {
@@ -75,13 +75,13 @@ describe("edit admin reservation dates action", () => {
       formData({ id: "r1", checkIn: "2030-01-01", checkOut: "2030-01-03" })
     );
     expect(result).toMatchObject({ ok: false, code: "failure" });
-    expect(mocks.editReservationDates).not.toHaveBeenCalled();
+    expect(mocks.editReservationStay).not.toHaveBeenCalled();
   });
 
   it("maps an invalid interval error to a validation result", async () => {
     mocks.requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
     mocks.createDatabaseBoundary.mockReturnValue({ context: "production" });
-    mocks.editReservationDates.mockRejectedValueOnce(
+    mocks.editReservationStay.mockRejectedValueOnce(
       new InvalidLodgingIntervalError("2030-01-03", "2030-01-01")
     );
     const result = await editAdminReservationDatesAction(
@@ -93,7 +93,7 @@ describe("edit admin reservation dates action", () => {
   it("maps a room-lock conflict to a conflict result", async () => {
     mocks.requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
     mocks.createDatabaseBoundary.mockReturnValue({ context: "production" });
-    mocks.editReservationDates.mockRejectedValueOnce(
+    mocks.editReservationStay.mockRejectedValueOnce(
       new RoomLockConflictError([], "room-1")
     );
     const result = await editAdminReservationDatesAction(
@@ -105,7 +105,7 @@ describe("edit admin reservation dates action", () => {
   it("maps a not-found reservation to a failure result", async () => {
     mocks.requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
     mocks.createDatabaseBoundary.mockReturnValue({ context: "production" });
-    mocks.editReservationDates.mockRejectedValueOnce(
+    mocks.editReservationStay.mockRejectedValueOnce(
       new ReservationNotFoundError("r1")
     );
     const result = await editAdminReservationDatesAction(
@@ -117,12 +117,12 @@ describe("edit admin reservation dates action", () => {
   it("succeeds and revalidates the relevant admin paths", async () => {
     mocks.requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
     mocks.createDatabaseBoundary.mockReturnValue({ context: "production" });
-    mocks.editReservationDates.mockResolvedValueOnce({});
+    mocks.editReservationStay.mockResolvedValueOnce({});
     const result = await editAdminReservationDatesAction(
       formData({ id: "r1", checkIn: "2030-01-01", checkOut: "2030-01-05" })
     );
     expect(result).toEqual({ ok: true });
-    expect(mocks.editReservationDates).toHaveBeenCalledWith(
+    expect(mocks.editReservationStay).toHaveBeenCalledWith(
       expect.objectContaining({
         input: expect.objectContaining({
           actorUserId: "admin-1",

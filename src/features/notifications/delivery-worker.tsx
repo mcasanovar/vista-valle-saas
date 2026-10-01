@@ -7,6 +7,7 @@ import {
   renderPayAtPropertyConfirmationEmail,
   renderPaymentCollectedAdminEmail,
   renderReservationDatesChangedAdminEmail,
+  type ReservationStayChangeEmailData,
   renderCompanyQuotationAdminEmail,
   renderCompanyQuotationCustomerEmail,
 } from "./email-template-renderer";
@@ -30,7 +31,69 @@ export type NotificationTemplateDataSource = Readonly<{
   getCompanyQuotationEmailData?: (
     quotationId: string
   ) => Promise<CompanyQuotationEmailData | null>;
+  /**
+   * Resolves display names for rooms by id, including rooms a reservation
+   * no longer references - needed to name the rooms a stay edit removed.
+   * Optional: without it, a removed room is reported by its identifier.
+   */
+  getRoomNamesByIds?: (
+    roomIds: readonly string[]
+  ) => Promise<ReadonlyMap<string, string>>;
 }>;
+
+/**
+ * Diffs the stay snapshot carried on the intent against the reservation's
+ * current rooms, so the email can say which rooms came in and which went
+ * out. Returns `undefined` when the intent carries no snapshot (an intent
+ * enqueued before this field existed), in which case the email renders
+ * without a "what changed" section rather than failing.
+ */
+async function buildStayChange(
+  intent: NotificationOutboxIntent,
+  data: PayAtPropertyConfirmationEmailData,
+  source: NotificationTemplateDataSource
+): Promise<ReservationStayChangeEmailData | undefined> {
+  const previousStay = intent.previousStay;
+  if (!previousStay) return undefined;
+
+  const currentItems = data.items ?? [];
+  const currentRoomIds = new Set(
+    currentItems
+      .map((item) => item.roomId)
+      .filter((roomId): roomId is string => Boolean(roomId))
+  );
+  const previousRoomIds = new Set(
+    previousStay.rooms.map((room) => room.roomId)
+  );
+
+  const removedRoomIds = previousStay.rooms
+    .map((room) => room.roomId)
+    .filter((roomId) => !currentRoomIds.has(roomId));
+  // Removed rooms are no longer on the reservation, so their names cannot
+  // come from the reservation's own projection.
+  const removedNames = removedRoomIds.length > 0
+    ? ((await source.getRoomNamesByIds?.(removedRoomIds)) ?? new Map())
+    : new Map<string, string>();
+
+  return Object.freeze({
+    addedRooms: currentItems
+      .filter((item) => item.roomId && !previousRoomIds.has(item.roomId))
+      .map((item) =>
+        Object.freeze({
+          guestCount: item.guestCount ?? 1,
+          roomName: item.roomName,
+        })
+      ),
+    datesChanged:
+      previousStay.checkIn !== data.checkIn ||
+      previousStay.checkOut !== data.checkOut,
+    previousCheckIn: previousStay.checkIn,
+    previousCheckOut: previousStay.checkOut,
+    removedRooms: removedRoomIds.map((roomId) =>
+      Object.freeze({ roomName: removedNames.get(roomId) ?? roomId })
+    ),
+  });
+}
 
 export type NotificationDeliveryWorker = Readonly<{
   process: (outboxId: string) => Promise<void>;
@@ -90,8 +153,11 @@ async function renderEmail(
   }
   if (intent.type === "reservation_dates_changed_admin") {
     return {
-      html: renderReservationDatesChangedAdminEmail(data),
-      subject: "Fechas de reserva actualizadas",
+      html: renderReservationDatesChangedAdminEmail(
+        data,
+        await buildStayChange(intent, data, source)
+      ),
+      subject: "Estadía de reserva actualizada",
     };
   }
   return {

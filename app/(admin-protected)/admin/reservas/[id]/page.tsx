@@ -5,8 +5,9 @@ import { createProductionDatabase } from "@/infrastructure/database/client";
 import { getAdminReservationDetail } from "@/infrastructure/database/admin-reservation-source";
 import { transitionAdminReservation } from "@/features/admin/reservation-actions";
 import { ReservationTransitionControls } from "@/features/admin/reservation-transition-controls";
-import { editAdminReservationDatesAction } from "@/features/admin/edit-reservation-dates-action";
-import { EditReservationDatesForm } from "@/features/admin/edit-reservation-dates-form";
+import { editAdminReservationStayAction } from "@/features/admin/edit-reservation-stay-action";
+import { EditReservationStayForm } from "@/features/admin/edit-reservation-stay-form";
+import { createDrizzleChannelConnectionRepository } from "@/infrastructure/database/channel-connections-repository";
 import { collectPayAtPropertyAdminAction } from "@/features/admin/pay-at-property-admin-collect-action";
 import { refundFintocPaymentAction } from "@/features/admin/fintoc-refund-action";
 import { markPaymentPaidAdminAction } from "@/features/admin/mark-payment-paid-action";
@@ -106,6 +107,17 @@ export default async function ReservationDetail({
   const isExternalChannelOrigin =
     reservation.origin === "airbnb" || reservation.origin === "booking";
 
+  // Rooms with an active channel connection: moving a stay into a room
+  // outside this set silently changes how it syncs with Airbnb and Booking,
+  // so the edit form warns about it before confirming.
+  const channelConnectedRoomIds = Object.freeze([
+    ...new Set(
+      (
+        await createDrizzleChannelConnectionRepository(db).listActive()
+      ).map((connection) => connection.roomId)
+    ),
+  ]);
+
   return (
     <section className="space-y-5">
       <AdminBackLink fallbackHref="/admin/reservas" label="Volver a reservas" />
@@ -201,16 +213,24 @@ export default async function ReservationDetail({
         </p>
         {isExternalChannelOrigin ? (
           <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-            Editar las fechas de esta reserva no se refleja en{" "}
+            Editar la estadía de esta reserva no se refleja en{" "}
             {originLabels[reservation.origin]}: la plataforma externa no se
             entera del cambio.
           </p>
         ) : null}
         <div className="mt-4">
-          <EditReservationDatesForm
-            action={editAdminReservationDatesAction}
+          <EditReservationStayForm
+            action={editAdminReservationStayAction}
+            channelConnectedRoomIds={channelConnectedRoomIds}
             checkIn={reservation.checkIn}
             checkOut={reservation.checkOut}
+            currentRooms={reservation.items.map((item) => ({
+              guestCount: item.guestCount,
+              roomId: item.roomId,
+            }))}
+            {...(isExternalChannelOrigin
+              ? { externalChannelLabel: originLabels[reservation.origin] }
+              : {})}
             reservationId={reservation.id}
           />
         </div>

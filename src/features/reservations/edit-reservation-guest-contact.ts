@@ -23,7 +23,7 @@ export type EditReservationGuestContactParams<TContext> = Readonly<{
  * Updates a reservation's guest contact info (name, last name, email,
  * phone), independent of the reservation's origin or status (design.md
  * decision 4 of "allow-full-reservation-editing-and-ota-sync-toggle").
- * Deliberately separate from `editReservationDates`: this edit never
+ * Deliberately separate from `editReservationStay`: this edit never
  * touches dates, pricing, payments, or reservation status, so it needs no
  * room lock and no financial recalculation.
  */

@@ -1,10 +1,9 @@
-# reservation-date-editing Specification
+## RENAMED Requirements
 
-## Purpose
+- FROM: `### Requirement: Edición transaccional de fechas`
+- TO: `### Requirement: Edición transaccional de la estadía`
 
-Permitir que el personal autorizado ajuste la estadía completa de una reserva elegible —sus fechas, el conjunto de habitaciones y la cantidad de personas de cada habitación— en una sola operación, sin perder consistencia de disponibilidad, precios, pagos ni trazabilidad operativa.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Edición transaccional de la estadía
 
@@ -116,6 +115,8 @@ El sistema SHALL registrar una auditoría del cambio con administrador, fechas a
 
 - **WHEN** la modificación falla por autorización, elegibilidad, intervalo, capacidad, disponibilidad o por quedar sin habitaciones
 - **THEN** no se registra un cambio de fechas, habitaciones, ocupación, precio o pago como exitoso ni se envía una comunicación de modificación
+
+## ADDED Requirements
 
 ### Requirement: Estadía con al menos una habitación
 

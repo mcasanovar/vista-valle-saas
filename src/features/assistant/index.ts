@@ -8,7 +8,7 @@
 // Already typed-invocable via their feature's barrel:
 // - `searchAvailability` — `@/features/availability`
 // - `createRoomBlocks`, `removeRoomBlock`, `listRoomBlocks` — `@/features/room-blocks`
-// - `editReservationDates`, `transitionReservationState` — `@/features/reservations`
+// - `editReservationStay`, `transitionReservationState` — `@/features/reservations`
 //
 // Typed but NOT YET invocable cross-feature: `src/features/admin/` has no
 // `index.ts` barrel, so none of its exports — including the typed cores
