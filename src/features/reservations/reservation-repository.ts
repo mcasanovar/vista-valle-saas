@@ -167,13 +167,17 @@ export type ReservationDateEditPaymentAction =
 
 /**
  * Recalculated, server-authoritative pricing and financial action to
- * persist for a date edit (see
- * `@/features/reservations/edit-reservation-dates`). `items` mirrors every
- * existing room line with its recalculated `nightlyPriceClp`, `nights`,
- * `chargesClp`, and `totalClp` for the new interval - the repository never
+ * persist for a stay edit (see
+ * `@/features/reservations/edit-reservation-stay`). `items` is the
+ * **complete requested set** of room lines - not a mirror of the rows that
+ * already exist - each with its recalculated `guestCount`,
+ * `nightlyPriceClp`, `nights`, `chargesClp`, and `totalClp`. The
+ * repository diffs it against the persisted items and applies the
+ * difference: a room absent from `items` is removed, a room present only
+ * in `items` is added, and a room in both is updated. The repository never
  * receives (or trusts) a caller-supplied total or payment amount.
  */
-export type EditReservationDatesTransactionInput = Readonly<{
+export type EditReservationStayTransactionInput = Readonly<{
   actorUserId?: string;
   /** Persisted sum of approved payments used to compute `paymentAction` - recorded verbatim in the audit event (task 2.4), never re-derived by the repository. */
   approvedPaymentsClp: number;
@@ -259,14 +263,14 @@ export type ReservationRepository<TContext> = Readonly<{
     transition: ReservationStateTransition
   ) => Promise<ReservationRecord>;
   /**
-   * Atomically updates a reservation's header and every room item to a
-   * recalculated interval/pricing (task 2.1 implements the Drizzle
-   * adapter; task 1.4 implements the mock double). Optional until both
-   * adapters land.
+   * Atomically updates a reservation's header and its whole set of room
+   * items to a recalculated interval/pricing. `input.items` is the
+   * complete requested set, so this also adds and removes rooms, not only
+   * updates the ones already there. Optional until both adapters land.
    */
-  editReservationDates?: (
+  editReservationStay?: (
     context: TContext,
-    input: EditReservationDatesTransactionInput
+    input: EditReservationStayTransactionInput
   ) => Promise<ReservationRecord>;
   /**
    * Non-transactional add/edit/remove of a reservation's invoice request
@@ -583,7 +587,7 @@ export function createMockReservationRepository(
 
       return updated;
     },
-    editReservationDates: async (context, input) => {
+    editReservationStay: async (context, input) => {
       const current = storage.reservationsById.get(input.reservationId);
       if (!current) throw new ReservationNotFoundError(input.reservationId);
 
@@ -607,6 +611,11 @@ export function createMockReservationRepository(
         chargesClp: firstItem.chargesClp,
         checkIn: input.checkIn,
         checkOut: input.checkOut,
+        // Derived from the items, never carried over from the previous
+        // record - mirrors `toReservationRecord` in the Drizzle adapter, so
+        // a stay edit that changes occupancy or the room set reports the
+        // same guest count through both implementations.
+        guestCount: items.reduce((total, item) => total + item.guestCount, 0),
         items,
         nightlyPriceClp: firstItem.nightlyPriceClp,
         roomId: firstItem.roomId,

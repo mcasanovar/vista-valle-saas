@@ -22,7 +22,7 @@ export type EditReservationDatesToolResult = Readonly<{
 /**
  * `editar_fechas` (task 6.5): proposes new dates for a reservation. The
  * real conflict check (whether the new interval is free) happens only at
- * confirmation, inside `editReservationDates` itself — proposing here
+ * confirmation, inside `editReservationStay` itself — proposing here
  * never touches data.
  */
 export function createEditReservationDatesTool(): AssistantToolDefinition<

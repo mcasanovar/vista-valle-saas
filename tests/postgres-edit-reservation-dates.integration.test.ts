@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, describe, expect, it } from "vitest";
@@ -8,6 +8,10 @@ import {
   editReservationDates,
   type ReservationDateEditRoomRate,
 } from "@/features/reservations/edit-reservation-dates";
+import {
+  editReservationStay,
+  ReservationStayRequiresRoomError,
+} from "@/features/reservations/edit-reservation-stay";
 import {
   getAdminReservationDetail,
   listAdminReservations,
@@ -135,8 +139,8 @@ if (!enabled) {
 
     describe("multi-room transaction (task 4.1)", () => {
       it("updates the header and every room item atomically when extending a multi-room reservation", async () => {
-        const roomA = "00000000-0000-4000-8000-000000000601";
-        const roomB = "00000000-0000-4000-8000-000000000602";
+        const roomA = "00000000-0000-4000-8000-000000001061";
+        const roomB = "00000000-0000-4000-8000-000000001062";
         await insertRoom(roomA);
         await insertRoom(roomB);
         const guest = await insertGuest();
@@ -170,7 +174,7 @@ if (!enabled) {
       });
 
       it("rejects a conflicting extension and leaves the reservation, its items and payments untouched", async () => {
-        const room = "00000000-0000-4000-8000-000000000611";
+        const room = "00000000-0000-4000-8000-000000001071";
         await insertRoom(room);
         const guestA = await insertGuest();
         const target = await insertReservation(
@@ -228,7 +232,7 @@ if (!enabled) {
 
     describe("payments and audit (task 4.2)", () => {
       it("replaces the pending amount for an unpaid reservation and audits before/after", async () => {
-        const room = "00000000-0000-4000-8000-000000000621";
+        const room = "00000000-0000-4000-8000-000000001081";
         await insertRoom(room);
         const guest = await insertGuest();
         const reservation = await insertReservation(
@@ -282,7 +286,7 @@ if (!enabled) {
       });
 
       it("keeps an approved payment untouched and opens a separate balance for an extension", async () => {
-        const room = "00000000-0000-4000-8000-000000000622";
+        const room = "00000000-0000-4000-8000-000000001082";
         await insertRoom(room);
         const guest = await insertGuest();
         const reservation = await insertReservation(
@@ -320,7 +324,7 @@ if (!enabled) {
       });
 
       it("flags an overpayment without creating a new charge when reducing a paid reservation", async () => {
-        const room = "00000000-0000-4000-8000-000000000623";
+        const room = "00000000-0000-4000-8000-000000001083";
         await insertRoom(room);
         const guest = await insertGuest();
         const reservation = await insertReservation(
@@ -370,7 +374,7 @@ if (!enabled) {
       });
 
       it("does not duplicate the pending balance on a retried identical edit", async () => {
-        const room = "00000000-0000-4000-8000-000000000624";
+        const room = "00000000-0000-4000-8000-000000001084";
         await insertRoom(room);
         const guest = await insertGuest();
         const reservation = await insertReservation(
@@ -405,7 +409,7 @@ if (!enabled) {
 
     describe("calendar, listing and iCal reflect the new dates (task 3.4)", () => {
       it("shows the edited dates in the calendar, listing, detail and outbound feed source", async () => {
-        const room = "00000000-0000-4000-8000-000000000631";
+        const room = "00000000-0000-4000-8000-000000001091";
         await insertRoom(room);
         const guest = await insertGuest();
         const reservation = await insertReservation(
@@ -462,6 +466,301 @@ if (!enabled) {
           checkIn: "2042-07-01",
           checkOut: "2042-07-06",
         });
+      });
+    });
+
+    describe("room-set diff (tasks 1.2, 1.3 and 1.4)", () => {
+      it("swaps a room: deletes the outgoing item, inserts the incoming one", async () => {
+        const roomA = "00000000-0000-4000-8000-000000001001";
+        const roomB = "00000000-0000-4000-8000-000000001002";
+        await insertRoom(roomA);
+        await insertRoom(roomB, 30_000);
+        const guest = await insertGuest();
+        const reservation = await insertReservation(
+          guest.id,
+          [roomA],
+          "2043-01-05",
+          "2043-01-07"
+        );
+
+        await editReservationStay({
+          getRoomRates: ratesOf({ [roomB]: 30_000 }),
+          input: {
+            actorUserId: adminActorId,
+            items: [{ guestCount: 2, roomId: roomB }],
+            reservationId: reservation.id,
+          },
+          reservationRepository,
+          roomLockGateway,
+        });
+
+        const itemRows = await db
+          .select()
+          .from(reservationItems)
+          .where(eq(reservationItems.reservationId, reservation.id));
+        expect(itemRows).toHaveLength(1);
+        expect(itemRows[0]).toMatchObject({ roomId: roomB, guestCount: 2 });
+
+        // The outgoing room is free again; the incoming one is occupied.
+        const occupyingA = await listOccupyingIntervals(db, roomA, new Date());
+        expect(
+          occupyingA.find((entry) => entry.sourceId === reservation.id)
+        ).toBeUndefined();
+        const occupyingB = await listOccupyingIntervals(db, roomB, new Date());
+        expect(
+          occupyingB.find((entry) => entry.sourceId === reservation.id)
+        ).toBeDefined();
+      });
+
+      it("re-adds a previously removed room without violating the unique index", async () => {
+        // The three diff groups are disjoint by construction, so the
+        // delete/insert order cannot by itself violate
+        // `reservation_items_reservation_room_unique` (verified by
+        // inverting the adapter's order: these tests still pass). What this
+        // covers is the real risk: removing a room and later bringing it
+        // back must reuse that (reservation_id, room_id) pair cleanly,
+        // which only holds if the first edit truly deleted the row instead
+        // of leaving it behind.
+        const roomA = "00000000-0000-4000-8000-000000001011";
+        const roomB = "00000000-0000-4000-8000-000000001012";
+        await insertRoom(roomA);
+        await insertRoom(roomB, 30_000);
+        const guest = await insertGuest();
+        const reservation = await insertReservation(
+          guest.id,
+          [roomA, roomB],
+          "2043-02-05",
+          "2043-02-07"
+        );
+
+        // A → out, B → stays with a new occupancy: the delete and the
+        // update both target rows of this same reservation.
+        await editReservationStay({
+          getRoomRates: ratesOf({ [roomB]: 30_000 }),
+          input: {
+            actorUserId: adminActorId,
+            items: [{ guestCount: 3, roomId: roomB }],
+            reservationId: reservation.id,
+          },
+          reservationRepository,
+          roomLockGateway,
+        });
+
+        const afterRemoval = await db
+          .select()
+          .from(reservationItems)
+          .where(eq(reservationItems.reservationId, reservation.id));
+        expect(afterRemoval).toHaveLength(1);
+        expect(afterRemoval[0]).toMatchObject({ roomId: roomB, guestCount: 3 });
+
+        // Now bring A back into the same stay: the INSERT must land cleanly
+        // on the pair the first edit deleted.
+        await editReservationStay({
+          getRoomRates: ratesOf({ [roomA]: 60_000, [roomB]: 30_000 }),
+          input: {
+            actorUserId: adminActorId,
+            items: [
+              { guestCount: 2, roomId: roomA },
+              { guestCount: 3, roomId: roomB },
+            ],
+            reservationId: reservation.id,
+          },
+          reservationRepository,
+          roomLockGateway,
+        });
+
+        const reinstated = await db
+          .select()
+          .from(reservationItems)
+          .where(eq(reservationItems.reservationId, reservation.id));
+        expect(reinstated).toHaveLength(2);
+        expect(
+          reinstated.map((row) => row.roomId).sort()
+        ).toEqual([roomA, roomB].sort());
+      });
+
+      it("adds a room as a new item without touching the item that stays", async () => {
+        const roomA = "00000000-0000-4000-8000-000000001021";
+        const roomB = "00000000-0000-4000-8000-000000001022";
+        await insertRoom(roomA);
+        await insertRoom(roomB, 30_000);
+        const guest = await insertGuest();
+        const reservation = await insertReservation(
+          guest.id,
+          [roomA],
+          "2043-03-05",
+          "2043-03-07"
+        );
+        const [before] = await db
+          .select()
+          .from(reservationItems)
+          .where(eq(reservationItems.reservationId, reservation.id));
+
+        await editReservationStay({
+          getRoomRates: ratesOf({ [roomA]: 60_000, [roomB]: 30_000 }),
+          input: {
+            actorUserId: adminActorId,
+            items: [
+              { guestCount: 2, roomId: roomA },
+              { guestCount: 2, roomId: roomB },
+            ],
+            reservationId: reservation.id,
+          },
+          reservationRepository,
+          roomLockGateway,
+        });
+
+        const itemRows = await db
+          .select()
+          .from(reservationItems)
+          .where(eq(reservationItems.reservationId, reservation.id));
+        expect(itemRows).toHaveLength(2);
+        const kept = itemRows.find((row) => row.roomId === roomA);
+        expect(kept).toMatchObject({
+          id: before!.id,
+          guestCount: 2,
+          nightlyPriceClp: 60_000,
+        });
+        const added = itemRows.find((row) => row.roomId === roomB);
+        expect(added).toMatchObject({ guestCount: 2, nightlyPriceClp: 30_000 });
+
+        const [header] = await db
+          .select()
+          .from(reservations)
+          .where(eq(reservations.id, reservation.id));
+        expect(header!.totalClp).toBe(
+          itemRows.reduce((total, row) => total + row.subtotalClp, 0)
+        );
+      });
+
+      it("removes a room, taking its charges with the row and leaving no orphan", async () => {
+        const roomA = "00000000-0000-4000-8000-000000001031";
+        const roomB = "00000000-0000-4000-8000-000000001032";
+        await insertRoom(roomA);
+        await insertRoom(roomB, 30_000);
+        const guest = await insertGuest();
+        const reservation = await insertReservation(
+          guest.id,
+          [roomA, roomB],
+          "2043-04-05",
+          "2043-04-07"
+        );
+        // Give the outgoing room a charge so its removal must take it along.
+        await db
+          .update(reservationItems)
+          .set({ chargesClp: 15_000, subtotalClp: 75_000 })
+          .where(
+            and(
+              eq(reservationItems.reservationId, reservation.id),
+              eq(reservationItems.roomId, roomB)
+            )
+          );
+
+        await editReservationStay({
+          getRoomRates: ratesOf({ [roomA]: 60_000 }),
+          input: {
+            actorUserId: adminActorId,
+            items: [{ guestCount: 2, roomId: roomA }],
+            reservationId: reservation.id,
+          },
+          reservationRepository,
+          roomLockGateway,
+        });
+
+        const itemRows = await db
+          .select()
+          .from(reservationItems)
+          .where(eq(reservationItems.reservationId, reservation.id));
+        expect(itemRows).toHaveLength(1);
+        expect(itemRows[0]!.roomId).toBe(roomA);
+        // No row anywhere still points at the removed room for this stay.
+        const orphans = await db
+          .select()
+          .from(reservationItems)
+          .where(
+            and(
+              eq(reservationItems.reservationId, reservation.id),
+              eq(reservationItems.roomId, roomB)
+            )
+          );
+        expect(orphans).toHaveLength(0);
+
+        const [header] = await db
+          .select()
+          .from(reservations)
+          .where(eq(reservations.id, reservation.id));
+        expect(header!.totalClp).toBe(itemRows[0]!.subtotalClp);
+
+        const occupying = await listOccupyingIntervals(db, roomB, new Date());
+        expect(
+          occupying.find((entry) => entry.sourceId === reservation.id)
+        ).toBeUndefined();
+      });
+
+      it("updates only the occupancy when the room set does not change", async () => {
+        const room = "00000000-0000-4000-8000-000000001041";
+        await insertRoom(room);
+        const guest = await insertGuest();
+        const reservation = await insertReservation(
+          guest.id,
+          [room],
+          "2043-05-05",
+          "2043-05-07"
+        );
+        const [before] = await db
+          .select()
+          .from(reservationItems)
+          .where(eq(reservationItems.reservationId, reservation.id));
+
+        await editReservationStay({
+          getRoomRates: ratesOf({ [room]: 60_000 }),
+          input: {
+            actorUserId: adminActorId,
+            items: [{ guestCount: 4, roomId: room }],
+            reservationId: reservation.id,
+          },
+          reservationRepository,
+          roomLockGateway,
+        });
+
+        const itemRows = await db
+          .select()
+          .from(reservationItems)
+          .where(eq(reservationItems.reservationId, reservation.id));
+        expect(itemRows).toHaveLength(1);
+        // Same row updated in place, not deleted and re-inserted.
+        expect(itemRows[0]).toMatchObject({ id: before!.id, guestCount: 4 });
+      });
+
+      it("rejects an edit that would leave the reservation with no rooms", async () => {
+        const room = "00000000-0000-4000-8000-000000001051";
+        await insertRoom(room);
+        const guest = await insertGuest();
+        const reservation = await insertReservation(
+          guest.id,
+          [room],
+          "2043-06-05",
+          "2043-06-07"
+        );
+
+        await expect(
+          editReservationStay({
+            getRoomRates: ratesOf({ [room]: 60_000 }),
+            input: {
+              actorUserId: adminActorId,
+              items: [],
+              reservationId: reservation.id,
+            },
+            reservationRepository,
+            roomLockGateway,
+          })
+        ).rejects.toBeInstanceOf(ReservationStayRequiresRoomError);
+
+        const itemRows = await db
+          .select()
+          .from(reservationItems)
+          .where(eq(reservationItems.reservationId, reservation.id));
+        expect(itemRows).toHaveLength(1);
       });
     });
   });

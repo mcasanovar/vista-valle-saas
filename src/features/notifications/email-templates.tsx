@@ -11,7 +11,18 @@ export type PayAtPropertyConfirmationEmailData = Readonly<{
   nights: number;
   publicId: string;
   roomName: string;
-  items?: readonly Readonly<{ roomName: string; subtotalClp: number }>[];
+  /**
+   * One entry per room on the reservation. `guestCount` and `roomId` are
+   * optional so older fixtures keep type-checking; a stay-change email
+   * needs both - the occupancy to report, and the id to tell which rooms
+   * are new against the pre-edit snapshot.
+   */
+  items?: readonly Readonly<{
+    guestCount?: number;
+    roomId?: string;
+    roomName: string;
+    subtotalClp: number;
+  }>[];
   totalClp: number;
 }>;
 

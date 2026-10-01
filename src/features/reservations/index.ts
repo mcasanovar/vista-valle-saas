@@ -12,6 +12,7 @@ export * from "@/features/reservations/confirm-pay-at-property";
 export * from "@/features/reservations/confirm-pay-now-reservation";
 export * from "@/features/reservations/online-checkout-candidate";
 export * from "@/features/reservations/transition-reservation-state";
+export * from "@/features/reservations/edit-reservation-stay";
 export * from "@/features/reservations/edit-reservation-dates";
 export * from "@/features/reservations/edit-reservation-guest-contact";
 export * from "@/features/reservations/edit-reservation-invoice";

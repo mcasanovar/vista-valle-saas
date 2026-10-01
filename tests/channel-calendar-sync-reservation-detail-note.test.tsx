@@ -20,11 +20,16 @@ vi.mock("@/features/admin/reservation-actions", () => ({
 vi.mock("@/features/admin/reservation-transition-controls", () => ({
   ReservationTransitionControls: () => null,
 }));
-vi.mock("@/features/admin/edit-reservation-dates-action", () => ({
-  editAdminReservationDatesAction: vi.fn(),
+vi.mock("@/features/admin/edit-reservation-stay-action", () => ({
+  editAdminReservationStayAction: vi.fn(),
 }));
-vi.mock("@/features/admin/edit-reservation-dates-form", () => ({
-  EditReservationDatesForm: () => null,
+vi.mock("@/features/admin/edit-reservation-stay-form", () => ({
+  EditReservationStayForm: () => null,
+}));
+vi.mock("@/infrastructure/database/channel-connections-repository", () => ({
+  createDrizzleChannelConnectionRepository: () => ({
+    listActive: async () => [],
+  }),
 }));
 vi.mock("@/features/admin/edit-reservation-guest-contact-action", () => ({
   editReservationGuestContactAction: vi.fn(),

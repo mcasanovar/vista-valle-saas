@@ -8,7 +8,7 @@ Darle una visual amigable y funcional a la seccion de administracion de reservas
 
 ### Requirement: Gestión de reservas
 
-El sistema SHALL permitir listar, buscar, filtrar, consultar, modificar fechas de estadía en cualquier reserva independientemente de su origen o estado, y cambiar el estado de una reserva a cancelada, completada o no presentada, exclusivamente contra los datos de producción. Editar las fechas de una reserva SHALL NOT modificar su estado. El listado SHALL presentarse paginado, con las reservas más recientemente creadas primero por defecto. El sistema SHALL permitir buscar por texto libre sobre nombre, apellido, email, teléfono, RUT y empresa del huésped, el identificador público de la reserva, y el nombre de la o las habitaciones asociadas, sin considerar el comentario libre del huésped. El sistema SHALL permitir filtrar por fecha de llegada y, opcionalmente, por fecha de salida, cada una admitiendo tanto una fecha exacta como un rango de fechas. El detalle de una reserva SHALL identificar todas sus habitaciones, subtotales, total agregado, el o los pagos asociados con su estado, y, cuando exista, la solicitud de factura sin exponer antecedentes tributarios innecesarios. El detalle SHALL ofrecer controles de edición de fechas y de datos de contacto del huésped para cualquier reserva, sin condicionarlos a su origen o estado, y SHALL mostrar el resultado financiero recalculado, los saldos pendientes y los sobrepagos pendientes de resolución manual. El sistema SHALL permitir cancelar una reserva confirmada independientemente de si su fecha de llegada ya pasó.
+El sistema SHALL permitir listar, buscar, filtrar, consultar, modificar la estadía —fechas, conjunto de habitaciones y cantidad de personas por habitación— en cualquier reserva independientemente de su origen o estado, y cambiar el estado de una reserva a cancelada, completada o no presentada, exclusivamente contra los datos de producción. Editar la estadía de una reserva SHALL NOT modificar su estado. El listado SHALL presentarse paginado, con las reservas más recientemente creadas primero por defecto. El sistema SHALL permitir buscar por texto libre sobre nombre, apellido, email, teléfono, RUT y empresa del huésped, el identificador público de la reserva, y el nombre de la o las habitaciones asociadas, sin considerar el comentario libre del huésped. El sistema SHALL permitir filtrar por fecha de llegada y, opcionalmente, por fecha de salida, cada una admitiendo tanto una fecha exacta como un rango de fechas. El detalle de una reserva SHALL identificar todas sus habitaciones, la cantidad de personas de cada una, subtotales, total agregado, el o los pagos asociados con su estado, y, cuando exista, la solicitud de factura sin exponer antecedentes tributarios innecesarios. El detalle SHALL ofrecer un control de edición de estadía y un control de edición de datos de contacto del huésped para cualquier reserva, sin condicionarlos a su origen o estado, y SHALL mostrar el resultado financiero recalculado, los saldos pendientes y los sobrepagos pendientes de resolución manual. El sistema SHALL permitir cancelar una reserva confirmada independientemente de si su fecha de llegada ya pasó.
 
 #### Scenario: Marcar no presentación
 
@@ -18,7 +18,7 @@ El sistema SHALL permitir listar, buscar, filtrar, consultar, modificar fechas d
 #### Scenario: Consulta de reserva con varias habitaciones
 
 - **WHEN** el administrador abre una reserva que contiene varias habitaciones
-- **THEN** puede identificar todos sus ítems y las fechas comunes para operar y completar el bloqueo manual de canales
+- **THEN** puede identificar todos sus ítems, la cantidad de personas de cada uno y las fechas comunes para operar y completar el bloqueo manual de canales
 
 #### Scenario: Búsqueda por cualquier campo del huésped o la reserva
 
@@ -53,12 +53,17 @@ El sistema SHALL permitir listar, buscar, filtrar, consultar, modificar fechas d
 #### Scenario: Edición disponible para una reserva propia sin importar su estado
 
 - **WHEN** el administrador abre una reserva con origen website, teléfono, WhatsApp o administración, sin importar si está confirmada, cancelada, completada o marcada como no presentada
-- **THEN** el detalle muestra las acciones para editar `check-in`, `check-out` y los datos de contacto del huésped, y la edición no altera el estado de la reserva
+- **THEN** el detalle muestra las acciones para editar la estadía —`check-in`, `check-out`, habitaciones y personas por habitación— y los datos de contacto del huésped, y la edición no altera el estado de la reserva
 
 #### Scenario: Edición bloqueada para una reserva de canal externo
 
 - **WHEN** el administrador abre una reserva con origen Airbnb o Booking
-- **THEN** el detalle ya no bloquea la edición por ese origen: muestra las mismas acciones para editar `check-in`, `check-out` y los datos de contacto del huésped que para una reserva de origen propio, sin alterar el estado de la reserva
+- **THEN** el detalle ya no bloquea la edición por ese origen: muestra las mismas acciones para editar la estadía y los datos de contacto del huésped que para una reserva de origen propio, sin alterar el estado de la reserva
+
+#### Scenario: Edición de fechas y habitaciones en una sola operación
+
+- **WHEN** el administrador necesita mover las fechas de una reserva y además cambiar sus habitaciones
+- **THEN** el detalle le permite enviar ambos cambios en una única edición de estadía, que produce un solo recálculo financiero, un solo registro de auditoría y una sola comunicación administrativa
 
 #### Scenario: Cancelación de una reserva con fecha de llegada pasada
 
@@ -168,6 +173,7 @@ El sistema SHALL permitir a un administrador autorizado crear y retirar bloqueos
 - **THEN** el sistema conserva el texto elegido como motivo del bloqueo y lo muestra en su detalle y listado
 
 ### Requirement: Acceso administrativo protegido
+
 El sistema SHALL exigir autenticación a una cuenta administrativa autorizada para acceder a datos de huéspedes y ejecutar operaciones del panel, sin ofrecer registro público de administradores.
 
 #### Scenario: Visitante no autenticado
@@ -175,6 +181,7 @@ El sistema SHALL exigir autenticación a una cuenta administrativa autorizada pa
 - **THEN** el sistema impide el acceso y solicita autenticación
 
 ### Requirement: Calendario operativo
+
 El sistema SHALL presentar por habitación las reservas, retenciones relevantes y bloqueos en una vista de calendario que permita identificar disponibilidad y origen.
 
 #### Scenario: Revisión de una fecha
@@ -182,6 +189,7 @@ El sistema SHALL presentar por habitación las reservas, retenciones relevantes 
 - **THEN** puede distinguir disponibilidad, reserva, retención o bloqueo y abrir su detalle
 
 ### Requirement: Reservas manuales multicanal
+
 El sistema SHALL permitir crear reservas manuales indicando como origen Airbnb, Booking, teléfono, WhatsApp o administración, aplicando las mismas validaciones de disponibilidad que una reserva web.
 
 #### Scenario: Ingreso de reserva de Booking
@@ -193,6 +201,7 @@ El sistema SHALL permitir crear reservas manuales indicando como origen Airbnb, 
 - **THEN** el sistema rechaza la creación y muestra el conflicto existente
 
 ### Requirement: Control de sincronización manual
+
 El sistema SHALL marcar cada reserva web confirmada como pendiente de bloqueo externo y permitir registrar por separado que Airbnb y Booking fueron bloqueados.
 
 #### Scenario: Nueva reserva web
@@ -204,7 +213,8 @@ El sistema SHALL marcar cada reserva web confirmada como pendiente de bloqueo ex
 - **THEN** la reserva deja de aparecer como pendiente de sincronización manual y conserva quién y cuándo completó la tarea
 
 ### Requirement: Auditoría administrativa
-El sistema SHALL registrar actor, fecha y cambio para operaciones sensibles sobre reservas, pagos, bloqueos y sincronización manual.
+
+El sistema SHALL registrar actor, fecha y cambio para operaciones sensibles sobre reservas, pagos, bloqueos y sincronización manual. El cambio de estadía de una reserva SHALL constar entre esas operaciones, registrando la diferencia de fechas, de habitaciones y de cantidad de personas por habitación.
 
 #### Scenario: Cancelación administrativa
 - **WHEN** un administrador cancela una reserva
@@ -214,7 +224,12 @@ El sistema SHALL registrar actor, fecha y cambio para operaciones sensibles sobr
 - **WHEN** un administrador cancela una reserva que tiene uno o más pagos asociados
 - **THEN** el sistema conserva, además del evento de auditoría de la reserva, un evento de auditoría por cada pago cancelado automáticamente, con su estado anterior, su nuevo estado (`cancelled`) y el responsable
 
+#### Scenario: Cambio de estadía de una reserva
+- **WHEN** un administrador confirma una edición de estadía que cambia fechas, habitaciones o cantidad de personas por habitación
+- **THEN** el sistema conserva un único evento de auditoría que identifica al responsable, las fechas anteriores y nuevas, las habitaciones que entran y salen, y la cantidad de personas anterior y nueva por habitación
+
 ### Requirement: Estado de pago cancelado en el listado de reservas
+
 El listado de reservas SHALL mostrar el estado de pago de una reserva cancelada como cancelado, en vez de pendiente o pagado, sin importar el estado que tuvieran sus pagos antes de la cancelación.
 
 #### Scenario: Reserva cancelada con pago previamente aprobado
@@ -226,9 +241,9 @@ El listado de reservas SHALL mostrar el estado de pago de una reserva cancelada 
 - **THEN** el sistema muestra el estado de pago de esa fila como cancelado, no como pendiente
 
 ### Requirement: Autenticación administrativa aislada en contexto mock
+
 El sistema SHALL ofrecer sesiones administrativas simuladas y persistencia controlada bajo un contexto mock explícito para validar el panel sin conectarse a Supabase Auth ni a una base externa, sin permitir que esas identidades sean aceptadas en producción.
 
 #### Scenario: Validación local del panel
 - **WHEN** se prueba una ruta administrativa bajo el contexto mock
 - **THEN** el sistema utiliza una identidad controlada y adaptadores locales, aplica las mismas fronteras de autorización configuradas y no realiza solicitudes de red
-
