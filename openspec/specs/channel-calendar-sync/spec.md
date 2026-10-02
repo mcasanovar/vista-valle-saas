@@ -81,13 +81,6 @@ El sistema SHALL detectar cuando un evento entrante se superpone con una reserva
 - **WHEN** el sondeo detecta este conflicto bajo contexto de producción
 - **THEN** el sistema persiste la alerta de forma que sobrevive a un reinicio del proceso y aparece en la pantalla de alertas del administrador, en vez de descartarse en memoria
 
-### Requirement: Alerta de conflicto por vencimiento de retención durante sincronización
-El sistema SHALL generar la misma alerta operativa de conflicto cuando una retención de pago en línea vence y su reserva no puede confirmarse porque, en el intervalo, una sincronización externa ocupó la habitación para las mismas fechas. Esta alerta SHALL persistir de la misma forma que la alerta de conflicto en la ingesta, en cualquier contexto.
-
-#### Scenario: Pago aprobado después de vencer la retención por ocupación externa
-- **WHEN** un pago en línea se aprueba para una retención ya vencida cuya habitación fue ocupada por una reserva sincronizada durante la ventana de vencimiento
-- **THEN** el sistema no confirma una reserva conflictiva a partir de ese pago y registra una alerta visible para el administrador describiendo la situación para que coordine con el huésped
-
 ### Requirement: La cola manual no duplica una conexión activa
 El sistema SHALL omitir la creación de una tarea de sincronización manual para una combinación de plataforma y habitación cuya conexión de canal esté activa, dado que esa plataforma ya recibe el bloqueo de fechas de forma automática a través del feed saliente.
 
