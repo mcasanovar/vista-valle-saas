@@ -7,6 +7,7 @@ import {
 import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
 import {
   createMultiRoomPayAtPropertyReservation,
+  isExternalChannelOrigin,
   parseGuestInput,
   selectedRooms,
   toResolvedRoom,
@@ -37,6 +38,7 @@ import {
   type ManualReservationDateFieldError,
 } from "./manual-reservation-contract";
 import { writeStructuredLog } from "@/infrastructure/observability/sentry";
+import { parseNightlyRateAmount } from "./nightly-rate-amount";
 
 export {
   manualOrigins,
@@ -86,6 +88,13 @@ export type ManualReservationInput = Readonly<{
   checkOut: string;
   guest: GuestBookingInput;
   invoice?: ManualReservationInvoiceInput;
+  /**
+   * Hand-set nightly values by `roomId`, accepted only when `origin` is
+   * `airbnb` or `booking` (`reservation-rate-and-channel-editing` spec
+   * "Sobrescritura al crear una reserva manual"). A room absent from the map
+   * is priced from its current occupancy rate, exactly as before.
+   */
+  nightlyRates?: ReadonlyMap<string, number>;
   origin: ManualOrigin;
   rooms: readonly ManualReservationRoomSelection[];
 }>;
@@ -111,6 +120,44 @@ function requestedInvoice(candidate: Record<string, unknown>) {
  * form's `FormData` action — it never parses strings or reads a loose
  * record, so it can't diverge from what the form path validates.
  */
+/** Thrown when a hand-set nightly value reaches the creation path with an unusable amount. */
+export class InvalidManualNightlyRateError extends RangeError {
+  readonly code = "INVALID_MANUAL_NIGHTLY_RATE" as const;
+  readonly roomId: string;
+
+  constructor(roomId: string) {
+    super(
+      `Nightly value for room ${roomId} must be a positive whole amount of CLP`
+    );
+    this.name = "InvalidManualNightlyRateError";
+    this.roomId = roomId;
+  }
+}
+
+/**
+ * Overrides one resolved room's nightly value with the administrator's, when
+ * the reservation's origin allows it. Silently ignores the map for any other
+ * origin, so a submission carrying rates for a phone or admin reservation
+ * cannot change its price; the amount itself is validated here so the DB
+ * check `reservation_items_nightly_price_positive` is never the first line of
+ * defence.
+ */
+function applyManualNightlyRate<
+  TRoom extends Readonly<{ id: string; nightlyPriceClp: number }>,
+>(room: TRoom, input: ManualReservationInput): TRoom {
+  if (!input.nightlyRates || !isExternalChannelOrigin(input.origin))
+    return room;
+  const manual = input.nightlyRates.get(room.id);
+  if (manual === undefined) return room;
+  if (!Number.isSafeInteger(manual) || manual <= 0)
+    throw new InvalidManualNightlyRateError(room.id);
+  return Object.freeze({
+    ...room,
+    nightlyPriceClp: manual,
+    nightlyPriceManual: true,
+  });
+}
+
 export async function createManualReservationFromInput<TContext>(
   input: ManualReservationInput,
   actor: string,
@@ -125,7 +172,9 @@ export async function createManualReservationFromInput<TContext>(
     roomSource
   );
   if (!selected.length) throw new Error("Unknown room");
-  const rooms = selected.map(toResolvedRoom);
+  const rooms = selected
+    .map(toResolvedRoom)
+    .map((room) => applyManualNightlyRate(room, input));
   const interval = createLodgingInterval(input.checkIn, input.checkOut);
   const dateErrors = validateManualReservationDateRange(
     interval.checkIn,
@@ -153,6 +202,27 @@ export async function createManualReservationFromInput<TContext>(
 }
 
 /**
+ * Reads the per-room nightly values out of a loose submission record. Each
+ * room arrives as a `rate:<roomId>` key, mirroring the edit action's field
+ * naming. An empty value means "use the room's rate" and is simply omitted; a
+ * malformed amount is passed through so `applyManualNightlyRate` rejects it
+ * rather than being silently dropped.
+ */
+function manualNightlyRatesOf(
+  candidate: Record<string, unknown>
+): ReadonlyMap<string, number> | undefined {
+  const rates = new Map<string, number>();
+  for (const [key, value] of Object.entries(candidate)) {
+    if (!key.startsWith("rate:")) continue;
+    const roomId = key.slice("rate:".length);
+    const raw = String(value ?? "").trim();
+    if (!roomId || raw === "") continue;
+    rates.set(roomId, parseNightlyRateAmount(raw));
+  }
+  return rates.size > 0 ? rates : undefined;
+}
+
+/**
  * Adapter over `createManualReservationFromInput` for callers that still
  * hand over a loose, string-keyed record — the admin form's `FormData`
  * (via `createManualReservationAction`) is the only intended caller.
@@ -174,6 +244,7 @@ export async function createManualReservationWith<TContext>(
     checkOut: String(candidate.checkOut ?? ""),
     guest,
     invoice: requestedInvoice(candidate),
+    nightlyRates: manualNightlyRatesOf(candidate),
     origin: origin as ManualOrigin,
     rooms: selected.map((entry) => ({
       guestCount: entry.guestCount,

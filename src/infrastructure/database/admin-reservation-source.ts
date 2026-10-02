@@ -260,6 +260,8 @@ export type AdminReservationDetailItem = Readonly<{
   roomName: string;
   nights: number;
   nightlyPriceClp: number;
+  /** `true` when an administrator fixed `nightlyPriceClp` by hand instead of it being resolved from the room's occupancy rate; the detail must present it as such rather than as the room's current rate. */
+  nightlyPriceManual: boolean;
   chargesClp: number;
   subtotalClp: number;
 }>;
@@ -351,6 +353,7 @@ export async function getAdminReservationDetail(
           chargesClp: reservationItems.chargesClp,
           guestCount: reservationItems.guestCount,
           nightlyPriceClp: reservationItems.nightlyPriceClp,
+          nightlyPriceManual: reservationItems.nightlyPriceManual,
           nights: reservationItems.nights,
           roomId: reservationItems.roomId,
           roomName: rooms.name,
@@ -401,6 +404,7 @@ export async function getAdminReservationDetail(
           chargesClp: item.chargesClp,
           guestCount: item.guestCount,
           nightlyPriceClp: item.nightlyPriceClp,
+          nightlyPriceManual: item.nightlyPriceManual,
           nights: item.nights,
           roomId: item.roomId,
           roomName: item.roomName ?? "",

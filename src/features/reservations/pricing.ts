@@ -26,7 +26,19 @@ export type ReservationPricingResult = Readonly<{
 }>;
 
 export type ReservationItemPricingResult = ReservationPricingResult &
-  Readonly<{ guestCount: number; roomId: string }>;
+  Readonly<{
+    guestCount: number;
+    /**
+     * Carries the provenance of `nightlyPriceClp` through to persistence:
+     * `true` when the administrator fixed it by hand instead of it being
+     * resolved from the room's occupancy rate. Absent means `false`
+     * (`reservation-rate-and-channel-editing` design.md decision 1). Pricing
+     * itself does not read it - `totalClp` is derived from the amount either
+     * way.
+     */
+    nightlyPriceManual?: boolean;
+    roomId: string;
+  }>;
 
 export type MultiRoomReservationPricingResult = Readonly<{
   items: readonly ReservationItemPricingResult[];
@@ -50,6 +62,8 @@ export function computeMultiRoomReservationPricing(
     guestCount?: number;
     id: string;
     nightlyPriceClp: number;
+    /** Provenance only; carried through to the result untouched. Pricing derives `totalClp` from the amount regardless of where it came from. */
+    nightlyPriceManual?: boolean;
   }>[],
   chargesByRoom: ReadonlyMap<string, readonly ReservationCharge[]> = new Map()
 ): MultiRoomReservationPricingResult {
@@ -68,6 +82,7 @@ export function computeMultiRoomReservationPricing(
       ids.add(room.id);
       return Object.freeze({
         guestCount,
+        nightlyPriceManual: room.nightlyPriceManual ?? false,
         roomId: room.id,
         ...computeReservationPricing(
           interval,

@@ -286,6 +286,20 @@ export const reservationItems = pgTable(
     nights: integer("nights").notNull(),
     guestCount: integer("guest_count").default(1).notNull(),
     nightlyPriceClp: integer("nightly_price_clp").notNull(),
+    /**
+     * Provenance of `nightly_price_clp`, never an amount itself: `true`
+     * means an administrator fixed the value by hand for an external-channel
+     * reservation, `false` that it was resolved from the room's occupancy
+     * rate. `nightly_price_clp` stays the effective nightly value in both
+     * cases, so every reader of the amount remains correct without
+     * consulting this column (`reservation-rate-and-channel-editing`
+     * design.md decision 1). Its only consumer is the stay-edit
+     * recalculation, which keeps a manual value instead of re-resolving the
+     * room's current rate.
+     */
+    nightlyPriceManual: boolean("nightly_price_manual")
+      .default(false)
+      .notNull(),
     chargesClp: integer("charges_clp").default(0).notNull(),
     subtotalClp: integer("subtotal_clp").notNull(),
     createdAt: createdAt(),

@@ -82,6 +82,14 @@ export type ReservationItemRecord = Readonly<{
   chargesClp: number;
   guestCount: number;
   nightlyPriceClp: number;
+  /**
+   * Provenance of `nightlyPriceClp`, not an amount: `true` when an
+   * administrator fixed the nightly value by hand. `nightlyPriceClp` is the
+   * effective value either way; this only tells a stay edit to keep it
+   * instead of re-resolving the room's current occupancy rate
+   * (`reservation-rate-and-channel-editing` design.md decision 1).
+   */
+  nightlyPriceManual: boolean;
   nights: number;
   roomId: string;
   subtotalClp: number;
@@ -192,6 +200,43 @@ export type EditReservationStayTransactionInput = Readonly<{
   reservationId: string;
 }>;
 
+/**
+ * Recalculated lines and financial action to persist for a nightly-value
+ * edit. `items` is the complete set of the reservation's rooms, each already
+ * repriced over the reservation's unchanged interval, so the repository
+ * updates every line and never adds or removes one - the stay is untouched.
+ * `previousRates` and `previousTotalClp` exist for the audit event only.
+ * The repository never receives a caller-supplied total or payment amount.
+ */
+export type EditReservationNightlyRatesTransactionInput = Readonly<{
+  actorUserId?: string;
+  /** Persisted sum of approved payments used to compute `paymentAction`; recorded verbatim in the audit event. */
+  approvedPaymentsClp: number;
+  items: readonly ReservationItemPricingResult[];
+  /** `max(approvedPaymentsClp - newTotalClp, 0)`, for the audit event only; never mutates a payment. */
+  overpaymentClp: number;
+  paymentAction: ReservationDateEditPaymentAction;
+  /** The reservation's single open `pay_at_property` pending payment, if any. */
+  pendingPayAtPropertyPaymentId?: string;
+  /**
+   * Set only when an origin correction is dropping hand-set values: the
+   * reservation's origin is written in the same transaction as the reprice, so
+   * a failure leaves both untouched (`reservation-rate-and-channel-editing`
+   * spec "El valor fijado a mano se suelta al salir de un canal externo").
+   */
+  origin?: ReservationOrigin;
+  /** The origin before the correction, for the audit event; set alongside `origin`. */
+  previousOrigin?: ReservationOrigin;
+  /** Each line's nightly value and provenance before this edit, for the audit event. */
+  previousRates: readonly Readonly<{
+    nightlyPriceClp: number;
+    nightlyPriceManual: boolean;
+    roomId: string;
+  }>[];
+  previousTotalClp: number;
+  reservationId: string;
+}>;
+
 export class ReservationStateTransitionError extends Error {
   readonly code = "INVALID_RESERVATION_STATE_TRANSITION" as const;
 
@@ -284,6 +329,27 @@ export type ReservationRepository<TContext> = Readonly<{
     invoiceRequest: InvoiceRequest | null,
     actorUserId?: string
   ) => Promise<ReservationRecord>;
+  editReservationNightlyRates?: (
+    context: TContext,
+    input: EditReservationNightlyRatesTransactionInput
+  ) => Promise<ReservationRecord>;
+  /**
+   * Corrects which origin a reservation is attributed to, in the case where no
+   * repricing is needed. Like `updateInvoiceRequest`, this touches neither
+   * dates, rooms, pricing, payments nor status, so it needs no room lock and no
+   * `TContext`. When the correction must drop hand-set nightly values, the
+   * caller uses `editReservationNightlyRates` with its `origin` field instead,
+   * so both land in one transaction.
+   *
+   * `externalPlatform` only ever moves with `origin` while it stays an external
+   * channel; a correction to a non-channel origin clears it, keeping the
+   * `reservations_external_ref_consistent` check satisfied.
+   */
+  updateReservationOrigin?: (
+    reservationId: string,
+    origin: ReservationOrigin,
+    actorUserId?: string
+  ) => Promise<ReservationRecord>;
 }>;
 
 type MockReservationStorage = Readonly<{
@@ -334,6 +400,64 @@ function assertConfirmedTransition(
 export function createMockReservationRepository(
   storage: MockReservationStorage = createReservationStorage()
 ): ReservationRepository<MockRoomLockOperationContext> {
+  /**
+   * Applies a reconciled payment action to the in-memory rows. Shared by the
+   * stay edit and the nightly-value edit so both reconcile identically; the
+   * decision of *which* action to apply is made in the domain, never here.
+   */
+  const applyPaymentAction = (
+    reservation: ReservationRecord,
+    paymentAction: ReservationDateEditPaymentAction,
+    pendingPayAtPropertyPaymentId?: string
+  ) => {
+    if (paymentAction.type === "none") return;
+    const payments = storage.paymentsByReservationId.get(reservation.id) ?? [];
+    const pendingIndex = payments.findIndex((payment) =>
+      pendingPayAtPropertyPaymentId
+        ? payment.id === pendingPayAtPropertyPaymentId
+        : payment.status === "pending"
+    );
+    if (paymentAction.type === "set_pending") {
+      const amountClp = paymentAction.amountClp;
+      if (pendingIndex >= 0) {
+        const adjusted = Object.freeze({
+          ...payments[pendingIndex]!,
+          amountClp,
+        });
+        storage.paymentsByReservationId.set(reservation.id, [
+          ...payments.slice(0, pendingIndex),
+          adjusted,
+          ...payments.slice(pendingIndex + 1),
+        ]);
+      } else {
+        const created: PayAtPropertyPayment = Object.freeze({
+          amountClp,
+          currency: "CLP",
+          externalReference: `${paymentReference(reservation.publicId)}:edit:${crypto.randomUUID()}`,
+          id: crypto.randomUUID(),
+          mode: "pay_at_property",
+          provider: "pay_at_property",
+          reservationId: reservation.id,
+          status: "pending",
+        });
+        storage.paymentsByReservationId.set(reservation.id, [
+          ...payments,
+          created,
+        ]);
+      }
+    } else if (paymentAction.type === "cancel_pending" && pendingIndex >= 0) {
+      const cancelled = Object.freeze({
+        ...payments[pendingIndex]!,
+        status: "cancelled" as const,
+      });
+      storage.paymentsByReservationId.set(reservation.id, [
+        ...payments.slice(0, pendingIndex),
+        cancelled,
+        ...payments.slice(pendingIndex + 1),
+      ]);
+    }
+  };
+
   return Object.freeze({
     createConfirmedPayAtPropertyReservation: async (context, input) => {
       if (storage.publicIds.has(input.publicId)) {
@@ -356,6 +480,7 @@ export function createMockReservationRepository(
             chargesClp: item.chargesClp,
             guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
+            nightlyPriceManual: item.nightlyPriceManual ?? false,
             nights: item.nights,
             roomId: item.roomId,
             subtotalClp: item.totalClp,
@@ -429,6 +554,7 @@ export function createMockReservationRepository(
             chargesClp: item.chargesClp,
             guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
+            nightlyPriceManual: item.nightlyPriceManual ?? false,
             nights: item.nights,
             roomId: item.roomId,
             subtotalClp: item.totalClp,
@@ -597,6 +723,7 @@ export function createMockReservationRepository(
             chargesClp: item.chargesClp,
             guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
+            nightlyPriceManual: item.nightlyPriceManual ?? false,
             nights: item.nights,
             roomId: item.roomId,
             subtotalClp: item.totalClp,
@@ -634,62 +761,92 @@ export function createMockReservationRepository(
           sourceId: updated.id,
         });
 
-      if (input.paymentAction.type !== "none") {
-        const payments = storage.paymentsByReservationId.get(updated.id) ?? [];
-        const pendingIndex = payments.findIndex(
-          (payment) =>
-            input.pendingPayAtPropertyPaymentId
-              ? payment.id === input.pendingPayAtPropertyPaymentId
-              : payment.status === "pending"
-        );
-        if (input.paymentAction.type === "set_pending") {
-          const amountClp = input.paymentAction.amountClp;
-          if (pendingIndex >= 0) {
-            const adjusted = Object.freeze({
-              ...payments[pendingIndex]!,
-              amountClp,
-            });
-            storage.paymentsByReservationId.set(updated.id, [
-              ...payments.slice(0, pendingIndex),
-              adjusted,
-              ...payments.slice(pendingIndex + 1),
-            ]);
-          } else {
-            const created: PayAtPropertyPayment = Object.freeze({
-              amountClp,
-              currency: "CLP",
-              externalReference: `${paymentReference(updated.publicId)}:edit:${crypto.randomUUID()}`,
-              id: crypto.randomUUID(),
-              mode: "pay_at_property",
-              provider: "pay_at_property",
-              reservationId: updated.id,
-              status: "pending",
-            });
-            storage.paymentsByReservationId.set(updated.id, [
-              ...payments,
-              created,
-            ]);
-          }
-        } else if (
-          input.paymentAction.type === "cancel_pending" &&
-          pendingIndex >= 0
-        ) {
-          const cancelled = Object.freeze({
-            ...payments[pendingIndex]!,
-            status: "cancelled" as const,
-          });
-          storage.paymentsByReservationId.set(updated.id, [
-            ...payments.slice(0, pendingIndex),
-            cancelled,
-            ...payments.slice(pendingIndex + 1),
-          ]);
-        }
-      }
+      applyPaymentAction(
+        updated,
+        input.paymentAction,
+        input.pendingPayAtPropertyPaymentId
+      );
 
       return updated;
     },
     // `actorUserId` is accepted only to match the production adapter's
     // signature - this in-memory double keeps no audit trail.
+    editReservationNightlyRates: async (_context, input) => {
+      const current = storage.reservationsById.get(input.reservationId);
+      if (!current) throw new ReservationNotFoundError(input.reservationId);
+
+      // The room set and the interval are untouched by a nightly-value edit,
+      // so every requested line updates an existing one and occupancy never
+      // moves - unlike `editReservationStay`, this records no occupancy.
+      const items = Object.freeze(
+        input.items.map((item) =>
+          Object.freeze({
+            chargesClp: item.chargesClp,
+            guestCount: item.guestCount,
+            nightlyPriceClp: item.nightlyPriceClp,
+            nightlyPriceManual: item.nightlyPriceManual ?? false,
+            nights: item.nights,
+            roomId: item.roomId,
+            subtotalClp: item.totalClp,
+          })
+        )
+      );
+      const firstItem = items[0];
+      if (!firstItem) throw new Error("Reservation requires room items");
+
+      const nextOrigin = input.origin ?? current.origin;
+      const keepsExternal =
+        nextOrigin === "airbnb" || nextOrigin === "booking";
+      const updated: ReservationRecord = Object.freeze({
+        ...current,
+        chargesClp: firstItem.chargesClp,
+        items,
+        nightlyPriceClp: firstItem.nightlyPriceClp,
+        origin: nextOrigin,
+        externalPlatform:
+          current.externalPlatform && keepsExternal
+            ? (nextOrigin as typeof current.externalPlatform)
+            : undefined,
+        externalRef:
+          current.externalPlatform && keepsExternal
+            ? current.externalRef
+            : undefined,
+        roomId: firstItem.roomId,
+        totalClp: items.reduce((total, item) => total + item.subtotalClp, 0),
+        updatedAt: new Date(),
+      });
+      storage.reservationsById.set(updated.id, updated);
+
+      applyPaymentAction(
+        updated,
+        input.paymentAction,
+        input.pendingPayAtPropertyPaymentId
+      );
+
+      return updated;
+    },
+    updateReservationOrigin: async (reservationId, origin) => {
+      const current = storage.reservationsById.get(reservationId);
+      if (!current) throw new ReservationNotFoundError(reservationId);
+
+      const updated: ReservationRecord = Object.freeze({
+        ...current,
+        origin,
+        // Only follows `origin` while it stays an external channel, and only
+        // when the record already carried it; a correction to any other origin
+        // clears it, since a non-channel reservation has no inbound event.
+        externalPlatform:
+          current.externalPlatform && (origin === "airbnb" || origin === "booking")
+            ? origin
+            : undefined,
+        externalRef: current.externalPlatform && (origin === "airbnb" || origin === "booking")
+          ? current.externalRef
+          : undefined,
+        updatedAt: new Date(),
+      });
+      storage.reservationsById.set(updated.id, updated);
+      return updated;
+    },
     updateInvoiceRequest: async (reservationId, invoiceRequest) => {
       const current = storage.reservationsById.get(reservationId);
       if (!current) throw new ReservationNotFoundError(reservationId);

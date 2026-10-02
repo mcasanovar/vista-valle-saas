@@ -24,6 +24,8 @@ export type CreatePayAtPropertyReservationRoom = Pick<
   Readonly<{
     /** Guests assigned to this specific room (see `room-occupancy-pricing` spec); its nightly price MUST already be resolved for this occupancy. Defaults to 1 for callers that don't track per-room occupancy (e.g. channel-sync imports). */
     guestCount?: number;
+    /** `true` when `nightlyPriceClp` is a value an administrator fixed by hand for an external-channel reservation rather than the room's resolved rate; carried through to the persisted line's provenance flag. */
+    nightlyPriceManual?: boolean;
   }>;
 
 export type CreatePayAtPropertyReservationParams<TContext> = Readonly<{

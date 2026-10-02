@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 
-const mocks = vi.hoisted(() => ({ detail: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  originAction: vi.fn(),
+  detail: vi.fn(),
+  rateAction: vi.fn(),
+}));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), replace: vi.fn(), back: vi.fn() }),
 }));
@@ -66,28 +70,21 @@ vi.mock("@/features/payments/mark-payment-paid-form", () => ({
   MarkPaymentPaidForm: () => null,
 }));
 vi.mock("@/features/admin/edit-reservation-nightly-rates-action", () => ({
-  editAdminReservationNightlyRatesAction: vi.fn(),
-}));
-vi.mock("@/features/admin/edit-reservation-nightly-rates-form", () => ({
-  EditReservationNightlyRatesForm: () => (
-    <form aria-label="Editar valor por noche" />
-  ),
+  editAdminReservationNightlyRatesAction: mocks.rateAction,
 }));
 vi.mock("@/features/admin/edit-reservation-origin-action", () => ({
-  editAdminReservationOriginAction: vi.fn(),
-}));
-vi.mock("@/features/admin/edit-reservation-origin-form", () => ({
-  EditReservationOriginForm: () => <form aria-label="Corregir origen" />,
+  editAdminReservationOriginAction: mocks.originAction,
 }));
 
 import ReservationDetail from "../app/(admin-protected)/admin/reservas/[id]/page";
+import { ToastProvider } from "@/presentation/organisms";
 
 function baseDetail(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     id: "reservation-1",
     publicId: "VV-abc",
     status: "confirmed",
-    origin: "website",
+    origin: "booking",
     checkIn: "2026-11-01",
     checkOut: "2026-11-03",
     totalClp: 120_000,
@@ -122,69 +119,143 @@ function baseDetail(overrides: Partial<Record<string, unknown>> = {}) {
 async function renderDetail(overrides: Partial<Record<string, unknown>> = {}) {
   mocks.detail.mockResolvedValue(baseDetail(overrides));
   render(
-    await ReservationDetail({
-      params: Promise.resolve({ id: "reservation-1" }),
-    })
+    <ToastProvider>
+      {await ReservationDetail({
+        params: Promise.resolve({ id: "reservation-1" }),
+      })}
+    </ToastProvider>
   );
 }
 
-describe("admin reservation detail — date edit eligibility", () => {
-  it.each([
-    "website",
-    "phone",
-    "whatsapp",
-    "admin",
-    "airbnb",
-    "booking",
-  ] as const)(
-    "shows the date edit form for a confirmed %s reservation",
+describe("nightly value editor in the detail (task 7.3)", () => {
+  it.each(["airbnb", "booking"] as const)(
+    "renders the editor for a %s reservation",
     async (origin) => {
       await renderDetail({ origin });
       expect(
-        screen.getByRole("form", { name: "Editar estadía de la reserva" })
+        screen.getByRole("form", { name: "Editar valor por noche" })
       ).toBeInTheDocument();
+      expect(screen.getByLabelText("Valle")).toHaveAttribute(
+        "name",
+        "rate:room-1"
+      );
+    }
+  );
+
+  it.each(["website", "phone", "whatsapp", "admin"] as const)(
+    "does not render the editor for a %s reservation",
+    async (origin) => {
+      await renderDetail({ origin });
+      expect(
+        screen.queryByRole("form", { name: "Editar valor por noche" })
+      ).not.toBeInTheDocument();
     }
   );
 
   it.each(["cancelled", "completed", "no_show"] as const)(
-    "still shows the date edit form for a %s reservation regardless of origin",
+    "renders the editor for a %s external-channel reservation",
     async (status) => {
-      await renderDetail({ status, origin: "airbnb" });
+      await renderDetail({ origin: "booking", status });
       expect(
-        screen.getByRole("form", { name: "Editar estadía de la reserva" })
+        screen.getByRole("form", { name: "Editar valor por noche" })
       ).toBeInTheDocument();
     }
   );
 
-  it("shows an overpayment alert when approved payments exceed the current total", async () => {
+  it("prefills the field with the hand-set value and leaves it empty otherwise", async () => {
     await renderDetail({
-      totalClp: 100_000,
-      payments: [
+      items: [
         {
-          id: "payment-1",
-          provider: "pay_at_property",
-          status: "approved",
-          amountClp: 150_000,
-          refundedAmountClp: 0,
+          nightlyPriceClp: 42_000,
+          nightlyPriceManual: true,
+          nights: 2,
+          roomId: "room-1",
+          roomName: "Valle",
+          subtotalClp: 84_000,
         },
       ],
     });
-    expect(screen.getByRole("alert")).toHaveTextContent("sobrepago");
+    expect(screen.getByLabelText("Valle")).toHaveValue("42000");
   });
 
-  it("shows no overpayment alert when the balance is settled", async () => {
+  it("offers going back to the current rate by emptying the field", async () => {
+    await renderDetail();
+    // An empty field is the documented way to drop the hand-set value.
+    expect(screen.getByLabelText("Valle")).toHaveValue("");
+    expect(
+      screen.getByText(/deja el campo vacío para volver a la tarifa vigente/i)
+    ).toBeInTheDocument();
+  });
+});
+
+describe("manual value is visually distinct (task 7.4)", () => {
+  it("marks a hand-set value in the rooms list", async () => {
     await renderDetail({
-      totalClp: 100_000,
-      payments: [
+      items: [
         {
-          id: "payment-1",
-          provider: "pay_at_property",
-          status: "approved",
-          amountClp: 100_000,
-          refundedAmountClp: 0,
+          nightlyPriceClp: 42_000,
+          nightlyPriceManual: true,
+          nights: 2,
+          roomId: "room-1",
+          roomName: "Valle",
+          subtotalClp: 84_000,
         },
       ],
     });
-    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getByTestId("manual-rate-room-1")).toHaveTextContent(
+      "Valor fijado a mano"
+    );
+    expect(screen.getByTestId("manual-badge-room-1")).toBeInTheDocument();
+  });
+
+  it("does not mark a value resolved from the room's rate", async () => {
+    await renderDetail();
+    expect(screen.queryByTestId("manual-rate-room-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("rate-badge-room-1")).toHaveTextContent(
+      "Tarifa vigente"
+    );
+  });
+});
+
+describe("origin correction in the detail (task 7.5)", () => {
+  it.each([
+    "website",
+    "airbnb",
+    "booking",
+    "phone",
+    "whatsapp",
+    "admin",
+  ] as const)(
+    "renders the origin form for a %s reservation with that origin selected",
+    async (origin) => {
+      await renderDetail({ origin });
+      expect(
+        screen.getByRole("form", { name: "Corregir origen" })
+      ).toBeInTheDocument();
+      expect(screen.getByLabelText("Origen de la reserva")).toHaveValue(origin);
+    }
+  );
+
+  it("offers all six origins as targets", async () => {
+    await renderDetail({ origin: "admin" });
+    const options = screen
+      .getAllByRole("option")
+      .map((option) => (option as HTMLOptionElement).value);
+    expect(options).toEqual([
+      "website",
+      "airbnb",
+      "booking",
+      "phone",
+      "whatsapp",
+      "admin",
+    ]);
+  });
+
+  it("lets an administración reservation be corrected to Booking", async () => {
+    await renderDetail({ origin: "admin" });
+    const select = screen.getByLabelText("Origen de la reserva");
+    expect(
+      [...(select as HTMLSelectElement).options].map((o) => o.value)
+    ).toContain("booking");
   });
 });
