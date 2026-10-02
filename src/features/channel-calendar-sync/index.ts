@@ -6,4 +6,3 @@ export * from "./guest-placeholder";
 export * from "./conflict-alerts";
 export * from "./ingest";
 export * from "./poll";
-export * from "./hold-expiry-alert";

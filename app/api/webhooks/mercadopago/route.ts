@@ -13,8 +13,6 @@ import {
   getMockMercadoPagoOnlinePaymentDependencies,
   getProductionMercadoPagoOnlinePaymentDependencies,
 } from "@/features/payments/mercado-pago-dependencies";
-import { HoldExpiredError } from "@/features/reservations/confirm-pay-now-reservation";
-import { raiseConflictAlertForExpiredHold } from "@/features/channel-calendar-sync/hold-expiry-alert";
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -73,17 +71,6 @@ export async function POST(request: Request) {
     const dependencies = isProduction
       ? getProductionMercadoPagoOnlinePaymentDependencies()
       : getMockMercadoPagoOnlinePaymentDependencies();
-    if (error instanceof HoldExpiredError) {
-      // A channel-sync arrival may have occupied this room during the
-      // hold's expiry window before this (now-late) approval arrived (see
-      // `channel-calendar-sync` spec: "Alerta de conflicto por vencimiento
-      // de retención durante sincronización") — distinct from every other
-      // error this handler catches generically above.
-      await raiseConflictAlertForExpiredHold(
-        error.holdId,
-        dependencies.holdRepository
-      );
-    }
     await dependencies.fintocPaymentRepository.discardWebhookEvent(
       event.id,
       "mercado_pago"

@@ -10,8 +10,6 @@ import { createLodgingInterval, createMockRoomLockGateway } from "@/features/ava
 import {
   getChannelConnections,
   ingestChannelConnection,
-  listChannelSyncConflictAlerts,
-  raiseConflictAlertForExpiredHold,
 } from "@/features/channel-calendar-sync";
 import { mockDemoRooms } from "@/features/rooms";
 import { mockReservationRepository as canonicalReservationRepository } from "@/features/reservations/confirm-pay-at-property";
@@ -32,10 +30,10 @@ function icalWithEvent(uid: string, checkIn: string, checkOut: string) {
  * End-to-end reproduction of design.md's documented risk: a web hold
  * expires while a channel-sync event lands on the same room/dates, and the
  * late Fintoc approval for that hold arrives afterward. No conflicting
- * reservation is created either way, and exactly one alert is raised.
+ * reservation is created either way.
  */
 describe("hold-expiry race with a channel-sync arrival", () => {
-  it("lets the sync reservation win, rejects the late online payment, and raises exactly one alert", async () => {
+  it("lets the sync reservation win and rejects the late online payment", async () => {
     const room = mockDemoRooms[1]!;
     const interval = createLodgingInterval("2044-01-01", "2044-01-03");
 
@@ -89,8 +87,6 @@ describe("hold-expiry race with a channel-sync arrival", () => {
     expect(syncResult.created).toHaveLength(1);
     expect(syncResult.conflicts).toBe(0);
 
-    const alertsBefore = (await listChannelSyncConflictAlerts()).length;
-
     // The late Fintoc approval for the now-expired hold arrives.
     await expect(
       confirmPayNowReservationFromHold({
@@ -105,13 +101,6 @@ describe("hold-expiry race with a channel-sync arrival", () => {
         roomLockGateway,
       })
     ).rejects.toBeInstanceOf(HoldExpiredError);
-
-    // Exactly what app/api/webhooks/fintoc/route.ts does on that error.
-    await raiseConflictAlertForExpiredHold(hold.id, holdRepository);
-
-    const alerts = await listChannelSyncConflictAlerts();
-    expect(alerts.length).toBe(alertsBefore + 1);
-    expect(alerts[alerts.length - 1]!.roomId).toBe(room.id);
 
     // No reservation was created from the failed confirmation — only the
     // one the sync ingestion already created, in the canonical store the
