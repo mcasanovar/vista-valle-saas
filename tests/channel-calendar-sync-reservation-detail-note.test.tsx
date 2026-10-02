@@ -61,6 +61,20 @@ vi.mock("@/features/payments/fintoc-refund-form", () => ({
 vi.mock("@/features/payments/mark-payment-paid-form", () => ({
   MarkPaymentPaidForm: () => null,
 }));
+vi.mock("@/features/admin/edit-reservation-nightly-rates-action", () => ({
+  editAdminReservationNightlyRatesAction: vi.fn(),
+}));
+vi.mock("@/features/admin/edit-reservation-nightly-rates-form", () => ({
+  EditReservationNightlyRatesForm: () => (
+    <form aria-label="Editar valor por noche" />
+  ),
+}));
+vi.mock("@/features/admin/edit-reservation-origin-action", () => ({
+  editAdminReservationOriginAction: vi.fn(),
+}));
+vi.mock("@/features/admin/edit-reservation-origin-form", () => ({
+  EditReservationOriginForm: () => <form aria-label="Corregir origen" />,
+}));
 
 import ReservationDetail from "../app/(admin-protected)/admin/reservas/[id]/page";
 

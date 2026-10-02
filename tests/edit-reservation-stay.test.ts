@@ -130,6 +130,7 @@ describe("stay edit eligibility (task 2.7)", () => {
           chargesClp: 0,
           guestCount: 2,
           nightlyPriceClp: 50_000,
+          nightlyPriceManual: false,
           nights: 3,
           roomId: "room-1",
           subtotalClp: 150_000,
