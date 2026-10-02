@@ -144,6 +144,121 @@ describe("manual reservation", () => {
       )
     ).rejects.toThrow("Unknown room");
   });
+  it("creates an external-channel reservation with the hand-set nightly value (task 7.2)", async () => {
+    const result = await createManualReservation(
+      {
+        ...guest,
+        checkIn: "2031-01-01",
+        checkOut: "2031-01-03",
+        origin: "booking",
+        rooms: "demo-room-andes:1",
+        "rate:demo-room-andes": "42000",
+      },
+      "admin-1"
+    );
+
+    const item = result.reservation.items.find(
+      (line) => line.roomId === "demo-room-andes"
+    );
+    expect(item?.nightlyPriceClp).toBe(42000);
+    expect(item?.nightlyPriceManual).toBe(true);
+    // 2 nights * 42.000, derived from the hand-set value.
+    expect(result.reservation.totalClp).toBe(84000);
+  });
+
+  it("reads a Chilean-formatted hand-set value as whole pesos (task 7.2)", async () => {
+    const result = await createManualReservation(
+      {
+        ...guest,
+        checkIn: "2031-02-01",
+        checkOut: "2031-02-03",
+        origin: "airbnb",
+        rooms: "demo-room-andes:1",
+        "rate:demo-room-andes": "$ 42.000",
+      },
+      "admin-1"
+    );
+    expect(result.reservation.totalClp).toBe(84000);
+  });
+
+  it("resolves the current rate when no value is given (task 7.2)", async () => {
+    const result = await createManualReservation(
+      {
+        ...guest,
+        checkIn: "2031-03-01",
+        checkOut: "2031-03-03",
+        origin: "booking",
+        rooms: "demo-room-andes:1",
+        "rate:demo-room-andes": "",
+      },
+      "admin-1"
+    );
+
+    const item = result.reservation.items.find(
+      (line) => line.roomId === "demo-room-andes"
+    );
+    expect(item?.nightlyPriceClp).toBe(60000);
+    expect(item?.nightlyPriceManual).toBe(false);
+    expect(result.reservation.totalClp).toBe(120000);
+  });
+
+  it("ignores a hand-set value submitted for a non-external origin (task 7.2)", async () => {
+    for (const [index, origin] of (
+      ["admin", "phone", "whatsapp"] as const
+    ).entries()) {
+      const result = await createManualReservation(
+        {
+          ...guest,
+          checkIn: `2031-0${index + 4}-01`,
+          checkOut: `2031-0${index + 4}-03`,
+          origin,
+          rooms: "demo-room-andes:1",
+          "rate:demo-room-andes": "42000",
+        },
+        "admin-1"
+      );
+
+      const item = result.reservation.items.find(
+        (line) => line.roomId === "demo-room-andes"
+      );
+      // The submitted amount cannot move the price of a non-channel origin.
+      expect(item?.nightlyPriceClp).toBe(60000);
+      expect(item?.nightlyPriceManual).toBe(false);
+    }
+  });
+
+  it("rejects a malformed hand-set value instead of silently ignoring it (task 7.2)", async () => {
+    await expect(
+      createManualReservation(
+        {
+          ...guest,
+          checkIn: "2031-08-01",
+          checkOut: "2031-08-03",
+          origin: "booking",
+          rooms: "demo-room-andes:1",
+          "rate:demo-room-andes": "42,5",
+        },
+        "admin-1"
+      )
+    ).rejects.toThrow("must be a positive whole amount");
+  });
+
+  it("rejects a zero or negative hand-set value (task 7.2)", async () => {
+    await expect(
+      createManualReservation(
+        {
+          ...guest,
+          checkIn: "2031-09-01",
+          checkOut: "2031-09-03",
+          origin: "booking",
+          rooms: "demo-room-andes:1",
+          "rate:demo-room-andes": "0",
+        },
+        "admin-1"
+      )
+    ).rejects.toThrow("must be a positive whole amount");
+  });
+
   it("rejects an overlapping manual reservation", async () => {
     const input = {
       ...guest,

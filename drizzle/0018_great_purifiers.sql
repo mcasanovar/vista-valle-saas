@@ -1,0 +1,1 @@
+ALTER TABLE "reservation_items" ADD COLUMN "nightly_price_manual" boolean DEFAULT false NOT NULL;

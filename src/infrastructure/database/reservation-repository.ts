@@ -36,6 +36,7 @@ function toReservationRecord(
         chargesClp: item.chargesClp,
         guestCount: item.guestCount,
         nightlyPriceClp: item.nightlyPriceClp,
+        nightlyPriceManual: item.nightlyPriceManual,
         nights: item.nights,
         roomId: item.roomId,
         subtotalClp: item.subtotalClp,
@@ -112,6 +113,7 @@ export function createDrizzleReservationRepository(
             chargesClp: item.chargesClp,
             guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
+            nightlyPriceManual: item.nightlyPriceManual ?? false,
             nights: item.nights,
             reservationId: reservationRow.id,
             roomId: item.roomId,
@@ -195,6 +197,7 @@ export function createDrizzleReservationRepository(
             chargesClp: item.chargesClp,
             guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
+            nightlyPriceManual: item.nightlyPriceManual ?? false,
             nights: item.nights,
             reservationId: reservationRow.id,
             roomId: item.roomId,
@@ -337,6 +340,7 @@ export function createDrizzleReservationRepository(
             chargesClp: item.chargesClp,
             guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
+            nightlyPriceManual: item.nightlyPriceManual ?? false,
             nights: item.nights,
             subtotalClp: item.totalClp,
           })
@@ -357,6 +361,7 @@ export function createDrizzleReservationRepository(
             chargesClp: item.chargesClp,
             guestCount: item.guestCount,
             nightlyPriceClp: item.nightlyPriceClp,
+            nightlyPriceManual: item.nightlyPriceManual ?? false,
             nights: item.nights,
             reservationId: updated.id,
             roomId: item.roomId,
@@ -535,6 +540,171 @@ export function createDrizzleReservationRepository(
         actorUserId,
         after: { invoiceRequested: Boolean(invoiceRequest) },
         before: { invoiceRequested: current.invoiceRequested },
+        entityId: updated.id,
+        entityType: "reservation",
+      });
+
+      const itemRows = await db
+        .select()
+        .from(reservationItems)
+        .where(eq(reservationItems.reservationId, updated.id));
+      return toReservationRecord(updated, itemRows);
+    },
+    editReservationNightlyRates: async (tx, input) => {
+      // The room set and the interval never move here, so every requested
+      // line updates an existing row: no diff, no insert, no delete, and no
+      // occupancy change (design.md decision 3).
+      const totalClp = input.items.reduce(
+        (total, item) => total + item.totalClp,
+        0
+      );
+      // `origin` is present only for an origin correction that drops hand-set
+      // values; writing it here is what makes the relabel and the reprice one
+      // atomic operation. `external_platform`/`external_ref` only survive while
+      // the origin stays an external channel, so the
+      // `reservations_external_ref_consistent` check keeps holding.
+      const keepsExternal =
+        input.origin === undefined ||
+        input.origin === "airbnb" ||
+        input.origin === "booking";
+      const [updated] = await tx
+        .update(reservations)
+        .set({
+          totalClp,
+          updatedAt: new Date(),
+          ...(input.origin ? { origin: input.origin } : {}),
+          ...(keepsExternal ? {} : { externalPlatform: null, externalRef: null }),
+        })
+        .where(eq(reservations.id, input.reservationId))
+        .returning();
+      if (!updated) throw new ReservationNotFoundError(input.reservationId);
+
+      for (const item of input.items) {
+        await tx
+          .update(reservationItems)
+          .set({
+            nightlyPriceClp: item.nightlyPriceClp,
+            nightlyPriceManual: item.nightlyPriceManual ?? false,
+            subtotalClp: item.totalClp,
+          })
+          .where(
+            and(
+              eq(reservationItems.reservationId, updated.id),
+              eq(reservationItems.roomId, item.roomId)
+            )
+          );
+      }
+
+      if (input.paymentAction.type === "set_pending") {
+        const amountClp = input.paymentAction.amountClp;
+        if (input.pendingPayAtPropertyPaymentId) {
+          await tx
+            .update(payments)
+            .set({ amountClp })
+            .where(eq(payments.id, input.pendingPayAtPropertyPaymentId));
+        } else {
+          await tx.insert(payments).values({
+            amountClp,
+            externalReference: `${paymentReference(updated.publicId)}:rate:${crypto.randomUUID()}`,
+            mode: "pay_at_property",
+            provider: "pay_at_property",
+            reservationId: updated.id,
+            status: "pending",
+          });
+        }
+      } else if (
+        input.paymentAction.type === "cancel_pending" &&
+        input.pendingPayAtPropertyPaymentId
+      ) {
+        await tx
+          .update(payments)
+          .set({ status: "cancelled" })
+          .where(eq(payments.id, input.pendingPayAtPropertyPaymentId));
+      }
+
+      const ratesOf = (
+        rows: readonly Readonly<{
+          nightlyPriceClp: number;
+          nightlyPriceManual?: boolean;
+          roomId: string;
+        }>[]
+      ) =>
+        rows
+          .map((row) => ({
+            nightlyPriceClp: row.nightlyPriceClp,
+            nightlyPriceManual: row.nightlyPriceManual ?? false,
+            roomId: row.roomId,
+          }))
+          .sort((left, right) => left.roomId.localeCompare(right.roomId));
+
+      await tx.insert(auditEvents).values({
+        // An origin correction that dropped hand-set values is audited as the
+        // origin correction it is, carrying the amounts it moved as well.
+        action: input.origin
+          ? "reservation.origin_corrected"
+          : "reservation.nightly_rate_changed",
+        actorUserId: input.actorUserId,
+        after: {
+          approvedPaymentsClp: input.approvedPaymentsClp,
+          overpaymentClp: input.overpaymentClp,
+          paymentAction: input.paymentAction,
+          rates: ratesOf(input.items),
+          totalClp,
+          ...(input.origin ? { origin: input.origin } : {}),
+        },
+        before: {
+          rates: ratesOf(input.previousRates),
+          totalClp: input.previousTotalClp,
+          ...(input.previousOrigin ? { origin: input.previousOrigin } : {}),
+        },
+        entityId: updated.id,
+        entityType: "reservation",
+      });
+
+      const itemRows = await tx
+        .select()
+        .from(reservationItems)
+        .where(eq(reservationItems.reservationId, updated.id));
+      return toReservationRecord(updated, itemRows);
+    },
+    updateReservationOrigin: async (reservationId, origin, actorUserId) => {
+      const [current] = await db
+        .select()
+        .from(reservations)
+        .where(eq(reservations.id, reservationId));
+      if (!current) throw new ReservationNotFoundError(reservationId);
+
+      // `external_platform`/`external_ref` identify an inbound channel event,
+      // so they only make sense while the origin is an external channel; both
+      // move together to satisfy `reservations_external_ref_consistent`.
+      const keepsExternal = origin === "airbnb" || origin === "booking";
+      const [updated] = await db
+        .update(reservations)
+        .set({
+          origin,
+          externalPlatform:
+            current.externalPlatform && keepsExternal ? origin : null,
+          externalRef:
+            current.externalPlatform && keepsExternal
+              ? current.externalRef
+              : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(reservations.id, reservationId))
+        .returning();
+      if (!updated) throw new ReservationNotFoundError(reservationId);
+
+      await db.insert(auditEvents).values({
+        action: "reservation.origin_corrected",
+        actorUserId,
+        after: {
+          externalPlatform: updated.externalPlatform,
+          origin: updated.origin,
+        },
+        before: {
+          externalPlatform: current.externalPlatform,
+          origin: current.origin,
+        },
         entityId: updated.id,
         entityType: "reservation",
       });

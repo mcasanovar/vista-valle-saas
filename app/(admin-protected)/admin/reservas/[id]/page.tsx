@@ -19,6 +19,10 @@ import { editReservationGuestContactAction } from "@/features/admin/edit-reserva
 import { EditReservationGuestContactForm } from "@/features/admin/edit-reservation-guest-contact-form";
 import { editReservationInvoiceAction } from "@/features/admin/edit-reservation-invoice-action";
 import { EditReservationInvoiceForm } from "@/features/admin/edit-reservation-invoice-form";
+import { editAdminReservationNightlyRatesAction } from "@/features/admin/edit-reservation-nightly-rates-action";
+import { EditReservationNightlyRatesForm } from "@/features/admin/edit-reservation-nightly-rates-form";
+import { editAdminReservationOriginAction } from "@/features/admin/edit-reservation-origin-action";
+import { EditReservationOriginForm } from "@/features/admin/edit-reservation-origin-form";
 
 const currency = new Intl.NumberFormat("es-CL", {
   currency: "CLP",
@@ -199,7 +203,16 @@ export default async function ReservationDetail({
               className="flex items-center justify-between border-b border-[#f2f3f7] pb-2 last:border-0"
             >
               <span>
-                {item.roomName} · {item.nights} noches
+                {item.roomName} · {item.nights} noches ·{" "}
+                {currency.format(item.nightlyPriceClp)} por noche
+                {item.nightlyPriceManual ? (
+                  <span
+                    className="ml-2 rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold text-foreground"
+                    data-testid={`manual-rate-${item.roomId}`}
+                  >
+                    Valor fijado a mano
+                  </span>
+                ) : null}
               </span>
               <span className="font-semibold">
                 {currency.format(item.subtotalClp)}
@@ -231,6 +244,29 @@ export default async function ReservationDetail({
             {...(isExternalChannelOrigin
               ? { externalChannelLabel: originLabels[reservation.origin] }
               : {})}
+            reservationId={reservation.id}
+          />
+        </div>
+        <div className="mt-4 space-y-4">
+          {isExternalChannelOrigin ? (
+            <EditReservationNightlyRatesForm
+              action={editAdminReservationNightlyRatesAction}
+              reservationId={reservation.id}
+              rooms={reservation.items.map((item) => ({
+                nightlyPriceClp: item.nightlyPriceClp,
+                nightlyPriceManual: item.nightlyPriceManual,
+                nights: item.nights,
+                roomId: item.roomId,
+                roomName: item.roomName,
+              }))}
+            />
+          ) : null}
+          <EditReservationOriginForm
+            action={editAdminReservationOriginAction}
+            currentOrigin={reservation.origin}
+            hasManualNightlyRate={reservation.items.some(
+              (item) => item.nightlyPriceManual
+            )}
             reservationId={reservation.id}
           />
         </div>

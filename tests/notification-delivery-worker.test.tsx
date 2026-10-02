@@ -29,6 +29,7 @@ const reservation: ReservationRecord = Object.freeze({
       chargesClp: 0,
       guestCount: 2,
       nightlyPriceClp: 60000,
+      nightlyPriceManual: false,
       nights: 2,
       roomId: "demo-room-valle",
       subtotalClp: 120000,

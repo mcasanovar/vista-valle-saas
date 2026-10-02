@@ -67,6 +67,7 @@ function domain(record: AdminReservation): ReservationRecord {
         chargesClp: 0,
         guestCount: 1,
         nightlyPriceClp: 1,
+        nightlyPriceManual: false,
         nights: 3,
         roomId: record.roomId,
         subtotalClp: 1,

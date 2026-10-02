@@ -17,6 +17,7 @@ import {
 import {
   ReservationNotFoundError,
   type ReservationDateEditPaymentAction,
+  type ReservationItemRecord,
   type ReservationRecord,
   type ReservationRepository,
 } from "./reservation-repository";
@@ -189,31 +190,64 @@ export function assertRequestedOccupancyFits(
 }
 
 /**
+ * The nightly values an administrator fixed by hand, keyed by `roomId`.
+ * Sourced from the reservation's persisted lines - never from a request
+ * payload - so a stay edit still refuses a browser-supplied price while
+ * honouring a value the administrator already committed
+ * (`reservation-rate-and-channel-editing` design.md decision 2).
+ */
+export type ManualNightlyPricesByRoomId = ReadonlyMap<string, number>;
+
+/**
+ * Collects the hand-set nightly values from a reservation's persisted lines,
+ * so a stay edit preserves them without the caller having to assemble the
+ * map. A room whose value was resolved from the room's rate is absent from
+ * the result.
+ */
+export function manualNightlyPricesOf(
+  reservation: Readonly<{ items: readonly ReservationItemRecord[] }>
+): ManualNightlyPricesByRoomId {
+  return new Map(
+    reservation.items
+      .filter((item) => item.nightlyPriceManual)
+      .map((item) => [item.roomId, item.nightlyPriceClp] as const)
+  );
+}
+
+/**
  * Recomputes noches, tarifa vigente por ocupación, cargos y total for the
  * requested stay. Each room's nightly price is re-resolved from the room's
  * *current* rate for the *requested* occupancy, not the price frozen when
  * the reservation was created, so changing only the guest count of a room
- * changes its subtotal. Nothing here accepts a caller-supplied price or
- * total; the only inputs are the interval, the requested room lines, and
- * the current room rates.
+ * changes its subtotal.
+ *
+ * The one exception is a room carrying a hand-set nightly value in
+ * `manualNightlyPrices`: that value is kept instead of being re-resolved, and
+ * the resulting item is flagged `nightlyPriceManual` so persistence carries
+ * the provenance forward. A room newly added to the stay never appears in
+ * that map, so it always takes the current rate.
+ *
+ * Nothing here accepts a caller-supplied total, and the manual values come
+ * from the reservation's own persisted lines rather than from a request.
  */
 export function recalculateReservationStayPricing(
   interval: LodgingInterval,
   rooms: readonly ReservationStayRoomSelection[],
   roomRatesById: ReadonlyMap<string, ReservationStayRoomRate>,
-  chargesByRoom: ReadonlyMap<string, readonly ReservationCharge[]> = new Map()
+  chargesByRoom: ReadonlyMap<string, readonly ReservationCharge[]> = new Map(),
+  manualNightlyPrices: ManualNightlyPricesByRoomId = new Map()
 ): MultiRoomReservationPricingResult {
   const priced = rooms.map((room) => {
     const rate = roomRatesById.get(room.roomId);
     if (!rate) throw new ReservationStayRoomRateMissingError(room.roomId);
+    const manualNightlyPriceClp = manualNightlyPrices.get(room.roomId);
     return Object.freeze({
       guestCount: room.guestCount,
       id: room.roomId,
-      nightlyPriceClp: resolveRoomNightlyPrice(
-        rate,
-        rate.occupancyPrices,
-        room.guestCount
-      ),
+      nightlyPriceClp:
+        manualNightlyPriceClp ??
+        resolveRoomNightlyPrice(rate, rate.occupancyPrices, room.guestCount),
+      nightlyPriceManual: manualNightlyPriceClp !== undefined,
     });
   });
 
@@ -366,7 +400,10 @@ export async function editReservationStay<TContext>(
     interval,
     requestedRooms,
     roomRatesById,
-    chargesByRoom
+    chargesByRoom,
+    // Read from the persisted lines, so a hand-set nightly value survives a
+    // stay edit without the request ever carrying a price.
+    manualNightlyPricesOf(current)
   );
   const financialSummary = computeReservationStayEditFinancialSummary(
     pricing.totalClp,

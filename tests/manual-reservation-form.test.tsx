@@ -324,3 +324,122 @@ describe("manual reservation form", () => {
     expect(dateErrors.length).toBeGreaterThan(0);
   });
 });
+
+describe("nightly value for an external channel (task 7.1)", () => {
+  function stubAvailability() {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => availableResponse())
+    );
+  }
+
+  async function selectRoom(user: ReturnType<typeof userEvent.setup>) {
+    await loadAvailability();
+    await user.click(
+      screen.getByRole("checkbox", { name: /habitación valle/i })
+    );
+  }
+
+  it("shows the field only once the origin is an external channel", async () => {
+    stubAvailability();
+    const user = userEvent.setup();
+    renderForm({ action: vi.fn() });
+    await selectRoom(user);
+
+    // Default origin is Administración: no channel value to record.
+    expect(
+      screen.queryByLabelText(/valor por noche del canal/i)
+    ).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText("Origen"), "booking");
+    expect(
+      screen.getByLabelText(/valor por noche del canal/i)
+    ).toHaveAttribute("name", "rate:available-room");
+
+    await user.selectOptions(screen.getByLabelText("Origen"), "airbnb");
+    expect(
+      screen.getByLabelText(/valor por noche del canal/i)
+    ).toBeInTheDocument();
+
+    // Back to a non-channel origin: the field disappears again.
+    await user.selectOptions(screen.getByLabelText("Origen"), "phone");
+    expect(
+      screen.queryByLabelText(/valor por noche del canal/i)
+    ).not.toBeInTheDocument();
+  });
+
+  /** The summary's total line, which with a single room shows the same amount as its subtotal. */
+  function totalLine() {
+    return screen.getByText("Total").parentElement;
+  }
+
+  it("recalculates the displayed total from the hand-set value", async () => {
+    stubAvailability();
+    const user = userEvent.setup();
+    renderForm({ action: vi.fn() });
+    await selectRoom(user);
+    await user.selectOptions(screen.getByLabelText("Origen"), "booking");
+
+    // 2 nights at the room's current rate of 60.000.
+    expect(totalLine()).toHaveTextContent("$120.000");
+
+    await user.type(
+      screen.getByLabelText(/valor por noche del canal/i),
+      "42000"
+    );
+
+    // 2 nights * 42.000, and the current rate is still reported for contrast.
+    expect(totalLine()).toHaveTextContent("$84.000");
+    expect(
+      screen.getByText(/valor fijado a mano.*\$60\.000/i)
+    ).toBeInTheDocument();
+  });
+
+  it("falls back to the current rate while the field is empty or malformed", async () => {
+    stubAvailability();
+    const user = userEvent.setup();
+    renderForm({ action: vi.fn() });
+    await selectRoom(user);
+    await user.selectOptions(screen.getByLabelText("Origen"), "booking");
+
+    expect(
+      screen.getByText(/sin valor propio.*\$60\.000/i)
+    ).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/valor por noche del canal/i), "42,5");
+
+    // A malformed amount never becomes a price in the summary; the server
+    // rejects it on submit.
+    expect(totalLine()).toHaveTextContent("$120.000");
+    expect(
+      screen.getByText(/sin valor propio.*\$60\.000/i)
+    ).toBeInTheDocument();
+  });
+
+  it("submits the hand-set value under its per-room field name", async () => {
+    stubAvailability();
+    // jsdom has no scrollIntoView, which the submit button calls on focus.
+    Element.prototype.scrollIntoView ??= vi.fn();
+    const action = vi.fn<
+      (data: FormData) => Promise<ManualReservationActionResult>
+    >(async () => ({
+      origin: "booking",
+      ok: true as const,
+      reservationId: "reservation-1",
+    }));
+    const user = userEvent.setup();
+    renderForm({ action });
+    await fillValidReservation(user);
+    await user.selectOptions(screen.getByLabelText("Origen"), "booking");
+    await user.type(
+      screen.getByLabelText(/valor por noche del canal/i),
+      "42000"
+    );
+    await user.click(screen.getByRole("button", { name: /crear reserva/i }));
+
+    await waitFor(() => expect(action).toHaveBeenCalled());
+    const submitted = action.mock.calls[0]![0];
+    expect(submitted.get("rate:available-room")).toBe("42000");
+    expect(submitted.get("origin")).toBe("booking");
+  });
+});

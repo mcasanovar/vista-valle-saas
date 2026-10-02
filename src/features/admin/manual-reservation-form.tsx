@@ -9,6 +9,8 @@ import { nights as calculateNights } from "@/features/availability/client-date-o
 import { resolveDisplayRoomNightlyPrice } from "@/features/rooms/occupancy-pricing";
 // eslint-disable-next-line architecture/feature-public-api -- the public reservations barrel reaches server-only data access.
 import { serializeRoomSelectionParam } from "@/features/reservations/room-selection-codec";
+// eslint-disable-next-line architecture/feature-public-api -- the public reservations barrel reaches server-only data access.
+import { isExternalChannelOrigin } from "@/features/reservations/reservation-rate-eligibility";
 import { useToast } from "@/presentation/organisms";
 import type {
   ManualReservationActionField,
@@ -20,6 +22,10 @@ import {
   manualReservationDateMinimums,
   validateManualReservationDateRange,
 } from "./manual-reservation-contract";
+import {
+  isValidNightlyRateAmount,
+  parseNightlyRateAmount,
+} from "./nightly-rate-amount";
 
 type AvailableRoom = Readonly<{
   capacity: number;
@@ -136,6 +142,11 @@ export function ManualReservationForm({
     "dates_required" | "loading" | "ready" | "error"
   >(initialData.availability.status);
   const [availabilityError, setAvailabilityError] = useState<string>();
+  const [origin, setOrigin] = useState<(typeof manualOrigins)[number]>("admin");
+  // Keyed by roomId; only read when the selected origin is an external
+  // channel, so switching away from Airbnb/Booking cannot carry a value into
+  // a submission the server would ignore anyway.
+  const [nightlyRates, setNightlyRates] = useState<Record<string, string>>({});
   const [invoiceRequested, setInvoiceRequested] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [message, setMessage] = useState<string>();
@@ -281,6 +292,7 @@ export function ManualReservationForm({
   const setRoomGuestCount = (roomId: string, guestCount: number) => {
     setRoomGuestCounts((current) => ({ ...current, [roomId]: guestCount }));
   };
+  const allowsManualRate = isExternalChannelOrigin(origin);
   const roomsFieldValue = () =>
     serializeRoomSelectionParam(
       selectedRoomIds.map((roomId) => ({
@@ -313,12 +325,22 @@ export function ManualReservationForm({
       .filter((room) => selectedRoomIds.includes(room.id))
       .map((room) => {
         const guestCount = roomGuestCounts[room.id] ?? 1;
-        const nightlyPriceClp = resolveDisplayRoomNightlyPrice(
+        const ratePriceClp = resolveDisplayRoomNightlyPrice(
           room,
           room.occupancyPrices,
           guestCount
         );
-        return { ...room, guestCount, nightlyPriceClp };
+        const manual = allowsManualRate
+          ? parseNightlyRateAmount(nightlyRates[room.id] ?? "")
+          : Number.NaN;
+        const manualApplies = isValidNightlyRateAmount(manual);
+        return {
+          ...room,
+          guestCount,
+          manualApplies,
+          nightlyPriceClp: manualApplies ? manual : ratePriceClp,
+          ratePriceClp,
+        };
       });
     const total = selectedRooms.reduce(
       (sum, room) => sum + room.nightlyPriceClp * nightsCount,
@@ -330,17 +352,43 @@ export function ManualReservationForm({
           Resumen de tarifa ({nightsCount}{" "}
           {nightsCount === 1 ? "noche" : "noches"})
         </p>
-        <ul className="mt-2 space-y-1">
+        <ul className="mt-2 space-y-2">
           {selectedRooms.map((room) => (
-            <li
-              key={room.id}
-              className="flex items-center justify-between text-muted-foreground"
-            >
-              <span>
-                {room.name} ({room.guestCount}{" "}
-                {room.guestCount === 1 ? "huésped" : "huéspedes"})
-              </span>
-              <span>{currency.format(room.nightlyPriceClp * nightsCount)}</span>
+            <li key={room.id} className="space-y-1">
+              <div className="flex items-center justify-between text-foreground">
+                <span>
+                  {room.name} ({room.guestCount}{" "}
+                  {room.guestCount === 1 ? "huésped" : "huéspedes"})
+                </span>
+                <span>
+                  {currency.format(room.nightlyPriceClp * nightsCount)}
+                </span>
+              </div>
+              {allowsManualRate ? (
+                <label className="flex items-center justify-between gap-2 text-xs font-semibold text-foreground">
+                  <span>Valor por noche del canal</span>
+                  <input
+                    className="w-32 rounded-md border border-border bg-background px-2 py-1 text-right text-sm font-normal text-foreground"
+                    inputMode="numeric"
+                    name={`rate:${room.id}`}
+                    onChange={(event) =>
+                      setNightlyRates((current) => ({
+                        ...current,
+                        [room.id]: event.target.value,
+                      }))
+                    }
+                    placeholder={String(room.ratePriceClp)}
+                    value={nightlyRates[room.id] ?? ""}
+                  />
+                </label>
+              ) : null}
+              {allowsManualRate ? (
+                <p className="text-xs text-foreground/80">
+                  {room.manualApplies
+                    ? `Valor fijado a mano. La tarifa vigente es ${currency.format(room.ratePriceClp)}.`
+                    : `Sin valor propio: se usa la tarifa vigente, ${currency.format(room.ratePriceClp)}.`}
+                </p>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -519,8 +567,13 @@ export function ManualReservationForm({
           <select
             aria-describedby={errors.origin ? "origin-error" : undefined}
             className={controlClass}
-            defaultValue="admin"
             name="origin"
+            onChange={(event) =>
+              setOrigin(
+                event.target.value as (typeof manualOrigins)[number]
+              )
+            }
+            value={origin}
           >
             {manualOrigins.map((origin) => (
               <option key={origin} value={origin}>
