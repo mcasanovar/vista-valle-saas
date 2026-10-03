@@ -15,4 +15,9 @@ test("serves core security headers without a third-party CSP source", async ({
     "frame-ancestors 'none'"
   );
   expect(headers["content-security-policy"]).not.toContain("https:");
+
+  const hsts = headers["strict-transport-security"] ?? "";
+  const maxAgeMatch = hsts.match(/max-age=(\d+)/);
+  expect(maxAgeMatch).not.toBeNull();
+  expect(Number(maxAgeMatch?.[1])).toBeGreaterThanOrEqual(60 * 60 * 24 * 365 * 2);
 });
