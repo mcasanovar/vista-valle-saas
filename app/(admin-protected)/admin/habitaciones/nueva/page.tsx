@@ -5,10 +5,12 @@ import { createProductionDatabase } from "@/infrastructure/database/client";
 import { createDrizzleRoomCreationRepository } from "@/infrastructure/database/room-creation-repository";
 import { RoomCreationForm } from "@/features/rooms/room-creation-form";
 import { createAmenityAction, createRoomDraftAction } from "@/features/rooms/actions";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
 async function loadInitialAmenities() {
+  await requireAdministrator();
   const boundary = createDatabaseBoundary();
   const repository =
     boundary.context === "mock"
@@ -18,6 +20,7 @@ async function loadInitialAmenities() {
 }
 
 export default async function NewRoomPage() {
+  await requireAdministrator();
   const initialAmenities = await loadInitialAmenities();
 
   return (

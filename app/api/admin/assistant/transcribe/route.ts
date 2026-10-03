@@ -1,5 +1,6 @@
 import { getServerEnvironment } from "@/config/server";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
+import { isTrustedAdminMutationOrigin } from "@/infrastructure/auth/admin-password-auth";
 import { getSpeechTranscriber } from "@/features/assistant/transcriber-provider";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +13,10 @@ export const maxDuration = 60;
  * instruction field, editable, never auto-sent (task 9.3).
  */
 export async function POST(request: Request) {
+  if (!isTrustedAdminMutationOrigin(request)) {
+    return Response.json({ error: "No autorizado" }, { status: 400 });
+  }
+
   try {
     await requireAdministrator();
   } catch {

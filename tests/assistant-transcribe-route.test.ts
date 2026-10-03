@@ -19,7 +19,11 @@ describe("POST /api/admin/assistant/transcribe (task 9.2)", () => {
       new Error("Administrative authorization failed: missing_session")
     );
     const blobSpy = vi.fn();
-    const request = { blob: blobSpy, headers: new Headers() } as unknown as Request;
+    const request = {
+      blob: blobSpy,
+      headers: new Headers({ origin: "http://localhost" }),
+      url: "http://localhost/api/admin/assistant/transcribe",
+    } as unknown as Request;
 
     const response = await POST(request);
 

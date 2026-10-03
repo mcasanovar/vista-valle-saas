@@ -39,6 +39,14 @@ const securityHeaders = [
     value: "camera=(), geolocation=(), microphone=(self)",
   },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // Two-year max-age with subdomains, so a browser that has visited once
+  // never issues a plaintext request to this domain again (harden-admin-
+  // authentication, task 4.5). Vercel serves everything over HTTPS already;
+  // this is what makes that the only thing the browser will ever attempt.
+  {
+    key: "Strict-Transport-Security",
+    value: "max-age=63072000; includeSubDomains",
+  },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "X-Permitted-Cross-Domain-Policies", value: "none" },

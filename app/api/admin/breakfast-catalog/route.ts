@@ -3,6 +3,7 @@ import {
   normalizeCompanyQuotationBreakfastCatalogInput,
 } from "@/features/company-quotations";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
+import { isTrustedAdminMutationOrigin } from "@/infrastructure/auth/admin-password-auth";
 import { getServerCompanyQuotationBreakfastCatalogRepository } from "@/infrastructure/database/company-quotation-source";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,10 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  if (!isTrustedAdminMutationOrigin(request)) {
+    return Response.json({ error: "No autorizado" }, { status: 400 });
+  }
+
   try {
     await requireAdministrator();
   } catch {

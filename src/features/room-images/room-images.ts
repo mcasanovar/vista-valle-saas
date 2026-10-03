@@ -11,6 +11,7 @@ import {
   type RoomImageUpload,
 } from "@/infrastructure/storage/contracts";
 import { createRoomImageStorage } from "@/infrastructure/storage/server";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 import {
   getCanonicalMockRoomCreationRepository,
   mockDemoRooms,
@@ -154,6 +155,7 @@ function toPhoto(record: RoomImageRecord, url: string): RoomImagePhoto {
 export async function listRoomImages(
   roomId: string
 ): Promise<readonly RoomImagePhoto[]> {
+  await requireAdministrator();
   const storage = createRoomImageStorage();
   const boundary = createDatabaseBoundary();
 

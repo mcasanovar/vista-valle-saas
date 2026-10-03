@@ -34,6 +34,7 @@ export type {
 import { listAdminReservations } from "@/infrastructure/database/admin-reservation-source";
 import { createProductionDatabase } from "@/infrastructure/database/client";
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 export type AdminDashboardKpis = Readonly<{
   approvedRevenueClp: number;
@@ -454,6 +455,7 @@ export function createAdminDashboardSource(
 }
 
 export async function getAdminDashboardSummary(period?: AdminDashboardPeriod) {
+  await requireAdministrator();
   return (
     (await createAdminDashboardSource(
       getServerEnvironment().VISTA_VALLE_CONFIG_CONTEXT

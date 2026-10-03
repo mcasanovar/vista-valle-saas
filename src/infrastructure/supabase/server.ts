@@ -10,6 +10,7 @@ import {
   type SupabaseAdapter,
 } from "@/infrastructure/supabase/contracts";
 import { createMockSupabaseAdapter } from "@/infrastructure/supabase/mock";
+import { ADMIN_SESSION_COOKIE_OPTIONS } from "@/infrastructure/supabase/cookie-config";
 
 function toVerifiedApplicationSession(
   user: Awaited<
@@ -51,6 +52,7 @@ export async function createServerSupabaseAdapter(): Promise<SupabaseAdapter> {
     publicEnvironment.NEXT_PUBLIC_SUPABASE_URL,
     publicEnvironment.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
+      cookieOptions: ADMIN_SESSION_COOKIE_OPTIONS,
       cookies: {
         getAll: () => cookieStore.getAll(),
         setAll: (cookiesToSet) => {

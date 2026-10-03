@@ -15,12 +15,16 @@ import {
   type RoomConnectionCards,
 } from "@/features/channel-calendar-sync/connections-panel";
 import { PlatformPauseToggles } from "@/features/channel-calendar-sync/platform-pause-toggles";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
+
+export const dynamic = "force-dynamic";
 
 const PLATFORMS = ["airbnb", "booking"] as const;
 
 export default async function SyncPage({
   searchParams,
 }: Readonly<{ searchParams: Promise<{ tab?: string }> }>) {
+  await requireAdministrator();
   const { tab } = await searchParams;
   const activeTab = tab === "conexiones" ? "conexiones" : "cola";
 

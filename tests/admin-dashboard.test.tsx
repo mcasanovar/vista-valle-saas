@@ -14,17 +14,29 @@ describe("admin guard and dashboard boundaries", () => {
   it("rejects a missing session and accepts an allowlisted administrator", async () => {
     const missing = { session: { getSession: async () => null } } as never;
     await expect(
-      authorizeAdministrator(missing, ["admin@example.com"])
+      authorizeAdministrator(
+        missing,
+        ["admin@example.com"],
+        ["00000000-0000-4000-8000-000000000003"]
+      )
     ).resolves.toMatchObject({ authorized: false });
     const allowed = {
       session: {
         getSession: async () => ({
-          user: { email: "admin@example.com", role: "authenticated" },
+          user: {
+            email: "admin@example.com",
+            id: "00000000-0000-4000-8000-000000000003",
+            role: "authenticated",
+          },
         }),
       },
     } as never;
     await expect(
-      authorizeAdministrator(allowed, ["admin@example.com"])
+      authorizeAdministrator(
+        allowed,
+        ["admin@example.com"],
+        ["00000000-0000-4000-8000-000000000003"]
+      )
     ).resolves.toMatchObject({ authorized: true });
   });
 

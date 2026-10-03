@@ -44,6 +44,7 @@ describe("admin payment methods API route", () => {
           payOnlineEnabled: false,
           payByCardEnabled: false,
         }),
+        headers: { origin: "http://localhost" },
         method: "PUT",
       })
     );
@@ -77,6 +78,7 @@ describe("admin payment methods API route", () => {
           payOnlineEnabled: false,
           payByCardEnabled: false,
         }),
+        headers: { origin: "http://localhost" },
         method: "PUT",
       })
     );
@@ -100,6 +102,7 @@ describe("admin payment methods API route", () => {
     const response = await PUT(
       new Request("http://localhost/api/admin/payment-methods", {
         body: JSON.stringify({ payAtPropertyEnabled: "no" }),
+        headers: { origin: "http://localhost" },
         method: "PUT",
       })
     );

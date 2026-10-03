@@ -1,4 +1,16 @@
 -- Declarative artifact only. Apply and verify in the production-readiness workflow.
+--
+-- Scope (harden-admin-authentication, task 13.5): this protects direct
+-- access to these tables through Supabase's public anon/authenticated
+-- keys only. The application itself reaches Postgres through a direct
+-- connection (DATABASE_URL) under a role that is not `anon` or
+-- `authenticated` and is not subject to these policies — whether that
+-- role also has `rolbypassrls` is a fact about the hosted project's
+-- configuration, not about this file (see task 10.4). This artifact is
+-- not a second authorization layer behind the application: the
+-- application's own session/allowlist checks
+-- (`src/infrastructure/auth/authorization.ts`) are the only control on
+-- that path.
 alter table public.rooms enable row level security;
 alter table public.room_images enable row level security;
 alter table public.amenities enable row level security;

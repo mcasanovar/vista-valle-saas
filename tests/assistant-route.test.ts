@@ -36,7 +36,9 @@ describe("POST /api/admin/assistant (task 7.2)", () => {
     );
     const jsonSpy = vi.fn();
     const request = {
+      headers: new Headers({ origin: "http://localhost" }),
       json: jsonSpy,
+      url: "http://localhost/api/admin/assistant",
     } as unknown as Request;
 
     const response = await POST(request);
@@ -55,7 +57,11 @@ describe("POST /api/admin/assistant behind ASSISTANT_ENABLED (task 11.6)", () =>
     }));
     mocks.requireAdministrator.mockResolvedValue({ user: { id: "admin-1" } });
     const jsonSpy = vi.fn();
-    const request = { json: jsonSpy } as unknown as Request;
+    const request = {
+      headers: new Headers({ origin: "http://localhost" }),
+      json: jsonSpy,
+      url: "http://localhost/api/admin/assistant",
+    } as unknown as Request;
 
     const response = await POST(request);
 
@@ -78,7 +84,9 @@ describe("POST /api/admin/assistant behind ASSISTANT_ENABLED (task 11.6)", () =>
       threadId: "thread-1",
     });
     const request = {
+      headers: new Headers({ origin: "http://localhost" }),
       json: async () => ({ instruction: "hola" }),
+      url: "http://localhost/api/admin/assistant",
     } as unknown as Request;
 
     const response = await POST(request);

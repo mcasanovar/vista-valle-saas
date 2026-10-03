@@ -14,6 +14,9 @@ import {
 } from "@/features/admin/operational-alerts";
 import { getNotificationDeliveryStatuses } from "@/features/admin/notification-delivery-status";
 import { OriginIcon, originLabels } from "@/features/admin/origin-icon";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
+
+export const dynamic = "force-dynamic";
 
 const alertKindIcon: Record<OperationalAlert["kind"], LucideIcon> = {
   channel_sync_conflict: TriangleAlert,
@@ -170,6 +173,7 @@ function DeliveryRow({
 }
 
 export default async function AlertsPage() {
+  await requireAdministrator();
   const alerts = await getOperationalAlerts();
   const deliveries = getNotificationDeliveryStatuses();
   return (

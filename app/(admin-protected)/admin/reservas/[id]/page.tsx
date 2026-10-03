@@ -23,6 +23,9 @@ import { editAdminReservationNightlyRatesAction } from "@/features/admin/edit-re
 import { EditReservationNightlyRatesForm } from "@/features/admin/edit-reservation-nightly-rates-form";
 import { editAdminReservationOriginAction } from "@/features/admin/edit-reservation-origin-action";
 import { EditReservationOriginForm } from "@/features/admin/edit-reservation-origin-form";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
+
+export const dynamic = "force-dynamic";
 
 const currency = new Intl.NumberFormat("es-CL", {
   currency: "CLP",
@@ -84,6 +87,7 @@ const originChipClasses = {
 export default async function ReservationDetail({
   params,
 }: Readonly<{ params: Promise<{ id: string }> }>) {
+  await requireAdministrator();
   const { id } = await params;
   const boundary = createDatabaseBoundary();
   if (boundary.context !== "production") {

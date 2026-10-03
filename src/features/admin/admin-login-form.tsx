@@ -1,18 +1,48 @@
 "use client";
 
 import Link from "next/link";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { useFormStatus } from "react-dom";
 
 const GENERIC_ERROR = "No fue posible iniciar sesión.";
+
+/**
+ * Reads its pending state from `useFormStatus`, not from a `useState` in the
+ * parent: React does not paint a state update made inside a `<form action>`
+ * callback until that callback's promise settles (harden-admin-authentication,
+ * task 14.1), so a manually managed "loading" flag never shows up while the
+ * request is actually in flight. `useFormStatus` is built for exactly this
+ * and reflects the pending submission immediately — it must be read in a
+ * component nested under the `<form>`, hence the split.
+ */
+function LoginSubmitButton() {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      aria-busy={pending}
+      className="flex min-h-11 w-full items-center justify-center gap-2 rounded-md bg-accent px-4 font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-70"
+      disabled={pending}
+      type="submit"
+    >
+      {pending ? (
+        <Loader2 aria-hidden="true" className="size-4 animate-spin" />
+      ) : null}
+      {pending ? "Ingresando…" : "Ingresar"}
+    </button>
+  );
+}
 
 export function AdminLoginForm({
   context,
 }: Readonly<{ context: "mock" | "production" }>) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const alertRef = useRef<HTMLParagraphElement>(null);
+  // A ref, not state: it must block a second submission synchronously, the
+  // instant the first one starts, regardless of when React next paints.
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     if (error) alertRef.current?.focus();
@@ -41,7 +71,8 @@ export function AdminLoginForm({
   }
 
   async function submit(formData: FormData) {
-    setLoading(true);
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setError(null);
     try {
       const response = await fetch("/api/admin/auth/login", {
@@ -69,7 +100,7 @@ export function AdminLoginForm({
     } catch {
       setError(GENERIC_ERROR);
     } finally {
-      setLoading(false);
+      submittingRef.current = false;
     }
   }
 
@@ -129,13 +160,7 @@ export function AdminLoginForm({
               {error}
             </p>
           ) : null}
-          <button
-            className="min-h-11 w-full rounded-md bg-accent px-4 font-semibold text-on-accent disabled:cursor-not-allowed disabled:opacity-70"
-            disabled={loading}
-            type="submit"
-          >
-            {loading ? "Ingresando…" : "Ingresar"}
-          </button>
+          <LoginSubmitButton />
         </form>
       </section>
     </main>

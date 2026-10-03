@@ -51,8 +51,47 @@ const allowedAdministratorEmails = z
     return Object.freeze(emails);
   });
 
+const allowedAdministratorUserIds = z
+  .string()
+  .trim()
+  .min(1)
+  .transform((value, context) => {
+    const ids = [
+      ...new Set(
+        value
+          .split(",")
+          .map((id) => id.trim().toLowerCase())
+          .filter(Boolean)
+      ),
+    ];
+
+    if (ids.length === 0) {
+      context.addIssue({
+        code: "custom",
+        message: "must contain at least one user id",
+      });
+      return z.NEVER;
+    }
+
+    for (const id of ids) {
+      if (!z.uuid().safeParse(id).success) {
+        context.addIssue({
+          code: "custom",
+          message: "must contain only valid UUIDs",
+        });
+        return z.NEVER;
+      }
+    }
+
+    return Object.freeze(ids);
+  });
+
 const serverEnvironmentSchema = z.object({
   ADMIN_ALLOWED_EMAILS: allowedAdministratorEmails,
+  /** Joint condition with ADMIN_ALLOWED_EMAILS (harden-admin-authentication,
+   * task 7.1): a correo on the allowlist with no matching user id is not
+   * sufficient — see `isAdministrativeSession`. */
+  ADMIN_ALLOWED_USER_IDS: allowedAdministratorUserIds,
   AI_API_KEY: z.string().trim().min(1),
   AI_MODEL: z.string().trim().min(1),
   AI_PROVIDER: z.string().trim().min(1),
@@ -100,7 +139,6 @@ const serverEnvironmentSchema = z.object({
       (value) => value.startsWith("http://") || value.startsWith("https://"),
       "must be an HTTP(S) URL"
     ),
-  SUPABASE_SERVICE_ROLE_KEY: z.string().trim().min(1),
   TIMEZONE: z.literal("America/Santiago"),
   VISTA_VALLE_CONFIG_CONTEXT: z
     .enum(["mock", "production"])
@@ -130,7 +168,6 @@ const configurationValuesThatMayBeMocked = [
   "RESEND_API_KEY",
   "RESEND_FROM_EMAIL",
   "SITE_URL",
-  "SUPABASE_SERVICE_ROLE_KEY",
   "OUTBOX_PROCESSOR_SECRET",
 ] as const;
 
@@ -155,6 +192,27 @@ function assertMockValuesAreExplicitlyAllowed(
       `Invalid server environment configuration: ${mockedKeys.join(", ")} must not use mock or placeholder values in production`
     );
   }
+}
+
+/**
+ * The `mock` context hands out a full administrative session with no
+ * credentials (`src/infrastructure/supabase/mock.ts`) — fine for local
+ * development, catastrophic on a live Vercel deployment. `VERCEL_ENV` is set
+ * by the platform itself (not by this project's own configuration), so it
+ * cannot be left mismatched by the same mistake that left
+ * `VISTA_VALLE_CONFIG_CONTEXT` on its `mock` default
+ * (harden-admin-authentication, task 3.1).
+ */
+function assertDeploymentContextMatchesProduction(
+  environment: Record<string, string | undefined>,
+  configuration: ServerEnvironment
+) {
+  if (environment.VERCEL_ENV !== "production") return;
+  if (configuration.VISTA_VALLE_CONFIG_CONTEXT === "production") return;
+
+  throw new Error(
+    "Invalid server environment configuration: VISTA_VALLE_CONFIG_CONTEXT must be production when VERCEL_ENV is production"
+  );
 }
 
 function assertProductionNotificationConfiguration(
@@ -185,6 +243,7 @@ export function getServerEnvironment(
 ): ServerEnvironment {
   const parsed = serverEnvironmentSchema.safeParse({
     ADMIN_ALLOWED_EMAILS: environment.ADMIN_ALLOWED_EMAILS,
+    ADMIN_ALLOWED_USER_IDS: environment.ADMIN_ALLOWED_USER_IDS,
     AI_API_KEY: environment.AI_API_KEY,
     AI_MODEL: environment.AI_MODEL,
     AI_PROVIDER: environment.AI_PROVIDER,
@@ -210,7 +269,6 @@ export function getServerEnvironment(
     RESEND_FROM_EMAIL: environment.RESEND_FROM_EMAIL,
     RESEND_FROM_NAME: environment.RESEND_FROM_NAME,
     SITE_URL: environment.SITE_URL,
-    SUPABASE_SERVICE_ROLE_KEY: environment.SUPABASE_SERVICE_ROLE_KEY,
     TIMEZONE: environment.TIMEZONE,
     VISTA_VALLE_CONFIG_CONTEXT: environment.VISTA_VALLE_CONFIG_CONTEXT,
   });
@@ -223,6 +281,7 @@ export function getServerEnvironment(
     environment,
     parsed.data.VISTA_VALLE_CONFIG_CONTEXT
   );
+  assertDeploymentContextMatchesProduction(environment, parsed.data);
   assertProductionNotificationConfiguration(environment, parsed.data);
 
   return parsed.data;

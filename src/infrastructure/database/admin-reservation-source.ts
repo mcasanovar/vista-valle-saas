@@ -17,6 +17,7 @@ import type {
   ReservationOrigin,
   ReservationStatus,
 } from "@/features/reservations";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 import {
   auditEvents,
   channelSyncTasks,
@@ -143,6 +144,7 @@ export async function listAdminReservations(
   db: ProductionDatabase,
   filter: AdminReservationListFilter
 ): Promise<AdminReservationListResult> {
+  await requireAdministrator();
   const pageSize = filter.pageSize ?? DEFAULT_PAGE_SIZE;
   const page = Math.max(1, filter.page);
   const offset = (page - 1) * pageSize;
@@ -334,6 +336,7 @@ export async function getAdminReservationDetail(
   db: ProductionDatabase,
   id: string
 ): Promise<AdminReservationDetail | null> {
+  await requireAdministrator();
   const [reservationRow] = await db
     .select()
     .from(reservations)
