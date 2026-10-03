@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { createLodgingInterval } from "@/features/availability";
 import { generateOutboundIcalDocument } from "@/features/channel-calendar-sync/outbound-feed";
 
+const token = "outbound-token-for-connection-a";
+const otherToken = "outbound-token-for-connection-b";
+
+function uidsIn(document: string): string[] {
+  return [...document.matchAll(/^UID:(.+)$/gm)].map((match) => match[1]!);
+}
+
 describe("generateOutboundIcalDocument", () => {
   it("excludes a reservation whose origin matches the requesting platform", () => {
     const document = generateOutboundIcalDocument(
@@ -13,9 +20,10 @@ describe("generateOutboundIcalDocument", () => {
           origin: "airbnb",
         },
       ],
-      "airbnb"
+      "airbnb",
+      token
     );
-    expect(document).not.toContain("airbnb-origin-reservation");
+    expect(uidsIn(document)).toHaveLength(0);
     expect(document.startsWith("BEGIN:VCALENDAR")).toBe(true);
     expect(document.trim().endsWith("END:VCALENDAR")).toBe(true);
   });
@@ -40,11 +48,10 @@ describe("generateOutboundIcalDocument", () => {
           sourceId: "manual-block",
         },
       ],
-      "airbnb"
+      "airbnb",
+      token
     );
-    expect(document).toContain("website-reservation");
-    expect(document).toContain("pending-hold");
-    expect(document).toContain("manual-block");
+    expect(uidsIn(document)).toHaveLength(3);
     expect(document).toContain("DTSTART;VALUE=DATE:20261101");
     expect(document).toContain("DTEND;VALUE=DATE:20261103");
   });
@@ -64,17 +71,16 @@ describe("generateOutboundIcalDocument", () => {
         origin: "airbnb",
       },
     ];
-    const bookingFeed = generateOutboundIcalDocument(entries, "booking");
-    expect(bookingFeed).not.toContain("booking-origin-reservation");
-    expect(bookingFeed).toContain("airbnb-origin-reservation");
+    const bookingFeed = generateOutboundIcalDocument(entries, "booking", token);
+    expect(uidsIn(bookingFeed)).toHaveLength(1);
 
-    const airbnbFeed = generateOutboundIcalDocument(entries, "airbnb");
-    expect(airbnbFeed).toContain("booking-origin-reservation");
-    expect(airbnbFeed).not.toContain("airbnb-origin-reservation");
+    const airbnbFeed = generateOutboundIcalDocument(entries, "airbnb", token);
+    expect(uidsIn(airbnbFeed)).toHaveLength(1);
+    expect(uidsIn(airbnbFeed)[0]).not.toBe(uidsIn(bookingFeed)[0]);
   });
 
   it("returns a valid empty calendar when nothing is occupied", () => {
-    const document = generateOutboundIcalDocument([], "booking");
+    const document = generateOutboundIcalDocument([], "booking", token);
     expect(document).toBe(
       [
         "BEGIN:VCALENDAR",
@@ -84,5 +90,43 @@ describe("generateOutboundIcalDocument", () => {
         "END:VCALENDAR",
       ].join("\r\n")
     );
+  });
+
+  it("publishes an opaque event UID that never contains the internal source id (harden-admin-authentication, task 9.2)", () => {
+    const document = generateOutboundIcalDocument(
+      [
+        {
+          interval: createLodgingInterval("2026-11-01", "2026-11-03"),
+          source: "reservation",
+          sourceId: "11111111-1111-4111-8111-111111111111",
+          origin: "website",
+        },
+      ],
+      "airbnb",
+      token
+    );
+    expect(document).not.toContain("11111111-1111-4111-8111-111111111111");
+    const [uid] = uidsIn(document);
+    expect(uid).toMatch(/^[0-9a-f]{32}@vistavallehospedaje\.com$/);
+  });
+
+  it("is stable across two generations of the same feed, and differs between feeds (different tokens)", () => {
+    const entry = {
+      interval: createLodgingInterval("2026-11-01", "2026-11-03"),
+      source: "reservation" as const,
+      sourceId: "11111111-1111-4111-8111-111111111111",
+      origin: "website",
+    };
+
+    const first = generateOutboundIcalDocument([entry], "airbnb", token);
+    const second = generateOutboundIcalDocument([entry], "airbnb", token);
+    expect(uidsIn(first)[0]).toBe(uidsIn(second)[0]);
+
+    const otherConnection = generateOutboundIcalDocument(
+      [entry],
+      "airbnb",
+      otherToken
+    );
+    expect(uidsIn(otherConnection)[0]).not.toBe(uidsIn(first)[0]);
   });
 });

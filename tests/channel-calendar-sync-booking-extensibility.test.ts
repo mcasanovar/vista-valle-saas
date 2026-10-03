@@ -82,9 +82,17 @@ describe("Booking connection, registered with the same mechanism as Airbnb", () 
     const airbnbReservationId = airbnbResult.created[0]!.id;
     const bookingReservationId = bookingResult.created[0]!.id;
 
+    // Event UIDs are opaque (harden-admin-authentication, task 9.2) - the
+    // internal reservation id never appears in either feed, regardless of
+    // which one it belongs to.
     expect(airbnbFeed).not.toContain(airbnbReservationId);
-    expect(airbnbFeed).toContain(bookingReservationId);
+    expect(airbnbFeed).not.toContain(bookingReservationId);
     expect(bookingFeed).not.toContain(bookingReservationId);
-    expect(bookingFeed).toContain(airbnbReservationId);
+    expect(bookingFeed).not.toContain(airbnbReservationId);
+
+    // Each feed still excludes only its own platform's reservation: one
+    // VEVENT each (the other platform's), not zero and not two.
+    expect(airbnbFeed.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(bookingFeed.match(/BEGIN:VEVENT/g)).toHaveLength(1);
   });
 });

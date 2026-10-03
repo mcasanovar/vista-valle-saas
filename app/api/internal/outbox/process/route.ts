@@ -1,5 +1,6 @@
 import { getServerEnvironment } from "@/config/server";
 import { getServerScheduledOutboxProcessor } from "@/infrastructure/database/notification-processor-source";
+import { timingSafeEqualStrings } from "@/infrastructure/security/timing-safe-equal";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +9,11 @@ async function processOutbox(request: Request) {
   const authorization = request.headers.get("authorization");
   if (
     !environment.OUTBOX_PROCESSOR_SECRET ||
-    authorization !== `Bearer ${environment.OUTBOX_PROCESSOR_SECRET}`
+    !authorization ||
+    !timingSafeEqualStrings(
+      authorization,
+      `Bearer ${environment.OUTBOX_PROCESSOR_SECRET}`
+    )
   ) {
     return Response.json({ message: "No autorizado." }, { status: 401 });
   }

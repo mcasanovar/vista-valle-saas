@@ -1,3 +1,5 @@
+import { createHmac } from "node:crypto";
+
 import type { LodgingDate, LodgingInterval } from "@/features/availability";
 import type { ChannelPlatform } from "./connections";
 
@@ -33,6 +35,28 @@ function escapeIcalText(value: string) {
 }
 
 /**
+ * Derives a stable but opaque event UID for one occupancy entry
+ * (harden-admin-authentication, task 9.2): the outbound feed's UID used to
+ * be `${source}-${sourceId}`, publishing the exact internal UUID that the
+ * mutation cores (`transitionAdminReservationWithResult` and friends)
+ * accept as an identifier. HMAC-SHA256 keyed by the connection's own
+ * `outboundToken` makes the id unguessable without that token, stable
+ * across regenerations of the same feed (same token, same source/sourceId
+ * in → same UID out), and different per connection (each has its own
+ * token) — all without storing anything new.
+ */
+function opaqueEventId(
+  outboundToken: string,
+  source: string,
+  sourceId: string
+): string {
+  return createHmac("sha256", outboundToken)
+    .update(`${source}:${sourceId}`)
+    .digest("hex")
+    .slice(0, 32);
+}
+
+/**
  * Builds the `.ics` document a given `platform` will import for one
  * connection, excluding reservations whose `origin` equals `platform` (the
  * spec's "Publicación de feed saliente por habitación": never echo a
@@ -42,6 +66,7 @@ function escapeIcalText(value: string) {
 export function generateOutboundIcalDocument(
   entries: readonly ChannelFeedOccupancyEntry[],
   platform: ChannelPlatform,
+  outboundToken: string,
   now: () => Date = () => new Date()
 ): string {
   const dtstamp = toUtcStamp(now());
@@ -51,7 +76,7 @@ export function generateOutboundIcalDocument(
     .map((entry) =>
       [
         "BEGIN:VEVENT",
-        `UID:${entry.source}-${entry.sourceId}@vistavallehospedaje.com`,
+        `UID:${opaqueEventId(outboundToken, entry.source, entry.sourceId)}@vistavallehospedaje.com`,
         `DTSTAMP:${dtstamp}`,
         `DTSTART;VALUE=DATE:${toCompactDate(entry.interval.checkIn)}`,
         `DTEND;VALUE=DATE:${toCompactDate(entry.interval.checkOut)}`,
