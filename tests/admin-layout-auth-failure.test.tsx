@@ -18,6 +18,13 @@ vi.mock("@/config/server", () => ({
 }));
 vi.mock("@/infrastructure/auth/authorization", () => ({
   authorizeAdministrator: mocks.authorizeAdministrator,
+  // Mirrors the real `getCachedAdministrativeAuthorization` just enough for
+  // this test: it still goes through the mocked adapter first, so a
+  // rejected adapter still short-circuits before `authorizeAdministrator`.
+  getCachedAdministrativeAuthorization: async () => {
+    await mocks.createServerSupabaseAdapter();
+    return mocks.authorizeAdministrator();
+  },
 }));
 vi.mock("@/infrastructure/supabase/server", () => ({
   createServerSupabaseAdapter: mocks.createServerSupabaseAdapter,

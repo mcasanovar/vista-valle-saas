@@ -2,9 +2,7 @@ import { redirect } from "next/navigation";
 import { Manrope, Source_Sans_3 } from "next/font/google";
 import type { ReactNode } from "react";
 
-import { authorizeAdministrator } from "@/infrastructure/auth/authorization";
-import { getServerEnvironment } from "@/config/server";
-import { createServerSupabaseAdapter } from "@/infrastructure/supabase/server";
+import { getCachedAdministrativeAuthorization } from "@/infrastructure/auth/authorization";
 import { AdminShell } from "@/features/admin/admin-shell";
 
 export const dynamic = "force-dynamic";
@@ -24,14 +22,9 @@ const adminSourceSans = Source_Sans_3({
 export default async function ProtectedAdminLayout({
   children,
 }: Readonly<{ children: ReactNode }>) {
-  const authorization = await (async () => {
-    const environment = getServerEnvironment();
-    return authorizeAdministrator(
-      await createServerSupabaseAdapter(),
-      environment.ADMIN_ALLOWED_EMAILS,
-      environment.ADMIN_ALLOWED_USER_IDS
-    );
-  })().catch(() => null);
+  const authorization = await getCachedAdministrativeAuthorization().catch(
+    () => null
+  );
 
   // Session verification failures are indistinguishable from an absent session
   // at this UI boundary. Never render the protected surface with an unverified
