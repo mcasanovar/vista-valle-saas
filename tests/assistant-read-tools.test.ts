@@ -195,6 +195,56 @@ describe("ver_reserva tool", () => {
       expect(result.reservation.payments[0]).toMatchObject({ status: "approved" });
     }
   });
+
+  it("never sends the guest's contact or billing data, or their free-text comment, to the model (harden-admin-authentication, task 12.1)", async () => {
+    const detail: AdminReservationDetail = {
+      auditEvents: [],
+      channelSyncTasks: [],
+      checkIn: "2030-02-01",
+      checkOut: "2030-02-03",
+      createdAt: new Date("2030-01-01T00:00:00Z"),
+      externalPlatform: null,
+      guest: {
+        company: "Acme SpA",
+        email: "ana@example.com",
+        firstName: "Ana",
+        lastName: "Pérez",
+        phone: "+56911111111",
+        rut: "11.111.111-1",
+      },
+      guestComment: "Llegaremos después de las 22:00, por favor dejar la llave bajo la maceta.",
+      id: "reservation-1",
+      invoiceRequest: {
+        businessActivity: "Comercio",
+        email: "facturacion@acme.cl",
+        name: "Acme SpA",
+        phone: "+56922222222",
+        rut: "76.111.111-1",
+      },
+      items: [],
+      origin: "website",
+      payments: [],
+      publicId: "VV-1",
+      status: "confirmed",
+      totalClp: 100_000,
+    };
+    const reader: ViewReservationReader = { async get() { return detail; } };
+    const tool = createViewReservationTool(reader);
+
+    const result = await tool.handler({ reservationId: "reservation-1" }, context);
+
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("ana@example.com");
+    expect(serialized).not.toContain("+56911111111");
+    expect(serialized).not.toContain("11.111.111-1");
+    expect(serialized).not.toContain("Acme SpA");
+    expect(serialized).not.toContain("facturacion@acme.cl");
+    expect(serialized).not.toContain("maceta");
+    expect(result).toMatchObject({
+      found: true,
+      reservation: { guest: { firstName: "Ana", lastName: "Pérez" } },
+    });
+  });
 });
 
 describe("resumen_financiero tool", () => {
