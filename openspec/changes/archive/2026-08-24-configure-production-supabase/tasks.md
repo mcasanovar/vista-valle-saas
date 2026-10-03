@@ -21,8 +21,8 @@
 
 ## 5. Administrador productivo
 
-- [x] 5.1 Crear el usuario `vistavallespa@gmail.com` en Supabase Auth del proyecto real vía `inviteUserByEmail` (envía correo para definir contraseña) y configurar `ADMIN_ALLOWED_EMAILS=vistavallespa@gmail.com` en `.env.local`. **Pendiente fuera de mi alcance:** deshabilitar "Allow new users to sign up" en el dashboard (Authentication → Providers → Email) — no hay CLI/Management API disponible aquí para hacerlo remotamente; `supabase/config.toml` lo declara pero no está vinculado al proyecto real
-- [x] 5.2 Verificado: test unitario dedicado (`tests/authorization.test.ts`) confirma que solo `vistavallespa@gmail.com` autenticado es reconocido como administrador; confirmado además que el usuario real existe en Supabase Auth (único usuario, invitación enviada, pendiente de confirmar)
+- [x] 5.1 Crear el usuario `<correo administrativo>` en Supabase Auth del proyecto real vía `inviteUserByEmail` (envía correo para definir contraseña) y configurar `ADMIN_ALLOWED_EMAILS=<correo administrativo>` en `.env.local`. **Pendiente fuera de mi alcance:** deshabilitar "Allow new users to sign up" en el dashboard (Authentication → Providers → Email) — no hay CLI/Management API disponible aquí para hacerlo remotamente; `supabase/config.toml` lo declara pero no está vinculado al proyecto real
+- [x] 5.2 Verificado: test unitario dedicado (`tests/authorization.test.ts`) confirma que solo `<correo administrativo>` autenticado es reconocido como administrador; confirmado además que el usuario real existe en Supabase Auth (único usuario, invitación enviada, pendiente de confirmar)
 
 ## 6. Contenido real de habitaciones
 
