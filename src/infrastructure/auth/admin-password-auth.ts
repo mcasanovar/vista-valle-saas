@@ -27,12 +27,26 @@ export type PasswordAuthProvider = Readonly<{
   signOut: () => Promise<unknown>;
 }>;
 
-export type PasswordAuthenticationResult =
-  | Readonly<{ ok: true }>
-  | Readonly<{ message: typeof GENERIC_AUTH_FAILURE; ok: false }>;
+export type PasswordAuthenticationFailureReason =
+  | "invalid_input"
+  | "not_allowed"
+  | "provider_rejected"
+  | "unverifiable_identity";
 
-const genericFailure = (): PasswordAuthenticationResult =>
-  Object.freeze({ message: GENERIC_AUTH_FAILURE, ok: false });
+export type PasswordAuthenticationResult =
+  | Readonly<{ ok: true; userId: string }>
+  | Readonly<{
+      message: typeof GENERIC_AUTH_FAILURE;
+      ok: false;
+      /** Never sent to the client - every failure branch returns the same
+       * generic message; this is for `writeStructuredLog` only (task 5.4). */
+      reason: PasswordAuthenticationFailureReason;
+    }>;
+
+const genericFailure = (
+  reason: PasswordAuthenticationFailureReason
+): PasswordAuthenticationResult =>
+  Object.freeze({ message: GENERIC_AUTH_FAILURE, ok: false, reason });
 
 async function revoke(provider: PasswordAuthProvider) {
   try {
@@ -46,19 +60,20 @@ async function revoke(provider: PasswordAuthProvider) {
 export async function authenticateAdministrativePassword(
   provider: PasswordAuthProvider,
   candidate: unknown,
-  allowedEmails: readonly string[]
+  allowedEmails: readonly string[],
+  allowedUserIds: readonly string[]
 ): Promise<PasswordAuthenticationResult> {
   const parsed = credentialsSchema.safeParse(candidate);
-  if (!parsed.success) return genericFailure();
+  if (!parsed.success) return genericFailure("invalid_input");
 
   try {
     const signedIn = await provider.signInWithPassword(parsed.data);
-    if (signedIn.error) return genericFailure();
+    if (signedIn.error) return genericFailure("provider_rejected");
 
     const verified = await provider.getUser();
     if (verified.error || !verified.data.user) {
       await revoke(provider);
-      return genericFailure();
+      return genericFailure("unverifiable_identity");
     }
 
     const session = {
@@ -68,14 +83,14 @@ export async function authenticateAdministrativePassword(
         role: verified.data.user.role ?? null,
       },
     };
-    if (!isAdministrativeSession(session, allowedEmails)) {
+    if (!isAdministrativeSession(session, allowedEmails, allowedUserIds)) {
       await revoke(provider);
-      return genericFailure();
+      return genericFailure("not_allowed");
     }
 
-    return Object.freeze({ ok: true });
+    return Object.freeze({ ok: true, userId: session.user.id });
   } catch {
-    return genericFailure();
+    return genericFailure("provider_rejected");
   }
 }
 
@@ -89,11 +104,18 @@ export async function authenticateAdministrativePassword(
  * the `X-Forwarded-*` headers themselves would accept a client-spoofed
  * origin, since nothing here can verify they were actually set by a
  * trusted proxy. Unset in every real deployment (see `next.config.ts`).
+ *
+ * Inert in production (harden-admin-authentication, task 6.4):
+ * `VERCEL_ENV` is set by the platform itself, not by this project's own
+ * configuration, so a value left over in a deployment's environment by
+ * mistake can't widen the trusted origin set there the way a misconfigured
+ * `DEV_TUNNEL_ORIGIN` application variable could.
  */
 export function isTrustedAdminMutationOrigin(request: Request) {
   const origin = request.headers.get("origin");
   if (origin === null) return false;
   if (origin === new URL(request.url).origin) return true;
+  if (process.env.VERCEL_ENV === "production") return false;
 
   const devTunnelOrigin = process.env.DEV_TUNNEL_ORIGIN;
   return devTunnelOrigin !== undefined && origin === `https://${devTunnelOrigin}`;

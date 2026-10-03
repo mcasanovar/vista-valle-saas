@@ -7,6 +7,7 @@ import {
   RoomPricingInputError,
 } from "@/features/rooms";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
+import { isTrustedAdminMutationOrigin } from "@/infrastructure/auth/admin-password-auth";
 import { createProductionDatabase } from "@/infrastructure/database/client";
 import { createDrizzleRoomPricingRepository } from "@/infrastructure/database/room-pricing-repository";
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
@@ -64,6 +65,10 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ roomId: string }> }
 ) {
+  if (!isTrustedAdminMutationOrigin(request)) {
+    return Response.json({ error: "No autorizado" }, { status: 400 });
+  }
+
   try {
     await requireAdministrator();
   } catch {
