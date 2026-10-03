@@ -8,6 +8,7 @@ import { getRoomReadSource } from "@/features/rooms";
 import { ManualBlockForm } from "@/features/room-blocks/manual-block-form";
 import { listRoomBlocks } from "@/features/room-blocks/manual-blocks";
 import { createLodgingInterval } from "@/features/availability/date-only";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,7 @@ export default async function BlocksPage({
 }: Readonly<{
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>) {
+  await requireAdministrator();
   const query = await searchParams;
   const one = (key: string) =>
     typeof query[key] === "string" ? query[key] : undefined;

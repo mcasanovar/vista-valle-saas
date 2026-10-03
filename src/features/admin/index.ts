@@ -18,18 +18,18 @@ export {
 export {
   editAdminReservationDatesWithResult,
   type EditReservationDatesActionResult,
-} from "./edit-reservation-dates-action";
+} from "./edit-reservation-dates-core";
 export {
   transitionAdminReservationWithResult,
   type AdminReservationTransition,
   type TransitionAdminReservationResult,
-} from "./reservation-actions";
+} from "./reservation-actions-core";
 export {
   markPaymentPaidWithResult,
   type MarkPaymentPaidResult,
-} from "./mark-payment-paid-action";
+} from "./mark-payment-paid-core";
 export {
   collectPayAtPropertyWithResult,
   type CollectPayAtPropertyInput,
   type CollectPayAtPropertyResult,
-} from "./pay-at-property-admin-collect-action";
+} from "./pay-at-property-admin-collect-core";

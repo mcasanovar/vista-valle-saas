@@ -2,12 +2,14 @@ import { notFound } from "next/navigation";
 import { ActionLink, Heading } from "@/presentation/atoms";
 import { getRoomReadSource } from "@/features/rooms";
 import { RoomPricingSettings } from "@/features/admin/room-pricing-settings";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
 export default async function RoomPricingPage({
   params,
 }: Readonly<{ params: Promise<{ roomId: string }> }>) {
+  await requireAdministrator();
   const { roomId } = await params;
   const source = await getRoomReadSource();
   const room = source.listActive().find((candidate) => candidate.id === roomId);

@@ -8,12 +8,14 @@ import {
   setPrimaryRoomImageAction,
   uploadRoomImagesAction,
 } from "@/features/room-images/actions";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
 export default async function RoomPhotosPage({
   params,
 }: Readonly<{ params: Promise<{ roomId: string }> }>) {
+  await requireAdministrator();
   const { roomId } = await params;
   const source = await getRoomReadSource();
   const room =

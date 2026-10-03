@@ -17,6 +17,7 @@ import {
   parseLodgingDate,
 } from "@/features/availability";
 import { getRoomReadSource } from "@/features/rooms";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 const BASE_PATH = "/admin/calendario";
 
@@ -33,6 +34,7 @@ export const dynamic = "force-dynamic";
 export default async function CalendarPage({
   searchParams,
 }: Readonly<{ searchParams: Promise<CalendarQuery> }>) {
+  await requireAdministrator();
   const query = await searchParams;
   const preset = parseCalendarRangePreset(query.preset);
   const range =

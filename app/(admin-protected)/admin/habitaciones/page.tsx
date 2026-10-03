@@ -8,6 +8,7 @@ import {
 import { activateRoomAction } from "@/features/rooms/actions";
 import { RoomDraftActivateButton } from "@/features/rooms/room-draft-activate-button";
 import { listRoomImages } from "@/features/room-images";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +21,7 @@ function pricingStatusLabel(room: RoomReadModel) {
 }
 
 export default async function RoomsPage() {
+  await requireAdministrator();
   const [source, drafts] = await Promise.all([
     getRoomReadSource(),
     getRoomDraftSource(),
