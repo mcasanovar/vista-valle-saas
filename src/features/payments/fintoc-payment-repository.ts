@@ -103,7 +103,11 @@ export type FintocPaymentRepository = Readonly<{
    */
   applyRefund: (
     payment: FintocPaymentRecord,
-    refundAmountClp: number
+    refundAmountClp: number,
+    /** Written to `audit_events.actor_user_id` (harden-admin-authentication,
+     * task 8.1). Omitted only by call sites that don't yet have a session
+     * (tests seeding fixtures directly). */
+    actorUserId?: string
   ) => Promise<FintocPaymentRecord>;
   /**
    * Marks an already-`approved` payment `charged_back` (see

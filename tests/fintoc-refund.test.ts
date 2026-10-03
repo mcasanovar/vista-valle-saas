@@ -72,6 +72,18 @@ describe("refundFintocPayment", () => {
     ).rejects.toBeInstanceOf(FintocRefundInputError);
   });
 
+  it("is idempotent against a resubmission of the same form: a second identical refund does not apply twice", async () => {
+    const payment = await seedApprovedPayment("cs_idempotent", 200_000);
+
+    const first = await refundFintocPayment(payment.id, 50_000, "admin-1");
+    expect(first.status).toBe("approved");
+    expect(first.refundedAmountClp).toBe(50_000);
+
+    const second = await refundFintocPayment(payment.id, 50_000, "admin-1");
+    expect(second.refundedAmountClp).toBe(50_000);
+    expect(second.status).toBe("approved");
+  });
+
   it("rejects an unknown payment id", async () => {
     await expect(
       refundFintocPayment("does-not-exist")

@@ -46,7 +46,8 @@ function getDependencies() {
  */
 export async function refundFintocPayment(
   paymentId: string,
-  amountClp?: number
+  amountClp?: number,
+  actorUserId?: string
 ) {
   const { fintocClient, fintocPaymentRepository } = getDependencies();
 
@@ -74,6 +75,29 @@ export async function refundFintocPayment(
     throw new FintocRefundInputError("Monto de reembolso inválido.");
   }
 
+  // Idempotent against a resubmission of the same form (harden-admin-
+  // authentication, task 8.3): the key is derived purely from
+  // `(paymentId, refundAmountClp)`, reusing the webhook event table's
+  // existing `(provider, providerEventId)` unique index for the dedup
+  // check — a second identical submission reports `alreadyProcessed` and
+  // returns the current payment record untouched, without calling Fintoc
+  // or crediting the refund a second time.
+  const idempotencyKey = `refund:${payment.id}:${refundAmountClp}`;
+  const { alreadyProcessed } = await fintocPaymentRepository.recordWebhookEvent({
+    eventType: "admin_refund_request",
+    occurredAt: new Date(),
+    payload: { refundAmountClp },
+    paymentId: payment.id,
+    providerEventId: idempotencyKey,
+  });
+  if (alreadyProcessed) {
+    writeStructuredLog("info", "fintoc_refund.duplicate_ignored", {
+      paymentId: payment.id,
+      refundAmountClp,
+    });
+    return payment;
+  }
+
   try {
     await fintocClient.createRefund({
       paymentIntentId: payment.providerPaymentId,
@@ -81,15 +105,21 @@ export async function refundFintocPayment(
     });
     const updated = await fintocPaymentRepository.applyRefund(
       payment,
-      refundAmountClp
+      refundAmountClp,
+      actorUserId
     );
     writeStructuredLog("info", "fintoc_refund.applied", {
+      actorUserId,
       paymentId: payment.id,
       refundAmountClp,
       status: updated.status,
     });
     return updated;
   } catch (error) {
+    // The idempotency key was already recorded above; discard it so a
+    // transient failure here doesn't permanently block a legitimate retry
+    // of this exact (paymentId, refundAmountClp) pair.
+    await fintocPaymentRepository.discardWebhookEvent(idempotencyKey);
     await captureServerException("fintoc_refund.failed", error, {
       paymentId: payment.id,
     });
