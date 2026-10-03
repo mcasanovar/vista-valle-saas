@@ -8,7 +8,7 @@ El proyecto ya define contratos y adaptadores productivos para Supabase (Postgre
 - Configurar `drizzle.config.ts` para aceptar credenciales reales de conexión y agregar un script `db:migrate` repetible que aplique todas las migraciones versionadas existentes a la base configurada.
 - Aplicar todas las migraciones de Drizzle al proyecto Supabase real de Vista Valle, dejando el esquema completo (incluyendo cotizaciones de empresa, reservas multi-habitación y el nuevo índice) en la base real.
 - Aplicar las políticas RLS (`supabase/rls/operational-tables.sql`) y la configuración de Storage/bucket (`supabase/storage/room-images.sql`) al proyecto real.
-- Crear la cuenta de administrador real en Supabase Auth (`vistavallespa@gmail.com`) y configurar `ADMIN_ALLOWED_EMAILS` para reconocerla, manteniendo el registro público deshabilitado.
+- Crear la cuenta de administrador real en Supabase Auth (`<correo administrativo>`) y configurar `ADMIN_ALLOWED_EMAILS` para reconocerla, manteniendo el registro público deshabilitado.
 - Extender la suite de integración de PostgreSQL (`scripts/run-postgres-integration.mjs`) para reproducir todas las migraciones existentes en vez de solo la `0000`, de forma que el esquema completo quede verificado antes de confiar en él contra el proyecto real.
 - Cargar el contenido real de las tres habitaciones (nombres, descripciones, capacidades, camas, baño, servicios, precios y fotografías) en la base y el bucket de Storage reales, reemplazando los fixtures de demostración para el catálogo publicado.
 - Documentar las variables de entorno productivas necesarias para el despliegue en Vercel (sin configurar el despliegue en sí, que queda fuera de este cambio).

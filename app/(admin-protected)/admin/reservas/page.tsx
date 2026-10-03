@@ -11,6 +11,7 @@ import type {
 import { ReservationsFilterBar } from "@/features/admin/reservations-filter-bar";
 import { ReservationsPagination } from "@/features/admin/reservations-pagination";
 import { ReservationRow } from "@/features/admin/reservation-row";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 const validStatuses: readonly ReservationStatus[] = [
   "confirmed",
@@ -109,6 +110,7 @@ export const dynamic = "force-dynamic";
 export default async function ReservationsPage({
   searchParams,
 }: Readonly<{ searchParams: Promise<SearchParams> }>) {
+  await requireAdministrator();
   const query = await searchParams;
   const page = Math.max(1, Number(query.page) || 1);
   const boundary = createDatabaseBoundary();

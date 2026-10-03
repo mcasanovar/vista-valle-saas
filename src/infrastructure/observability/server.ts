@@ -17,13 +17,36 @@ type LogSink = (record: StructuredLogRecord) => void;
 
 const redactedValue = "[REDACTED]";
 const sensitiveKey =
-  /(?:address|authorization|comment|cookie|email|firstName|lastName|name|password|phone|rut|secret|token|apiKey|accessKey|webhook)/i;
+  /(?:address|authorization|bearer|credential|connectionstring|databaseurl|dsn|comment|cookie|email|firstName|lastName|name|password|phone|rut|secret|signature|token|apiKey|accessKey|url|href|webhook)/i;
 
 function isSensitiveKey(key: string) {
   return sensitiveKey.test(key.replace(/[^a-z0-9]/gi, ""));
 }
 
+/**
+ * JWT-shaped string, a `Bearer <token>` header value, or a PostgreSQL
+ * connection string with embedded credentials (harden-admin-authentication,
+ * task 13.4) — redacted regardless of the key it's found under, because a
+ * value this shaped is a credential by construction, not by naming
+ * convention: `isSensitiveKey` alone misses it under an unrecognized key
+ * (e.g. inside an array, or a key not yet added to the alternation above).
+ */
+const jwtShape = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+const bearerShape = /^Bearer\s+\S+$/i;
+const postgresConnectionStringShape = /^postgres(?:ql)?:\/\/[^:/@\s]+:[^@\s]+@/i;
+
+function isCredentialShapedString(value: string): boolean {
+  return (
+    jwtShape.test(value) ||
+    bearerShape.test(value) ||
+    postgresConnectionStringShape.test(value)
+  );
+}
+
 function redactValue(value: unknown, seen: WeakSet<object>): unknown {
+  if (typeof value === "string" && isCredentialShapedString(value)) {
+    return redactedValue;
+  }
   if (value instanceof Error) {
     const candidate = value as Error & { code?: unknown };
     return Object.freeze({

@@ -34,7 +34,11 @@ export async function GET(
       : await getProductionOutboundFeedEntries(connection.roomId);
   if (!entries) return new Response("Not found.", { status: 404 });
 
-  const document = generateOutboundIcalDocument(entries, connection.platform);
+  const document = generateOutboundIcalDocument(
+    entries,
+    connection.platform,
+    connection.outboundToken
+  );
   return new Response(document, {
     status: 200,
     headers: {

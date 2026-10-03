@@ -1,12 +1,16 @@
 import { ManualReservationForm } from "@/features/admin/manual-reservation-form";
 import { createManualReservationAction } from "@/features/admin/manual-reservation-action";
 import { getManualReservationInitialData } from "@/features/admin/manual-reservation-data";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
+
+export const dynamic = "force-dynamic";
 
 export default async function NewManualReservationPage({
   searchParams,
 }: Readonly<{
   searchParams: Promise<{ roomId?: string; checkIn?: string; checkOut?: string }>;
 }>) {
+  await requireAdministrator();
   const [initialData, query] = await Promise.all([
     getManualReservationInitialData(),
     searchParams,

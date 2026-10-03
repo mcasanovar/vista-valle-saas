@@ -134,6 +134,13 @@
       "when": 1790863849022,
       "tag": "0018_great_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1790961321261,
+      "tag": "0019_last_justice",
+      "breakpoints": true
     }
   ]
 }

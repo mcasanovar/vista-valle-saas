@@ -29,6 +29,7 @@ describe("mock infrastructure boundaries", () => {
       getServerEnvironment({
         ADMIN_NOTIFICATION_EMAIL: "admin@example.test",
         ADMIN_ALLOWED_EMAILS: "mock-admin@example.test",
+        ADMIN_ALLOWED_USER_IDS: "00000000-0000-4000-8000-000000000001",
         AI_API_KEY: "mock-ai-api-key",
         AI_MODEL: "mock-ai-model",
         AI_PROVIDER: "mock-ai-provider",
@@ -62,6 +63,7 @@ describe("mock infrastructure boundaries", () => {
     expect(() =>
       getServerEnvironment({
         ADMIN_ALLOWED_EMAILS: "mock-admin@example.test",
+        ADMIN_ALLOWED_USER_IDS: "00000000-0000-4000-8000-000000000001",
         ADMIN_NOTIFICATION_EMAIL: "admin@company.cl",
         AI_API_KEY: "key",
         AI_MODEL: "model",
@@ -91,10 +93,76 @@ describe("mock infrastructure boundaries", () => {
     ).toThrow(/ADMIN_ALLOWED_EMAILS/);
   });
 
+  const validProductionEnvironment = {
+    ADMIN_ALLOWED_EMAILS: "admin@vistavalle.cl",
+    ADMIN_ALLOWED_USER_IDS: "00000000-0000-4000-8000-000000000001",
+    ADMIN_NOTIFICATION_EMAIL: "admin@company.cl",
+    AI_API_KEY: "key",
+    AI_MODEL: "model",
+    AI_PROVIDER: "provider",
+    AI_TRANSCRIPTION_MODEL: "transcription-model",
+    ASSISTANT_PROPOSAL_TTL_MINUTES: "10",
+    BOOKING_ENABLED: "false",
+    BOOKING_HOLD_DURATION_MINUTES: "15",
+    CHANNEL_SYNC_PROCESSOR_SECRET: "production-channel-sync-secret-000000",
+    CLOUDINARY_API_KEY: "key",
+    CLOUDINARY_API_SECRET: "secret",
+    CLOUDINARY_CLOUD_NAME: "cloud-name",
+    DATABASE_URL: "postgresql://user:password@host:5432/database",
+    FINTOC_API_KEY: "key",
+    FINTOC_WEBHOOK_SECRET: "secret",
+    MERCADO_PAGO_ACCESS_TOKEN: "token",
+    MERCADO_PAGO_WEBHOOK_SECRET: "secret",
+    NOTIFICATION_MAX_RETRIES: "3",
+    OUTBOX_PROCESSOR_SECRET: "production-outbox-processor-secret-000000",
+    RESEND_API_KEY: "key",
+    RESEND_DELIVERY_MODE: "real",
+    RESEND_FROM_EMAIL: "reservas@vistavalle.cl",
+    SITE_URL: "https://vista-valle.cl",
+    SUPABASE_SERVICE_ROLE_KEY: "service-role",
+    TIMEZONE: "America/Santiago",
+    VISTA_VALLE_CONFIG_CONTEXT: "production",
+  } as const;
+
+  it("rejects a mock configuration context when Vercel reports a production deployment", () => {
+    expect(() =>
+      getServerEnvironment({
+        ...validProductionEnvironment,
+        VERCEL_ENV: "production",
+        VISTA_VALLE_CONFIG_CONTEXT: "mock",
+      })
+    ).toThrow(/VISTA_VALLE_CONFIG_CONTEXT must be production/);
+  });
+
+  it("accepts a production configuration context on a Vercel production deployment", () => {
+    expect(() =>
+      getServerEnvironment({
+        ...validProductionEnvironment,
+        VERCEL_ENV: "production",
+      })
+    ).not.toThrow();
+  });
+
+  it("does not require a production configuration context when VERCEL_ENV is absent", () => {
+    expect(() =>
+      getServerEnvironment({
+        ...validProductionEnvironment,
+        VISTA_VALLE_CONFIG_CONTEXT: "mock",
+      })
+    ).not.toThrow();
+  });
+
+  it("starts without SUPABASE_SERVICE_ROLE_KEY (harden-admin-authentication, task 13.1): no runtime route uses it", () => {
+    const { SUPABASE_SERVICE_ROLE_KEY: _unused, ...withoutServiceRoleKey } =
+      validProductionEnvironment;
+    expect(() => getServerEnvironment(withoutServiceRoleKey)).not.toThrow();
+  });
+
   it("fails to start with a clear message when AI_TRANSCRIPTION_MODEL is missing", () => {
     expect(() =>
       getServerEnvironment({
         ADMIN_ALLOWED_EMAILS: "mock-admin@example.test",
+        ADMIN_ALLOWED_USER_IDS: "00000000-0000-4000-8000-000000000001",
         ADMIN_NOTIFICATION_EMAIL: "admin@example.test",
         AI_API_KEY: "mock-ai-api-key",
         AI_MODEL: "mock-ai-model",

@@ -10,6 +10,7 @@ import { queryPendingPayAtPropertyPayments } from "@/infrastructure/database/adm
 import { createProductionDatabase } from "@/infrastructure/database/client";
 import { getReservationSummaryById } from "@/infrastructure/database/reservation-summary-source";
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 export type OperationalAlert = Readonly<{
   id: string;
@@ -118,6 +119,7 @@ async function channelSyncConflictAlerts(
 export async function getOperationalAlerts(): Promise<
   readonly OperationalAlert[]
 > {
+  await requireAdministrator();
   const boundary = createDatabaseBoundary();
   const rawConflicts = await listChannelSyncConflictAlerts();
 

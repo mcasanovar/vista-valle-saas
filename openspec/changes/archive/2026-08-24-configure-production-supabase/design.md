@@ -1,6 +1,6 @@
 ## Context
 
-Ver `proposal.md` — Why para la motivación. El proyecto Supabase real de Vista Valle (`ljwukpcwysvahqmrpwjd`, región `sa-east-1`) ya está creado, verificado como accesible y confirmado vacío (sin tablas en `public`). Las credenciales reales (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`) ya están en `.env.local`. `DATABASE_URL` apunta al Transaction pooler (puerto 6543); además se cuenta con la cadena del Session pooler (puerto 5432) para uso puntual de migraciones. El correo del administrador real es `vistavallespa@gmail.com`.
+Ver `proposal.md` — Why para la motivación. El proyecto Supabase real de Vista Valle (`ljwukpcwysvahqmrpwjd`, región `sa-east-1`) ya está creado, verificado como accesible y confirmado vacío (sin tablas en `public`). Las credenciales reales (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `DATABASE_URL`) ya están en `.env.local`. `DATABASE_URL` apunta al Transaction pooler (puerto 6543); además se cuenta con la cadena del Session pooler (puerto 5432) para uso puntual de migraciones. El correo del administrador real es `<correo administrativo>`.
 
 `drizzle.config.ts` hoy solo define `dialect`, `out` y `schema` — no acepta credenciales de conexión, por lo que `drizzle-kit migrate`/`push` no pueden ejecutarse todavía. `scripts/run-postgres-integration.mjs` reconstruye el esquema de verificación reproduciendo únicamente `drizzle/0000_thin_paper_doll.sql`, aunque existen migraciones posteriores (`0001`–`0003`) que agregan `company_quotations` y `reservation_items`. Además, `reservations` no tiene índice sobre `(check_in, check_out)` pese a ser el rango que las consultas de disponibilidad cruzan contra `reservation_items`.
 
@@ -106,7 +106,7 @@ El interruptor solo aplica bajo contexto `production` (`isBookingAcceptanceEnabl
 3. Extender `scripts/run-postgres-integration.mjs` para reproducir todas las migraciones y confirmar que la suite de integración sigue pasando.
 4. Ejecutar `db:migrate` una vez contra el proyecto Supabase real usando el Session pooler.
 5. Aplicar `supabase/rls/operational-tables.sql` y `supabase/storage/room-images.sql` contra el proyecto real.
-6. Crear el usuario administrador real en Supabase Auth (`vistavallespa@gmail.com`) y configurar `ADMIN_ALLOWED_EMAILS`.
+6. Crear el usuario administrador real en Supabase Auth (`<correo administrativo>`) y configurar `ADMIN_ALLOWED_EMAILS`.
 7. Cargar el contenido real de las tres habitaciones (datos + fotografías) mediante el script de carga.
 8. Verificar manualmente: conexión productiva, login del administrador, y que el catálogo lea las habitaciones reales bajo un contexto de verificación explícito, sin activar `BOOKING_ENABLED` ni cambiar el contexto de despliegue.
 
@@ -121,7 +121,7 @@ Esta lista es la referencia para configurar el entorno de producción en Vercel 
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — ya en `.env.local`
 - `SUPABASE_SERVICE_ROLE_KEY` — ya en `.env.local`; en Vercel solo debe vivir como variable de entorno del servidor, nunca expuesta al cliente
 - `DATABASE_URL` — Transaction pooler (6543), ya en `.env.local`; usar exactamente ese valor en Vercel, no el Session pooler usado para migrar
-- `ADMIN_ALLOWED_EMAILS=vistavallespa@gmail.com` — ya en `.env.local`
+- `ADMIN_ALLOWED_EMAILS=<correo administrativo>` — ya en `.env.local`
 
 **Pendientes de gestión aparte (fuera del alcance de este cambio, según lo indicado por el usuario):**
 - `MERCADO_PAGO_ACCESS_TOKEN`, `MERCADO_PAGO_WEBHOOK_SECRET`

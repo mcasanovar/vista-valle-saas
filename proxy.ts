@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getPublicEnvironment } from "@/config/public";
 import { getServerEnvironment } from "@/config/server";
+import { ADMIN_SESSION_COOKIE_OPTIONS } from "@/infrastructure/supabase/cookie-config";
 
 export async function proxy(request: NextRequest) {
   const publicEnvironment = getPublicEnvironment();
@@ -26,15 +27,19 @@ export async function proxy(request: NextRequest) {
     publicEnvironment.NEXT_PUBLIC_SUPABASE_URL,
     publicEnvironment.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     {
+      cookieOptions: ADMIN_SESSION_COOKIE_OPTIONS,
       cookies: {
         getAll: () => request.cookies.getAll(),
-        setAll: (cookiesToSet) => {
+        setAll: (cookiesToSet, headers) => {
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, options, value }) =>
             response.cookies.set(name, value, options)
+          );
+          Object.entries(headers).forEach(([key, value]) =>
+            response.headers.set(key, value)
           );
         },
       },

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { getServerEnvironment } from "@/config/server";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
+import { isTrustedAdminMutationOrigin } from "@/infrastructure/auth/admin-password-auth";
 import { getRoomReadSource } from "@/features/rooms";
 import { buildAssistantOperationalContext } from "@/features/assistant/operational-context";
 import { createAssistantToolRegistry } from "@/features/assistant/tool-registry";
@@ -31,6 +32,10 @@ const requestSchema = z.object({
  * the instruction is interpreted before the session is verified.
  */
 export async function POST(request: Request) {
+  if (!isTrustedAdminMutationOrigin(request)) {
+    return Response.json({ error: "No autorizado" }, { status: 400 });
+  }
+
   let session;
   try {
     session = await requireAdministrator();

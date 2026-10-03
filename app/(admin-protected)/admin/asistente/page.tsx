@@ -13,15 +13,19 @@ import {
   listAssistantMemoryFactsAction,
   updateAssistantMemoryFactAction,
 } from "@/features/assistant/memory-actions";
+import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 export const dynamic = "force-dynamic";
 
 /**
  * The assistant page (task 8.1). Behind `ASSISTANT_ENABLED` (design.md
  * decision 11): off, it behaves exactly as it did before this change —
- * a redirect to `/admin`, nothing else changes.
+ * a redirect to `/admin`, nothing else changes. Its own actions already
+ * fail closed, but this explicit check is added for uniformity with the
+ * rest of the protected pages (harden-admin-authentication, task 1.1).
  */
 export default async function AssistantPage() {
+  await requireAdministrator();
   if (!getServerEnvironment().ASSISTANT_ENABLED) {
     redirect("/admin");
   }

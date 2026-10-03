@@ -37,8 +37,45 @@ export function createProductionViewReservationReader(): ViewReservationReader {
   });
 }
 
+/**
+ * What actually reaches the model (harden-admin-authentication, task
+ * 12.1): `AdminReservationDetail` minus the guest's contact and billing
+ * data and their free-text comment — name, dates, status, amounts and
+ * identifiers are enough for the assistant's operations, and none of them
+ * need `email`, `phone`, `rut`, `company`, `invoiceRequest` or
+ * `guestComment` to work. An administrator who needs a contact detail gets
+ * it from the admin UI directly, not through the model (see
+ * `admin-password-auth/spec.md`, "Minimización de datos personales
+ * enviados al proveedor de modelo").
+ */
+export type AssistantSafeReservationDetail = Omit<
+  AdminReservationDetail,
+  "guest" | "guestComment" | "invoiceRequest"
+> &
+  Readonly<{
+    guest: Readonly<{ firstName: string; lastName: string }>;
+  }>;
+
+function toAssistantSafeReservationDetail(
+  reservation: AdminReservationDetail
+): AssistantSafeReservationDetail {
+  const { guest, guestComment: _guestComment, invoiceRequest: _invoiceRequest, ...rest } =
+    reservation;
+  return Object.freeze({
+    ...rest,
+    guest: Object.freeze({
+      firstName: guest.firstName,
+      lastName: guest.lastName,
+    }),
+  });
+}
+
 export type ViewReservationToolResult =
-  | Readonly<{ found: true; reservation: AdminReservationDetail; success: true }>
+  | Readonly<{
+      found: true;
+      reservation: AssistantSafeReservationDetail;
+      success: true;
+    }>
   | Readonly<{ found: false; success: true }>
   | Readonly<{ code: "unavailable"; message: string; success: false }>;
 
@@ -59,7 +96,7 @@ export function createViewReservationTool(
         if (!reservation) return Object.freeze({ found: false as const, success: true as const });
         return Object.freeze({
           found: true as const,
-          reservation,
+          reservation: toAssistantSafeReservationDetail(reservation),
           success: true as const,
         });
       } catch (error) {

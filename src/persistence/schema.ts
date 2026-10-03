@@ -611,7 +611,10 @@ export const auditEvents = pgTable("audit_events", {
   actorUserId: uuid("actor_user_id"),
   action: varchar("action", { length: 160 }).notNull(),
   entityType: varchar("entity_type", { length: 120 }).notNull(),
-  entityId: uuid("entity_id").notNull(),
+  /** Nullable for `entityType: "admin_session"` (harden-admin-authentication,
+   * task 5.5): a failed login before identity verification has no entity to
+   * attribute the row to yet. Every other entity type still always sets it. */
+  entityId: uuid("entity_id"),
   before: jsonb("before"),
   after: jsonb("after"),
   occurredAt: timestamp("occurred_at", { withTimezone: true })

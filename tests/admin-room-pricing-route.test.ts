@@ -103,6 +103,7 @@ describe("admin room pricing API route", () => {
     const putResponse = await PUT(
       new Request("http://localhost/api/admin/habitaciones/room-doble/tarifas", {
         body: JSON.stringify({ prices: [55_000, 70_000] }),
+        headers: { origin: "http://localhost" },
         method: "PUT",
       }),
       paramsFor("room-doble")
@@ -125,6 +126,7 @@ describe("admin room pricing API route", () => {
     const response = await PUT(
       new Request("http://localhost/api/admin/habitaciones/room-doble/tarifas", {
         body: JSON.stringify({ prices: [-5, 70_000] }),
+        headers: { origin: "http://localhost" },
         method: "PUT",
       }),
       paramsFor("room-doble")
@@ -137,6 +139,7 @@ describe("admin room pricing API route", () => {
     const response = await PUT(
       new Request("http://localhost/api/admin/habitaciones/room-doble/tarifas", {
         body: JSON.stringify({ prices: [55_000] }),
+        headers: { origin: "http://localhost" },
         method: "PUT",
       }),
       paramsFor("room-doble")
@@ -151,6 +154,7 @@ describe("admin room pricing API route", () => {
         "http://localhost/api/admin/habitaciones/room-individual/tarifas",
         {
           body: JSON.stringify({ prices: [45_000] }),
+          headers: { origin: "http://localhost" },
           method: "PUT",
         }
       ),
@@ -177,6 +181,7 @@ describe("admin room pricing API route", () => {
         "http://localhost/api/admin/habitaciones/room-departamento/tarifas",
         {
           body: JSON.stringify({ prices: [60_000, 80_000, 95_000] }),
+          headers: { origin: "http://localhost" },
           method: "PUT",
         }
       ),

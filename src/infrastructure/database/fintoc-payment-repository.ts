@@ -7,7 +7,7 @@ import type {
   FintocPaymentRecord,
   FintocPaymentRepository,
 } from "@/features/payments";
-import { paymentEvents, payments } from "@/persistence/schema";
+import { auditEvents, paymentEvents, payments } from "@/persistence/schema";
 import type { ProductionDatabase } from "./client";
 
 const paymentColumns = {
@@ -124,7 +124,7 @@ export function createDrizzleFintocPaymentRepository(
       if (!row) throw new Error("Failed to update Fintoc payment");
       return Object.freeze(row as FintocPaymentRecord);
     },
-    applyRefund: async (payment, refundAmountClp) => {
+    applyRefund: async (payment, refundAmountClp, actorUserId) => {
       if (payment.status !== "approved") {
         throw new Error(
           `Fintoc payment ${payment.id} is not approved and cannot be refunded`
@@ -137,15 +137,27 @@ export function createDrizzleFintocPaymentRepository(
       if (refundedAmountClp > payment.amountClp) {
         throw new Error("Refund amount exceeds the payment total");
       }
+      const nextStatus =
+        refundedAmountClp === payment.amountClp ? "refunded" : payment.status;
       const [row] = await db
         .update(payments)
-        .set({
-          refundedAmountClp,
-          status: refundedAmountClp === payment.amountClp ? "refunded" : payment.status,
-        })
+        .set({ refundedAmountClp, status: nextStatus })
         .where(eq(payments.id, payment.id))
         .returning(paymentColumns);
       if (!row) throw new Error("Failed to update Fintoc payment");
+      // Auditable (harden-admin-authentication, task 8.2): same shape as
+      // `admin-payment-collection.ts`'s `payment.collected` row.
+      await db.insert(auditEvents).values({
+        action: "payment.refunded",
+        actorUserId: actorUserId ?? null,
+        after: { refundedAmountClp, status: nextStatus },
+        before: {
+          refundedAmountClp: payment.refundedAmountClp,
+          status: payment.status,
+        },
+        entityId: payment.id,
+        entityType: "payment",
+      });
       return Object.freeze(row as FintocPaymentRecord);
     },
     markChargedBack: async (payment) => {
