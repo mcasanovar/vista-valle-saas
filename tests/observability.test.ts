@@ -47,6 +47,37 @@ describe("server observability", () => {
     });
   });
 
+  it("redacts a value by its own shape, not only by its key name (harden-admin-authentication, task 13.4)", () => {
+    const jwt =
+      "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+    const bearerHeader = "Bearer sk_live_abcdef1234567890";
+    const connectionString =
+      "postgresql://vista_valle_user:super-secret-password@db.internal:5432/vista_valle";
+
+    expect(
+      redactObservabilityData({
+        // Keys the sensitive-key alternation does not recognize - only the
+        // value's shape can catch these.
+        randomNote: jwt,
+        thirdPartyAuthHeader: bearerHeader,
+        unlabeledConnection: connectionString,
+        // Explicitly inside an array of tuples, not a flat object.
+        pairs: [
+          ["note", jwt],
+          ["other", "not-a-secret"],
+        ],
+      })
+    ).toEqual({
+      randomNote: "[REDACTED]",
+      thirdPartyAuthHeader: "[REDACTED]",
+      unlabeledConnection: "[REDACTED]",
+      pairs: [
+        ["note", "[REDACTED]"],
+        ["other", "not-a-secret"],
+      ],
+    });
+  });
+
   it("keeps reservation/payment correlation while excluding guest data from structured logs", async () => {
     const logs: StructuredLogRecord[] = [];
     setStructuredLogSinkForTests((record) => logs.push(record));

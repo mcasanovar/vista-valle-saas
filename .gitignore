@@ -26,3 +26,8 @@ yarn-error.log*
 
 # macOS
 .DS_Store
+
+# one-off operational data imports (harden-admin-authentication, task 13.3):
+# these can carry real guest names/history and must never be committed.
+scripts/*.xlsx
+scripts/*.csv
