@@ -76,7 +76,7 @@ describe("room presentation", () => {
     ).toBeVisible();
     expect(
       screen.getByRole("img", {
-        name: "Imagen de demostración para la habitación Valle",
+        name: "Habitación con cama matrimonial en Vista Valle, hostal en Illapel (imagen de demostración).",
       })
     ).toHaveAttribute("src", expect.stringContaining("room-1.jpeg"));
     expect(screen.getByText("Wi‑Fi")).toBeVisible();

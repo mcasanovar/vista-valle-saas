@@ -1,12 +1,13 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Price } from "@/presentation/molecules";
 import {
   effectiveRoomSelection,
   saveSessionRoomSelection,
   useSessionRoomSelection,
+  type SessionRoomSelection,
 } from "./selection-session";
 import { isOccupancySelectable } from "./guest-allocation";
 import { RoomDetailSelectionButton } from "./room-detail-selection-button";
@@ -21,23 +22,45 @@ function selectableOccupanciesUpTo(capacity: number) {
   return Array.from({ length: Math.max(0, capacity) }, (_, index) => index + 1);
 }
 
-export function RoomDetailPriceCard({
-  slug,
-  capacity,
-  nightlyPriceClp,
-  occupancyPrices,
-}: Readonly<{
+type RoomDetailPriceCardProps = Readonly<{
   slug: string;
   capacity: number;
   nightlyPriceClp: number;
   occupancyPrices: readonly RoomOccupancyPrice[];
-}>) {
+}>;
+
+/**
+ * Reads the URL-dependent selection state inside its own `<Suspense>`
+ * boundary so the price and features in `RoomDetailPriceCardView` stay
+ * outside it and are never swallowed by an empty fallback.
+ */
+function RoomDetailPriceCardSelectionReader(props: RoomDetailPriceCardProps) {
   const searchParams = useSearchParams();
   const storedSelection = useSessionRoomSelection();
   const selection = effectiveRoomSelection(
     new URLSearchParams(searchParams?.toString() ?? ""),
     storedSelection
   );
+  return <RoomDetailPriceCardView {...props} selection={selection} />;
+}
+
+export function RoomDetailPriceCard(props: RoomDetailPriceCardProps) {
+  return (
+    <Suspense fallback={<RoomDetailPriceCardView {...props} selection={null} />}>
+      <RoomDetailPriceCardSelectionReader {...props} />
+    </Suspense>
+  );
+}
+
+function RoomDetailPriceCardView({
+  slug,
+  capacity,
+  nightlyPriceClp,
+  occupancyPrices,
+  selection,
+}: RoomDetailPriceCardProps & {
+  selection: SessionRoomSelection | null;
+}) {
   const existingEntry = selection?.rooms.find((room) => room.roomId === slug);
   const hasOccupancyChoice = capacity > 1;
   const [pendingOccupancy, setPendingOccupancy] = useState<number | null>(

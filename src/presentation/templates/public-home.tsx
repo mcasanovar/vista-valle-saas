@@ -12,7 +12,7 @@ import {
   RoomCard,
   RoomPhotoGalleryProvider,
 } from "@/presentation/organisms";
-import { publicSiteContent } from "@/config/public-site-content";
+import { publicFaq, publicSiteContent } from "@/config/public-site-content";
 
 type CompanyEnquiryPresentation =
   | Readonly<{ kind: "demo" }>
@@ -186,7 +186,7 @@ export function PublicHomeTemplate({
           >
             <Image
               src="/brand/panoramic-bg.png"
-              alt="Vista Valle Lodging House"
+              alt="Vista panorámica del valle y la montaña alrededor de Vista Valle, hostal en Illapel."
               fill
               sizes="100vw"
               className="object-cover"
@@ -210,6 +210,38 @@ export function PublicHomeTemplate({
             </div>
           </section>
         </Reveal>
+        {publicFaq.length ? (
+          <Reveal delay={0.14}>
+            <section
+              id="preguntas-frecuentes"
+              aria-labelledby="preguntas-frecuentes-heading"
+              className="vv-section mx-auto max-w-content space-y-7 px-4 phone:px-6 tablet:px-8"
+            >
+              <div className="vv-section-head">
+                <h2
+                  id="preguntas-frecuentes-heading"
+                  className="font-heading text-display font-normal text-foreground"
+                >
+                  Preguntas frecuentes
+                </h2>
+              </div>
+              <dl className="grid gap-6 tablet:grid-cols-2">
+                {publicFaq.map((entry) => (
+                  <div key={entry.id}>
+                    <dt>
+                      <h3 className="font-heading text-title font-normal text-foreground">
+                        {entry.question}
+                      </h3>
+                    </dt>
+                    <dd className="mt-2 text-sm text-muted-foreground">
+                      {entry.answer}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          </Reveal>
+        ) : null}
       </main>
       <PublicFooter
         brandDescription={content.footer.brandDescription}

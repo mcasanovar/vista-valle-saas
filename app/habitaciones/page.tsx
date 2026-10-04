@@ -3,7 +3,10 @@ import { getRoomReadSource } from "@/features/rooms";
 import { getServerEnvironment } from "@/config/server";
 import { StructuredData } from "@/presentation/organisms";
 import { RoomCatalogueTemplate } from "@/presentation/templates";
-import { createLodgingStructuredData } from "@/seo/structured-data";
+import {
+  createBreadcrumbStructuredData,
+  createLodgingStructuredData,
+} from "@/seo/structured-data";
 
 export const metadata: Metadata = {
   title: "Habitaciones",
@@ -31,10 +34,15 @@ export default async function RoomCataloguePage() {
   const rooms = roomSource.listActive();
   const siteUrl = getServerEnvironment().SITE_URL;
 
+  const breadcrumb = createBreadcrumbStructuredData(siteUrl, [
+    { name: "Habitaciones", url: "/habitaciones" },
+  ]);
+
   return (
     <>
       <RoomCatalogueTemplate rooms={rooms} />
       <StructuredData data={createLodgingStructuredData(siteUrl, rooms)} />
+      <StructuredData data={breadcrumb} />
     </>
   );
 }

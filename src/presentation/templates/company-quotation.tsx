@@ -29,6 +29,7 @@ export function CompanyQuotationTemplate() {
             </p>
             <Heading level={1}>Solicita una cotización para tu empresa</Heading>
             <Text className="max-w-prose text-muted-foreground">
+              Cotiza alojamiento para empresas en Vista Valle, Illapel.
               Selecciona las fechas, personas y habitaciones que necesitas.
               Calcularemos el valor total y enviaremos el resumen al correo
               indicado.
