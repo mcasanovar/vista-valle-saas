@@ -85,7 +85,11 @@ export async function loadProductionRoomReadModels(
       images: imageRows
         .filter((image) => image.roomId === room.id)
         .map((image) => ({
-          alt: image.altText?.trim() || room.name?.trim() || "",
+          alt:
+            image.altText?.trim() ||
+            (room.name?.trim()
+              ? `Fotografía de la habitación ${room.name.trim()} en Vista Valle, hostal en Illapel.`
+              : ""),
           id: image.id,
           src: imageStorage.getPublicUrl(image.storagePath),
         })),

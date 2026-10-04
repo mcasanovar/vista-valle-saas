@@ -45,8 +45,14 @@ function mockImagesFor(roomId: string, roomName: string) {
   return records.map((record) =>
     Object.freeze({
       // Mirrors `loadProductionRoomReadModels`'s read-time fallback: a photo
-      // uploaded with no caption still counts as having valid alt text.
-      alt: record.altText?.trim() || roomName.trim() || "",
+      // uploaded with no caption still counts as having valid alt text, and
+      // that fallback names the lodging and its locality rather than just
+      // the room (see "Accesibilidad y rendimiento" in spec.md).
+      alt:
+        record.altText?.trim() ||
+        (roomName.trim()
+          ? `Fotografía de la habitación ${roomName.trim()} en Vista Valle, hostal en Illapel.`
+          : ""),
       id: record.id,
       src: storage.getPublicUrl(record.storagePath),
     })

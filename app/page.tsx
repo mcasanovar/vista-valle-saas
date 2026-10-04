@@ -5,26 +5,28 @@ import { getServerEnvironment } from "@/config/server";
 import { publicSiteContent } from "@/config/public-site-content";
 import { StructuredData } from "@/presentation/organisms";
 import { PublicHomeTemplate } from "@/presentation/templates";
-import { createLodgingStructuredData } from "@/seo/structured-data";
-import { Suspense } from "react";
+import {
+  createFaqStructuredData,
+  createLodgingStructuredData,
+} from "@/seo/structured-data";
 
 export default async function HomePage() {
   const roomSource = await getRoomReadSource();
   const rooms = roomSource.listActive();
   const siteUrl = getServerEnvironment().SITE_URL;
+  const faq = createFaqStructuredData();
 
   return (
     <>
-      <Suspense fallback={<main aria-live="polite" className="min-h-screen bg-warm" />}>
-        <PublicHomeTemplate
-          companyEnquiry={getCompanyEnquiryPath(
-            publicSiteContent.company.contact
-          )}
-          bookingSearch={<AvailabilitySearchController presentation="hero" />}
-          rooms={rooms}
-        />
-      </Suspense>
+      <PublicHomeTemplate
+        companyEnquiry={getCompanyEnquiryPath(
+          publicSiteContent.company.contact
+        )}
+        bookingSearch={<AvailabilitySearchController presentation="hero" />}
+        rooms={rooms}
+      />
       <StructuredData data={createLodgingStructuredData(siteUrl, rooms)} />
+      {faq ? <StructuredData data={faq} /> : null}
     </>
   );
 }

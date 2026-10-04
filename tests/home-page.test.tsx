@@ -29,7 +29,7 @@ describe("HomePage", () => {
       expect(
         screen.getByRole("heading", {
           level: 1,
-          name: "Un lugar para bajar el ritmo.",
+          name: "Hospedaje y habitaciones en Illapel",
         })
       ).toBeVisible()
     );

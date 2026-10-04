@@ -18,6 +18,7 @@ import {
   RoomGallery,
   RoomPhotoGalleryProvider,
 } from "@/presentation/organisms";
+import { RoomAvailabilityAction } from "@/features/reservations/room-availability-action";
 import { RoomDetailPriceCard } from "@/features/reservations/room-detail-price-card";
 import { RoomSelectionSummary } from "@/features/reservations/room-selection-summary";
 import type { RoomOccupancyPrice } from "@/features/rooms/read-model";
@@ -155,16 +156,23 @@ export function RoomDetailTemplate({
                 nightlyPriceClp={room.nightlyPriceClp}
                 occupancyPrices={room.occupancyPrices}
               />
-              <ActionLink
-                href={
-                  availabilityHref ??
-                  `/disponibilidad?room=${encodeURIComponent(room.slug)}`
-                }
-                variant="action"
-                className="w-full justify-center border-0"
-              >
-                Consultar disponibilidad
-              </ActionLink>
+              {availabilityHref ? (
+                <ActionLink
+                  href={availabilityHref}
+                  variant="action"
+                  className="w-full justify-center border-0"
+                >
+                  Consultar disponibilidad
+                </ActionLink>
+              ) : (
+                <RoomAvailabilityAction
+                  roomSlug={room.slug}
+                  fallbackHref={`/disponibilidad?room=${encodeURIComponent(room.slug)}`}
+                  className="w-full justify-center border-0"
+                >
+                  Consultar disponibilidad
+                </RoomAvailabilityAction>
+              )}
               <ActionLink
                 href="/habitaciones"
                 className="inline-flex w-full items-center justify-center gap-2"

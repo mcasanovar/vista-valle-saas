@@ -12,17 +12,17 @@ export const mockDemoRooms: readonly RoomReadModel[] = Object.freeze([
     id: "demo-room-valle",
     images: [
       {
-        alt: "Imagen de demostración para la habitación Valle",
+        alt: "Habitación con cama matrimonial en Vista Valle, hostal en Illapel (imagen de demostración).",
         id: "demo-valle-hero",
         src: "/rooms/room-1.jpeg",
       },
       {
-        alt: "Segunda imagen de demostración para la habitación Valle",
+        alt: "Vista interior de la habitación en Vista Valle, Illapel (imagen de demostración).",
         id: "demo-valle-2",
         src: "/rooms/room-2.jpeg",
       },
       {
-        alt: "Tercera imagen de demostración para la habitación Valle",
+        alt: "Detalle del baño privado en Vista Valle, Illapel (imagen de demostración).",
         id: "demo-valle-3",
         src: "/rooms/room-3.jpeg",
       },
@@ -44,7 +44,7 @@ export const mockDemoRooms: readonly RoomReadModel[] = Object.freeze([
     id: "demo-room-andes",
     images: [
       {
-        alt: "Imagen de demostración para la habitación Andes",
+        alt: "Habitación con dos camas individuales en Vista Valle, hostal en Illapel (imagen de demostración).",
         id: "demo-andes-hero",
         src: "/rooms/room-2.jpeg",
       },
@@ -66,7 +66,7 @@ export const mockDemoRooms: readonly RoomReadModel[] = Object.freeze([
     id: "demo-room-terra",
     images: [
       {
-        alt: "Imagen de demostración para la habitación Terra",
+        alt: "Habitación con cama queen y cama individual en Vista Valle, hostal en Illapel (imagen de demostración).",
         id: "demo-terra-hero",
         src: "/rooms/room-3.jpeg",
       },
