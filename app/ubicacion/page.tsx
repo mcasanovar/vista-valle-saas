@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
+import { getServerEnvironment } from "@/config/server";
+import { StructuredData } from "@/presentation/organisms";
 import { LocationTemplate } from "@/presentation/templates";
+import { createBreadcrumbStructuredData } from "@/seo/structured-data";
 
 export const metadata: Metadata = {
   title: "Ubicación",
@@ -23,5 +26,15 @@ export const metadata: Metadata = {
 };
 
 export default function LocationPage() {
-  return <LocationTemplate />;
+  const siteUrl = getServerEnvironment().SITE_URL;
+  const breadcrumb = createBreadcrumbStructuredData(siteUrl, [
+    { name: "Ubicación", url: "/ubicacion" },
+  ]);
+
+  return (
+    <>
+      <LocationTemplate />
+      <StructuredData data={breadcrumb} />
+    </>
+  );
 }

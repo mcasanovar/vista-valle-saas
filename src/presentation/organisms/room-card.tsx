@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Image from "next/image";
-import { useEffect, useState, type MouseEvent } from "react";
+import { Suspense, useEffect, useState, type MouseEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ActionLink, Button, Heading, Icon, Text } from "@/presentation/atoms";
 import { Price } from "@/presentation/molecules";
@@ -16,6 +16,7 @@ import {
   getSessionRoomSelection,
   saveSessionRoomSelection,
   useSessionRoomSelection,
+  type SessionRoomSelection,
 } from "@/features/reservations/selection-session";
 // eslint-disable-next-line architecture/feature-public-api, architecture/presentation-boundaries
 import { isOccupancySelectable } from "@/features/reservations/guest-allocation";
@@ -28,26 +29,7 @@ function selectableOccupanciesUpTo(capacity: number) {
   return Array.from({ length: Math.max(0, capacity) }, (_, index) => index + 1);
 }
 
-export function RoomCard({
-  image,
-  images,
-  roomSlug,
-  name,
-  capacity,
-  capacityCount = 1,
-  occupancyPrices = [],
-  beds,
-  bathroom,
-  amenities,
-  price,
-  priceSuffix,
-  detailHref,
-  detailLabel = "Ver detalle",
-  headingLevel = 3,
-  numberLabel,
-  selectable = false,
-  featured = false,
-}: {
+type RoomCardProps = {
   image?: { src: string; alt: string };
   images?: readonly { src: string; alt: string }[];
   roomSlug?: string;
@@ -67,12 +49,54 @@ export function RoomCard({
   numberLabel?: string;
   selectable?: boolean;
   featured?: boolean;
-}) {
-  const router = useRouter();
+};
+
+/**
+ * Reads the URL-dependent selection state on its own, inside the `<Suspense>`
+ * boundary `RoomCard` wraps it with. `RoomCardView` below stays outside that
+ * boundary so the card's indexable content is never swallowed by a fallback.
+ */
+function RoomCardSelectionReader(props: RoomCardProps) {
   const searchParams = useSearchParams();
   const storedSelection = useSessionRoomSelection();
   const currentParams = new URLSearchParams(searchParams?.toString() ?? "");
   const selection = effectiveRoomSelection(currentParams, storedSelection);
+  return <RoomCardView {...props} selection={selection} />;
+}
+
+export function RoomCard(props: RoomCardProps) {
+  return (
+    <Suspense fallback={<RoomCardView {...props} selection={null} />}>
+      <RoomCardSelectionReader {...props} />
+    </Suspense>
+  );
+}
+
+function RoomCardView({
+  image,
+  images,
+  roomSlug,
+  name,
+  capacity,
+  capacityCount = 1,
+  occupancyPrices = [],
+  beds,
+  bathroom,
+  amenities,
+  price,
+  priceSuffix,
+  detailHref,
+  detailLabel = "Ver detalle",
+  headingLevel = 3,
+  numberLabel,
+  selectable = false,
+  featured = false,
+  selection,
+}: RoomCardProps & {
+  /** Resolved URL/session selection, or `null` while it is still unresolved (fallback/neutral state). */
+  selection: SessionRoomSelection | null;
+}) {
+  const router = useRouter();
   const existingEntry = roomSlug
     ? selection?.rooms.find((room) => room.roomId === roomSlug)
     : undefined;

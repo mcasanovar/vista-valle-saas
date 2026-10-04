@@ -1,5 +1,4 @@
 import { Feedback, Heading, Text } from "@/presentation/atoms";
-import { Suspense } from "react";
 import {
   publicNavigationForRoute,
   publicSiteContent,
@@ -46,7 +45,8 @@ export function RoomCatalogueTemplate({
           <div className="max-w-prose space-y-3">
             <Heading level={1}>Habitaciones</Heading>
             <Text className="text-muted-foreground">
-              Conoce las alternativas disponibles y consulta su disponibilidad.
+              Habitaciones de alojamiento en Illapel: conoce las alternativas
+              disponibles de Vista Valle y consulta su disponibilidad.
             </Text>
           </div>
           {showsDemonstrationContent ? (
@@ -57,33 +57,31 @@ export function RoomCatalogueTemplate({
             </Feedback>
           ) : null}
           {rooms.length ? (
-            <Suspense fallback={<div aria-live="polite" className="grid min-h-64 gap-5 tablet:grid-cols-2 laptop:grid-cols-3" />}>
-              <RoomPhotoGalleryProvider>
-                <div className="grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3">
-                {rooms.map((room, index) => (
-                  <RoomCard
-                    key={room.id}
-                    numberLabel={`Habitación N.° ${String(index + 1).padStart(2, "0")}`}
-                    image={{ src: room.images[0].src, alt: room.images[0].alt }}
-                    images={room.images}
-                    roomSlug={room.slug}
-                    name={room.name}
-                    capacity={`${room.capacity} huéspedes`}
-                    capacityCount={room.capacity}
-                    occupancyPrices={room.occupancyPrices}
-                    beds={room.bedConfiguration}
-                    bathroom={room.bathroom}
-                    amenities={room.amenities}
-                    price={room.nightlyPriceClp}
-                    priceSuffix="CLP / noche"
-                    detailHref={`/habitaciones/${room.slug}`}
-                    detailLabel="Ver habitación"
-                    headingLevel={2}
-                  />
-                ))}
-                </div>
-              </RoomPhotoGalleryProvider>
-            </Suspense>
+            <RoomPhotoGalleryProvider>
+              <div className="grid gap-5 tablet:grid-cols-2 laptop:grid-cols-3">
+              {rooms.map((room, index) => (
+                <RoomCard
+                  key={room.id}
+                  numberLabel={`Habitación N.° ${String(index + 1).padStart(2, "0")}`}
+                  image={{ src: room.images[0].src, alt: room.images[0].alt }}
+                  images={room.images}
+                  roomSlug={room.slug}
+                  name={room.name}
+                  capacity={`${room.capacity} huéspedes`}
+                  capacityCount={room.capacity}
+                  occupancyPrices={room.occupancyPrices}
+                  beds={room.bedConfiguration}
+                  bathroom={room.bathroom}
+                  amenities={room.amenities}
+                  price={room.nightlyPriceClp}
+                  priceSuffix="CLP / noche"
+                  detailHref={`/habitaciones/${room.slug}`}
+                  detailLabel="Ver habitación"
+                  headingLevel={2}
+                />
+              ))}
+              </div>
+            </RoomPhotoGalleryProvider>
           ) : (
             <Text className="text-muted-foreground">
               Las habitaciones se publicarán cuando cuenten con información

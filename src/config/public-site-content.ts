@@ -18,8 +18,8 @@ export const publicSiteContent = {
   ] satisfies readonly PublicNavigationItem[],
   hero: {
     eyebrow: "Illapel · Valle del Choapa",
-    title: "Un lugar para bajar el ritmo.",
-    copy: "Comodidad, tranquilidad y una vista privilegiada para descansar después del camino.",
+    title: "Hospedaje y habitaciones en Illapel",
+    copy: "Un lugar para bajar el ritmo.",
     primaryCta: {
       href: "#consulta-disponibilidad",
       label: "Reservar ahora",
@@ -71,15 +71,32 @@ export const publicSiteContent = {
       },
     ],
   },
+  // Not currently rendered by any template (public-home.tsx does not wire
+  // this section in) — kept here with real, confirmed content instead of a
+  // pending marker so it is ready if a future change renders it.
   services: {
     title: "Servicios",
-    items: [],
-    emptyMessage:
-      "Los servicios se publicarán cuando su información esté aprobada.",
+    items: [
+      {
+        id: "wifi",
+        title: "Wi-Fi gratuito",
+        description: "Conexión a internet sin costo en todas las habitaciones.",
+        icon: "Wifi",
+      },
+      {
+        id: "parking",
+        title: "Estacionamiento privado",
+        description: "Estacionamiento privado dentro del recinto.",
+        icon: "Car",
+      },
+    ],
   },
+  // Not currently rendered by any template — see the note on `services`.
+  // Invented placeholder copy pending the owner's own text, in the same
+  // spirit as `location.teaserCopy`/`location.cityInfo` below.
   experience: {
     title: "Vista y experiencia",
-    copy: "La información sobre la experiencia y sus imágenes se publicará cuando esté aprobada.",
+    copy: "El valle y la montaña de Illapel, a pasos del hostal.",
   },
   company: {
     title: "Tu equipo también necesita descansar.",
@@ -90,6 +107,48 @@ export const publicSiteContent = {
       href: "/cotizacion-empresa",
       label: "Solicitar cotización",
     },
+  },
+  /**
+   * Stay conditions confirmed directly by the lodging's owner (chat
+   * confirmation, 2026-10-03 — see tasks.md 3.2 for the record of what was
+   * confirmed and what was omitted). Every field here is published as-is in
+   * the page content, the FAQ (5.1) and the structured data (6.1); a field
+   * without a confirmed value is left out of this object entirely rather
+   * than guessed, per the "Presentación institucional" requirement.
+   */
+  stayPolicies: {
+    // Confirmed by the owner: 15:00 / 12:00.
+    checkInTime: "15:00",
+    checkOutTime: "12:00",
+    // Confirmed by the owner: pets are not accepted.
+    petsAllowed: false,
+    // Confirmed by the owner: private parking on the property.
+    parking: "Estacionamiento privado en el recinto.",
+    // Confirmed by the owner: free Wi-Fi.
+    wifi: "Wi-Fi gratuito.",
+    // Confirmed by the owner, volunteered alongside the policies above.
+    houseRules: [
+      "No se permite fumar en las habitaciones.",
+      "No se permite generar ruidos molestos.",
+    ],
+    // Breakfast is intentionally omitted: the owner confirmed it is not part
+    // of the direct-booking channel this site sells — it is only included in
+    // company quotations (see the `company-quotation-breakfast-catalog`
+    // capability), which is a different product from a direct room stay.
+  },
+  /**
+   * Official external profiles confirmed by the owner. Only linked via
+   * `sameAs` in structured data (6.1) — never used to republish their
+   * ratings or reviews (see "Sin aggregateRating propio" in design.md).
+   */
+  externalProfiles: {
+    // Confirmed by the owner.
+    booking: {
+      href: "https://www.booking.com/hotel/cl/vista-valle.es.html",
+      label: "Vista Valle en Booking.com",
+    },
+    // Tripadvisor and Instagram: not confirmed by the owner yet; omitted
+    // rather than guessed.
   },
   location: {
     title: "Tu próxima estadía comienza aquí.",
@@ -158,9 +217,12 @@ export const publicSiteContent = {
     transportInfo:
       "Illapel se conecta por buses interurbanos que llegan al Terminal de Buses de Illapel, con servicios regulares desde La Serena y Santiago. Dentro de la ciudad, colectivos y taxis cubren los trayectos cortos, y el centro —incluida la Plaza de Armas— es fácilmente recorrible a pie hasta el hostal.",
   },
+  // Not currently rendered by any template — see the note on `services`.
+  // Real, confirmed content: the same channels already published in
+  // `footer.contacts` below.
   contact: {
     title: "Contacto",
-    copy: "Los canales de contacto se publicarán cuando estén configurados y aprobados.",
+    copy: "Escríbenos por teléfono, correo o WhatsApp — te respondemos a la brevedad.",
   },
   finalCta: {
     title: "Planifique su estadía",
@@ -227,3 +289,63 @@ export function publicNavigationForRoute(
     item.href.startsWith("#") ? { ...item, href: `/${item.href}` } : item,
   );
 }
+
+export type StayFaqEntry = Readonly<{
+  id: string;
+  question: string;
+  answer: string;
+}>;
+
+/** Only the `stayPolicies` fields a FAQ entry can be built from. */
+type StayFaqInput = Readonly<{
+  checkInTime?: string;
+  checkOutTime?: string;
+  parking?: string;
+  petsAllowed?: boolean;
+  wifi?: string;
+}>;
+
+/**
+ * Builds the stay FAQ from confirmed `stayPolicies` data only: a field left
+ * out of the input (not confirmed, see 3.2) yields no question about it,
+ * rather than a question with a guessed answer.
+ */
+export function buildStayFaq(stay: StayFaqInput): readonly StayFaqEntry[] {
+  const entries: StayFaqEntry[] = [];
+  if (stay.checkInTime && stay.checkOutTime) {
+    entries.push({
+      id: "check-in-out",
+      question: "¿Cuál es el horario de check-in y check-out?",
+      answer: `El check-in es a partir de las ${stay.checkInTime} hrs y el check-out hasta las ${stay.checkOutTime} hrs.`,
+    });
+  }
+  if (stay.parking) {
+    entries.push({
+      id: "parking",
+      question: "¿Hay estacionamiento disponible?",
+      answer: stay.parking,
+    });
+  }
+  if (stay.petsAllowed !== undefined) {
+    entries.push({
+      id: "pets",
+      question: "¿Se aceptan mascotas?",
+      answer: stay.petsAllowed
+        ? "Sí, Vista Valle acepta mascotas."
+        : "No, Vista Valle no acepta mascotas.",
+    });
+  }
+  if (stay.wifi) {
+    entries.push({
+      id: "wifi",
+      question: "¿Hay Wi-Fi disponible?",
+      answer: stay.wifi,
+    });
+  }
+  return Object.freeze(entries);
+}
+
+/** The stay FAQ actually published, derived from the confirmed `stayPolicies`. */
+export const publicFaq: readonly StayFaqEntry[] = buildStayFaq(
+  publicSiteContent.stayPolicies,
+);

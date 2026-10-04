@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Icon } from "@/presentation/atoms";
 import { Price } from "@/presentation/molecules";
 import {
@@ -10,6 +10,7 @@ import {
   clearSessionRoomSelection,
   saveSessionRoomSelection,
   useSessionRoomSelection,
+  type SessionRoomSelection,
 } from "./selection-session";
 import { serializeRoomSelectionParam } from "./room-selection-codec";
 import { computeGuestAllocation, describeGuestAllocation } from "./guest-allocation";
@@ -29,11 +30,16 @@ type Room = Readonly<{
   occupancyPrices: readonly RoomOccupancyPrice[];
 }>;
 
-export function RoomSelectionSummary({
-  rooms,
-}: Readonly<{ rooms: readonly Room[] }>) {
+type RoomSelectionSummaryProps = Readonly<{ rooms: readonly Room[] }>;
+
+/**
+ * Reads the URL-dependent selection state inside its own `<Suspense>`
+ * boundary. This floating cart is never part of a page's indexable content,
+ * so an empty fallback here is safe and matches its already-empty neutral
+ * state (no selection yet).
+ */
+function RoomSelectionSummarySelectionReader(props: RoomSelectionSummaryProps) {
   const searchParams = useSearchParams();
-  const router = useRouter();
   // `useSearchParams` can be null while migrating from Pages Router. The URL is
   // still the single source of truth for this client-only cart in that case.
   const query =
@@ -43,6 +49,24 @@ export function RoomSelectionSummary({
     );
   const storedSelection = useSessionRoomSelection();
   const selection = effectiveRoomSelection(query, storedSelection);
+  return <RoomSelectionSummaryView {...props} selection={selection} />;
+}
+
+export function RoomSelectionSummary(props: RoomSelectionSummaryProps) {
+  return (
+    <Suspense fallback={null}>
+      <RoomSelectionSummarySelectionReader {...props} />
+    </Suspense>
+  );
+}
+
+function RoomSelectionSummaryView({
+  rooms,
+  selection,
+}: RoomSelectionSummaryProps & {
+  selection: SessionRoomSelection | null;
+}) {
+  const router = useRouter();
   const sessionSignature = `${selection?.checkIn ?? ""}:${selection?.checkOut ?? ""}:${selection?.guests ?? ""}:${serializeRoomSelectionParam(selection?.rooms ?? [])}`;
   const reducedMotion = useReducedMotion();
   const [expandedFor, setExpandedFor] = useState<string>();

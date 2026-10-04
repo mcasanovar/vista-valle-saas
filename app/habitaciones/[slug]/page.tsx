@@ -5,15 +5,18 @@ import { getServerEnvironment } from "@/config/server";
 import { StructuredData } from "@/presentation/organisms";
 import { RoomDetailTemplate } from "@/presentation/templates";
 import {
-  serializeAvailabilityResultsQuery,
-  validateAvailabilityResultsQuery,
-} from "@/features/availability";
-import { createRoomStructuredData } from "@/seo/structured-data";
+  createBreadcrumbStructuredData,
+  createRoomStructuredData,
+} from "@/seo/structured-data";
 
 type RoomRouteProps = Readonly<{
   params: Promise<{ slug: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }>;
+
+export async function generateStaticParams() {
+  const roomSource = await getRoomReadSource();
+  return roomSource.listActive().map((room) => ({ slug: room.slug }));
+}
 
 export async function generateMetadata({
   params,
@@ -56,10 +59,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function RoomDetailPage({
-  params,
-  searchParams,
-}: RoomRouteProps) {
+export default async function RoomDetailPage({ params }: RoomRouteProps) {
   const { slug } = await params;
   const roomSource = await getRoomReadSource();
   const room = roomSource.getActiveBySlug(slug);
@@ -69,21 +69,16 @@ export default async function RoomDetailPage({
   }
 
   const siteUrl = getServerEnvironment().SITE_URL;
-  const context = searchParams
-    ? validateAvailabilityResultsQuery(await searchParams)
-    : null;
-  const availabilityHref = context?.ok
-    ? serializeAvailabilityResultsQuery({ ...context.value, room: room.slug })
-    : `/disponibilidad?room=${encodeURIComponent(room.slug)}`;
+  const breadcrumb = createBreadcrumbStructuredData(siteUrl, [
+    { name: "Habitaciones", url: "/habitaciones" },
+    { name: room.name, url: `/habitaciones/${room.slug}` },
+  ]);
 
   return (
     <>
-      <RoomDetailTemplate
-        room={room}
-        availabilityHref={availabilityHref}
-        selectionRooms={roomSource.listActive()}
-      />
+      <RoomDetailTemplate room={room} selectionRooms={roomSource.listActive()} />
       <StructuredData data={createRoomStructuredData(siteUrl, room)} />
+      <StructuredData data={breadcrumb} />
     </>
   );
 }

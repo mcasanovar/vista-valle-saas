@@ -1,25 +1,58 @@
 "use client";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { useState, type MouseEvent } from "react";
+import { Suspense, useState, type MouseEvent } from "react";
 import { Button } from "@/presentation/atoms";
 import {
   effectiveRoomSelection,
   saveSessionRoomSelection,
   useSessionRoomSelection,
+  type SessionRoomSelection,
 } from "./selection-session";
-export function RoomDetailSelectionButton({
-  slug,
-  guestCount = 1,
-  disabled = false,
-}: Readonly<{ slug: string; guestCount?: number; disabled?: boolean }>) {
-  const router = useRouter();
+
+type RoomDetailSelectionButtonProps = Readonly<{
+  slug: string;
+  guestCount?: number;
+  disabled?: boolean;
+}>;
+
+/**
+ * Reads the URL-dependent selection state inside its own `<Suspense>`
+ * boundary, as this control is never part of a room's indexable content.
+ */
+function RoomDetailSelectionButtonSelectionReader(
+  props: RoomDetailSelectionButtonProps
+) {
   const searchParams = useSearchParams();
   const storedSelection = useSessionRoomSelection();
   const selection = effectiveRoomSelection(
     new URLSearchParams(searchParams?.toString() ?? ""),
     storedSelection
   );
+  return <RoomDetailSelectionButtonView {...props} selection={selection} />;
+}
+
+export function RoomDetailSelectionButton(
+  props: RoomDetailSelectionButtonProps
+) {
+  return (
+    <Suspense
+      fallback={<RoomDetailSelectionButtonView {...props} selection={null} />}
+    >
+      <RoomDetailSelectionButtonSelectionReader {...props} />
+    </Suspense>
+  );
+}
+
+function RoomDetailSelectionButtonView({
+  slug,
+  guestCount = 1,
+  disabled = false,
+  selection,
+}: RoomDetailSelectionButtonProps & {
+  selection: SessionRoomSelection | null;
+}) {
+  const router = useRouter();
   const [added, setAdded] = useState(false);
   const [travel, setTravel] = useState<{
     left: number;
