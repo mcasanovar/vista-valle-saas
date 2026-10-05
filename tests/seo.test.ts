@@ -21,8 +21,8 @@ describe("public SEO metadata", () => {
       "https://vista-valle.example/"
     );
     expect(metadata.title).toEqual({
-      default: "Vista Valle | Alojamiento en Illapel",
-      template: "%s | Vista Valle",
+      default: "Habitaciones Vista Valle | Alojamiento en Illapel",
+      template: "%s | Habitaciones Vista Valle",
     });
     expect(metadata.alternates?.canonical).toBe("/");
     expect(metadata.openGraph).toMatchObject({

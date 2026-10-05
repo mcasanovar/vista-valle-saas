@@ -101,7 +101,8 @@ export function createLodgingStructuredData(
     "@context": "https://schema.org",
     "@type": "LodgingBusiness",
     "@id": `${normalizedSiteUrl}/#lodging-business`,
-    name: "Vista Valle",
+    name: "Habitaciones Vista Valle",
+    alternateName: "Vista Valle",
     description:
       "Servicio de alojamiento para turistas y empresas en la ciudad de Illapel",
     url: normalizedSiteUrl,
