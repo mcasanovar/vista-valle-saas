@@ -16,14 +16,14 @@ export const metadata: Metadata = {
     canonical: "/habitaciones",
   },
   openGraph: {
-    title: "Habitaciones | Vista Valle",
+    title: "Habitaciones | Habitaciones Vista Valle",
     description:
       "Explora las habitaciones de Vista Valle en Illapel y conoce sus características para planificar tu estadía.",
     url: "/habitaciones",
     type: "website",
   },
   twitter: {
-    title: "Habitaciones | Vista Valle",
+    title: "Habitaciones | Habitaciones Vista Valle",
     description:
       "Explora las habitaciones de Vista Valle en Illapel y conoce sus características para planificar tu estadía.",
   },

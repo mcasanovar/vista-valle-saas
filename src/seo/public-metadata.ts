@@ -7,11 +7,12 @@ export function createPublicMetadata(siteUrl: string): Metadata {
   return {
     metadataBase: new URL(siteUrl),
     title: {
-      default: "Vista Valle | Alojamiento en Illapel",
-      template: "%s | Vista Valle",
+      default: "Habitaciones Vista Valle | Alojamiento en Illapel",
+      template: "%s | Habitaciones Vista Valle",
     },
     description: siteDescription,
     keywords: [
+      "Habitaciones Vista Valle",
       "Vista Valle",
       "alojamiento en Illapel",
       "habitaciones en Illapel",
@@ -23,8 +24,8 @@ export function createPublicMetadata(siteUrl: string): Metadata {
       type: "website",
       locale: "es_CL",
       url: siteUrl,
-      siteName: "Vista Valle",
-      title: "Vista Valle | Alojamiento en Illapel",
+      siteName: "Habitaciones Vista Valle",
+      title: "Habitaciones Vista Valle | Alojamiento en Illapel",
       description: siteDescription,
       images: [
         {
@@ -35,7 +36,7 @@ export function createPublicMetadata(siteUrl: string): Metadata {
     },
     twitter: {
       card: "summary_large_image",
-      title: "Vista Valle | Alojamiento en Illapel",
+      title: "Habitaciones Vista Valle | Alojamiento en Illapel",
       description: siteDescription,
       images: ["/brand/bg-hero.png"],
     },

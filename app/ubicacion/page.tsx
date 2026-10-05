@@ -12,14 +12,14 @@ export const metadata: Metadata = {
     canonical: "/ubicacion",
   },
   openGraph: {
-    title: "Ubicación | Vista Valle",
+    title: "Ubicación | Habitaciones Vista Valle",
     description:
       "Ubica el hostal Vista Valle en Illapel con un mapa interactivo, su relación con la Plaza de Armas y cómo llegar.",
     url: "/ubicacion",
     type: "website",
   },
   twitter: {
-    title: "Ubicación | Vista Valle",
+    title: "Ubicación | Habitaciones Vista Valle",
     description:
       "Ubica el hostal Vista Valle en Illapel con un mapa interactivo, su relación con la Plaza de Armas y cómo llegar.",
   },
