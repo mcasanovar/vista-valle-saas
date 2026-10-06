@@ -10,6 +10,7 @@ import {
   CalendarDays,
   CircleAlert,
   Ellipsis,
+  FileText,
   House,
   LayoutDashboard,
   type LucideIcon,
@@ -41,6 +42,7 @@ const navigationGroups: ReadonlyArray<
         label: "Nueva reserva",
         icon: PlusSquare,
       },
+      { href: "/admin/cotizaciones", label: "Cotizaciones", icon: FileText },
     ],
   },
   {

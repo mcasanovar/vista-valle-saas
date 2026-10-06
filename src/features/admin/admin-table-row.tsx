@@ -4,10 +4,11 @@ import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
 /**
- * Makes the whole `<tr>` clickable/keyboard-navigable to the reservation
- * detail, instead of only the guest-name cell.
+ * Makes a whole admin table `<tr>` clickable/keyboard-navigable to its detail
+ * page, instead of only one cell. Shared by the reservations and quotations
+ * listings - it carries no entity-specific behaviour beyond `href`.
  */
-export function ReservationRow({
+export function AdminTableRow({
   href,
   children,
 }: Readonly<{ href: string; children: ReactNode }>) {
