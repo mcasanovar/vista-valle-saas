@@ -135,7 +135,12 @@ export function createDrizzleCompanyQuotationCreationService(
           transaction,
           idempotencyKey
         );
-        if (existing) return withLines(transaction, existing);
+        if (existing) {
+          return {
+            notificationOutboxIds: [],
+            record: await withLines(transaction, existing),
+          };
+        }
 
         const created = await insertQuotation(
           transaction,
@@ -148,15 +153,19 @@ export function createDrizzleCompanyQuotationCreationService(
             idempotencyKey
           );
           if (!concurrent) throw new Error("Company quotation creation failed");
-          return withLines(transaction, concurrent);
+          return {
+            notificationOutboxIds: [],
+            record: await withLines(transaction, concurrent),
+          };
         }
 
         const record = await withLines(transaction, created);
-        await notificationOutboxWriter.writeCompanyQuotationRequested(
-          transaction,
-          { quotation: record }
-        );
-        return record;
+        const { outboxIds } =
+          await notificationOutboxWriter.writeCompanyQuotationRequested(
+            transaction,
+            { quotation: record }
+          );
+        return { notificationOutboxIds: outboxIds, record };
       }),
   });
 }

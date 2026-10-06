@@ -68,6 +68,23 @@ export function createScheduledOutboxProcessor(
             : "no_ready",
       };
     },
+    /**
+     * Attempts delivery of exactly the given intents, ignoring the rest of
+     * the outbox backlog. Meant for a best-effort first attempt right after
+     * an intent is enqueued, so a single request pays only for its own
+     * notifications. A failing or already-delivered id never blocks the
+     * others, since `process()` itself is a no-op for ids it cannot claim.
+     */
+    processByIds: async (ids: readonly string[]): Promise<void> => {
+      for (const id of ids) {
+        try {
+          await dependencies.process.process(id);
+        } catch {
+          // Best-effort: this is a backstop-covered first attempt, so one
+          // failing id must not stop the remaining ones from being tried.
+        }
+      }
+    },
   });
 }
 
