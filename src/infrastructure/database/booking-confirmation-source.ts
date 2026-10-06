@@ -29,7 +29,7 @@ export async function getProductionPublicBookingConfirmation(
   if (!guest) return null;
 
   const items = await db
-    .select({ name: rooms.name })
+    .select({ name: rooms.name, guestCount: reservationItems.guestCount })
     .from(reservationItems)
     .innerJoin(rooms, eq(reservationItems.roomId, rooms.id))
     .where(eq(reservationItems.reservationId, reservation.id));
@@ -39,7 +39,7 @@ export async function getProductionPublicBookingConfirmation(
     checkIn: reservation.checkIn,
     checkOut: reservation.checkOut,
     guest: Object.freeze({ firstName: guest.firstName }),
-    guestCount: 1,
+    guestCount: items.reduce((sum, item) => sum + item.guestCount, 0),
     nights: nights(reservation.checkIn, reservation.checkOut),
     paymentMode:
       reservation.paymentMode === "pay_now"
