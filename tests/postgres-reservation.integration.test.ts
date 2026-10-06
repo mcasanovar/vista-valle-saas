@@ -239,7 +239,7 @@ if (!enabled) {
       ]);
       const failingOutbox: NotificationOutboxWriter<ProductionRoomLockTransaction> =
         {
-          writeCompanyQuotationRequested: async () => undefined,
+          writeCompanyQuotationRequested: async () => ({ outboxIds: [] }),
           writePaymentCollected: async () => undefined,
           writeReservationDatesChanged: async () => undefined,
           writeReservationConfirmed: async () => {

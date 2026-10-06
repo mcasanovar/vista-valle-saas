@@ -221,6 +221,38 @@ describe("company quotation notifications", () => {
     ).toBe(true);
   });
 
+  it("returns the ids of both intents it just enqueued", async () => {
+    const quotation = calculateCompanyQuotation(
+      normalizeCompanyQuotationInput({
+        checkIn: "2026-10-05",
+        checkOut: "2026-10-08",
+        company: "Empresa demo",
+        contact: "Ana Pérez",
+        email: "ana@example.com",
+        guestCount: 2,
+        message: "Mensaje",
+        breakfastRequested: false,
+        requireParking: true,
+        rooms: [{ guestCount: 2, quantity: 2, slug: "habitacion-valle-demo" }],
+      }),
+      mockDemoRooms
+    );
+    const record = await createMockCompanyQuotationRepository().create(
+      quotation,
+      "notification-returned-ids"
+    );
+    const outbox = createMockNotificationOutbox();
+
+    const { outboxIds } = await outbox.writeCompanyQuotationRequested(
+      undefined,
+      { quotation: record }
+    );
+
+    expect(outboxIds).toHaveLength(2);
+    const enqueuedIds = outbox.list().map((intent) => intent.id);
+    for (const id of outboxIds) expect(enqueuedIds).toContain(id);
+  });
+
   it("never builds a quotation whose assigned guests fall short of the requested total, so no partial-coverage email can ever be generated", () => {
     const input = normalizeCompanyQuotationInput({
       checkIn: "2026-10-05",
