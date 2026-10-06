@@ -1,42 +1,28 @@
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
 import { createProductionDatabase } from "@/infrastructure/database/client";
 import {
-  listAdminReservations,
-  type AdminReservationListRow,
-} from "@/infrastructure/database/admin-reservation-source";
-import type {
-  ReservationOrigin,
-  ReservationStatus,
-} from "@/features/reservations";
-import { ReservationsFilterBar } from "@/features/admin/reservations-filter-bar";
-import { ReservationsPagination } from "@/features/admin/reservations-pagination";
+  listAdminCompanyQuotations,
+  type AdminCompanyQuotationDeliveryState,
+} from "@/infrastructure/database/admin-company-quotation-source";
 import { AdminTableRow } from "@/features/admin/admin-table-row";
+import { deliveryStateMeta } from "@/features/admin/company-quotation-delivery-state";
+import { CompanyQuotationsFilterBar } from "@/features/admin/company-quotations-filter-bar";
+import { CompanyQuotationsPagination } from "@/features/admin/company-quotations-pagination";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
-const validStatuses: readonly ReservationStatus[] = [
-  "confirmed",
-  "cancelled",
-  "completed",
-  "no_show",
-];
-const validOrigins: readonly ReservationOrigin[] = [
-  "website",
-  "airbnb",
-  "booking",
-  "phone",
-  "whatsapp",
-  "admin",
+const validDeliveryStates: readonly AdminCompanyQuotationDeliveryState[] = [
+  "delivered",
+  "failed",
+  "pending",
 ];
 
-function parseStatus(value?: string): ReservationStatus | undefined {
-  return validStatuses.includes(value as ReservationStatus)
-    ? (value as ReservationStatus)
-    : undefined;
-}
-
-function parseOrigin(value?: string): ReservationOrigin | undefined {
-  return validOrigins.includes(value as ReservationOrigin)
-    ? (value as ReservationOrigin)
+function parseDeliveryState(
+  value?: string
+): AdminCompanyQuotationDeliveryState | undefined {
+  return validDeliveryStates.includes(
+    value as AdminCompanyQuotationDeliveryState
+  )
+    ? (value as AdminCompanyQuotationDeliveryState)
     : undefined;
 }
 
@@ -54,60 +40,19 @@ const createdAtFormatter = new Intl.DateTimeFormat("es-CL", {
   year: "numeric",
 });
 
-function statusMeta(status: AdminReservationListRow["status"]) {
-  const meta = {
-    cancelled: [
-      "Cancelada",
-      "bg-[var(--admin-reservation-cancelled-background)] text-[var(--admin-reservation-cancelled)]",
-    ],
-    completed: [
-      "Completada",
-      "bg-[var(--admin-reservation-confirmed-background)] text-[var(--admin-reservation-confirmed)]",
-    ],
-    confirmed: [
-      "Confirmada",
-      "bg-[var(--admin-reservation-confirmed-background)] text-[var(--admin-reservation-confirmed)]",
-    ],
-    no_show: [
-      "No se presentó",
-      "bg-[var(--admin-reservation-pending-background)] text-[var(--admin-reservation-pending)]",
-    ],
-  } as const;
-  return meta[status];
-}
-
-function paymentStatusMeta(status: AdminReservationListRow["paymentStatus"]) {
-  const meta = {
-    cancelled: [
-      "Cancelado",
-      "bg-[var(--admin-reservation-cancelled-background)] text-[var(--admin-reservation-cancelled)]",
-    ],
-    paid: [
-      "Pagado",
-      "bg-[var(--admin-reservation-confirmed-background)] text-[var(--admin-reservation-confirmed)]",
-    ],
-    pending: [
-      "Pendiente",
-      "bg-[var(--admin-reservation-pending-background)] text-[var(--admin-reservation-pending)]",
-    ],
-  } as const;
-  return meta[status];
-}
-
 type SearchParams = Readonly<{
   search?: string;
   checkInFrom?: string;
   checkInTo?: string;
   checkOutFrom?: string;
   checkOutTo?: string;
-  status?: string;
-  origin?: string;
+  deliveryState?: string;
   page?: string;
 }>;
 
 export const dynamic = "force-dynamic";
 
-export default async function ReservationsPage({
+export default async function CompanyQuotationsPage({
   searchParams,
 }: Readonly<{ searchParams: Promise<SearchParams> }>) {
   await requireAdministrator();
@@ -118,16 +63,16 @@ export default async function ReservationsPage({
   if (boundary.context !== "production") {
     return (
       <section className="space-y-4">
-        <h1 className="font-heading text-title">Reservas</h1>
+        <h1 className="font-heading text-title">Cotizaciones</h1>
         <p role="status" className="text-muted-foreground">
-          Las reservas no están disponibles.
+          Las cotizaciones no están disponibles.
         </p>
       </section>
     );
   }
 
   const db = createProductionDatabase(boundary);
-  const result = await listAdminReservations(db, {
+  const result = await listAdminCompanyQuotations(db, {
     checkIn:
       query.checkInFrom || query.checkInTo
         ? { from: query.checkInFrom, to: query.checkInTo }
@@ -136,10 +81,9 @@ export default async function ReservationsPage({
       query.checkOutFrom || query.checkOutTo
         ? { from: query.checkOutFrom, to: query.checkOutTo }
         : undefined,
-    origin: parseOrigin(query.origin),
+    deliveryState: parseDeliveryState(query.deliveryState),
     page,
     search: query.search,
-    status: parseStatus(query.status),
   });
 
   const urlSearchParams = new URLSearchParams(
@@ -151,50 +95,55 @@ export default async function ReservationsPage({
 
   return (
     <section className="space-y-4">
-      <h1 className="font-heading text-title">Reservas</h1>
-      <ReservationsFilterBar
+      <h1 className="font-heading text-title">Cotizaciones</h1>
+      <CompanyQuotationsFilterBar
         values={{
           checkInFrom: query.checkInFrom,
           checkInTo: query.checkInTo,
           checkOutFrom: query.checkOutFrom,
           checkOutTo: query.checkOutTo,
-          origin: query.origin,
+          deliveryState: query.deliveryState,
           search: query.search,
-          status: query.status,
         }}
       />
       {result.rows.length === 0 ? (
-        <p role="status" className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
-          No se encontraron reservas para estos filtros.
+        <p
+          role="status"
+          className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground"
+        >
+          No se encontraron cotizaciones para estos filtros.
         </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-card">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#eef0f5] text-left text-[11px] font-bold tracking-[0.04em] text-[var(--admin-neutral)]">
-                <th className="px-4 py-3">Huésped</th>
+                <th className="px-4 py-3">Empresa</th>
+                <th className="px-4 py-3">Contacto</th>
                 <th className="px-4 py-3">Habitación(es)</th>
                 <th className="px-4 py-3">Entrada</th>
                 <th className="px-4 py-3">Salida</th>
-                <th className="px-4 py-3">Estado</th>
-                <th className="px-4 py-3">Factura</th>
-                <th className="px-4 py-3">Pago</th>
-                <th className="px-4 py-3">Creada</th>
+                <th className="px-4 py-3">Personas</th>
+                <th className="px-4 py-3">Correo</th>
+                <th className="px-4 py-3">Solicitada</th>
                 <th className="px-4 py-3 text-right">Total</th>
               </tr>
             </thead>
             <tbody>
               {result.rows.map((row) => {
-                const [label, className] = statusMeta(row.status);
+                const [label, className] = deliveryStateMeta(row.deliveryState);
                 return (
                   <AdminTableRow
                     key={row.id}
-                    href={`/admin/reservas/${row.id}`}
+                    href={`/admin/cotizaciones/${row.id}`}
                   >
                     <td className="px-4 py-3">
                       <span className="font-semibold text-foreground">
-                        {row.guestName}
+                        {row.company}
                       </span>
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {row.contact}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {row.rooms.join(", ")}
@@ -205,29 +154,14 @@ export default async function ReservationsPage({
                     <td className="px-4 py-3 text-muted-foreground">
                       {row.checkOut}
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {row.guestCount}
+                    </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${className}`}
                       >
                         {label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${
-                          row.invoiceRequested
-                            ? "bg-[var(--admin-reservation-confirmed-background)] text-[var(--admin-reservation-confirmed)]"
-                            : "bg-muted text-[var(--admin-neutral)]"
-                        }`}
-                      >
-                        {row.invoiceRequested ? "Con factura" : "Sin factura"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold ${paymentStatusMeta(row.paymentStatus)[1]}`}
-                      >
-                        {paymentStatusMeta(row.paymentStatus)[0]}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
@@ -243,7 +177,7 @@ export default async function ReservationsPage({
           </table>
         </div>
       )}
-      <ReservationsPagination
+      <CompanyQuotationsPagination
         page={result.page}
         pageSize={result.pageSize}
         searchParams={urlSearchParams}
