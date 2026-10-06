@@ -99,7 +99,7 @@ export type NotificationOutboxWriter<TContext> = Readonly<{
   writeCompanyQuotationRequested: (
     context: TContext,
     input: Readonly<{ quotation: CompanyQuotationRecord }>
-  ) => Promise<void>;
+  ) => Promise<Readonly<{ outboxIds: readonly string[] }>>;
   /**
    * Enqueues an idempotent operational alert once a reservation's stay is
    * modified - dates, rooms, or per-room occupancy. The idempotency key
@@ -160,21 +160,26 @@ export function createMockNotificationOutbox<TContext = unknown>(
   const intents: NotificationOutboxIntent[] = [];
   const idempotencyKeys = new Set<string>();
 
+  const keyToIntentId = new Map<string, string>();
+
   const addBatch = (
     candidates: readonly Readonly<{
       intent: NotificationOutboxIntent;
       key: string;
     }>[]
-  ) => {
+  ): readonly string[] => {
     const pending = candidates.filter(
       (candidate) => !idempotencyKeys.has(candidate.key)
     );
-    if (pending.length === 0) return;
-    if (failWrite?.()) throw new Error("Notification outbox unavailable");
-    for (const candidate of pending) {
-      idempotencyKeys.add(candidate.key);
-      intents.push(candidate.intent);
+    if (pending.length > 0) {
+      if (failWrite?.()) throw new Error("Notification outbox unavailable");
+      for (const candidate of pending) {
+        idempotencyKeys.add(candidate.key);
+        keyToIntentId.set(candidate.key, candidate.intent.id);
+        intents.push(candidate.intent);
+      }
     }
+    return candidates.map((candidate) => keyToIntentId.get(candidate.key)!);
   };
 
   const replace = (
@@ -230,7 +235,7 @@ export function createMockNotificationOutbox<TContext = unknown>(
     },
     writeCompanyQuotationRequested: async (_context, input) => {
       const quotation = input.quotation;
-      addBatch([
+      const outboxIds = addBatch([
         {
           key: `company-quotation:${quotation.id}:customer`,
           intent: createIntent({
@@ -248,6 +253,7 @@ export function createMockNotificationOutbox<TContext = unknown>(
           }),
         },
       ]);
+      return { outboxIds };
     },
     writePaymentCollected: async (_context, input) => {
       addBatch([

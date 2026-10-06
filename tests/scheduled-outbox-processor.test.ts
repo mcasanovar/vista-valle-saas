@@ -57,4 +57,37 @@ describe("scheduled outbox processor", () => {
     });
     expect(process).toHaveBeenCalledOnce();
   });
+
+  it("processes exactly the given ids, without reading the ready backlog", async () => {
+    const process = vi.fn().mockResolvedValue(undefined);
+    const listReady = vi.fn().mockResolvedValue([]);
+    const processor = createScheduledOutboxProcessor({
+      listReady,
+      process: { process },
+    });
+
+    await processor.processByIds(["one", "two"]);
+
+    expect(process).toHaveBeenCalledTimes(2);
+    expect(process).toHaveBeenNthCalledWith(1, "one");
+    expect(process).toHaveBeenNthCalledWith(2, "two");
+    expect(listReady).not.toHaveBeenCalled();
+  });
+
+  it("tolerates a failing or already-delivered id without blocking the rest of the batch", async () => {
+    const process = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("already claimed"))
+      .mockResolvedValueOnce(undefined);
+    const processor = createScheduledOutboxProcessor({
+      listReady: () => [],
+      process: { process },
+    });
+
+    await expect(
+      processor.processByIds(["missing", "deliverable"])
+    ).resolves.toBeUndefined();
+    expect(process).toHaveBeenCalledTimes(2);
+    expect(process).toHaveBeenNthCalledWith(2, "deliverable");
+  });
 });

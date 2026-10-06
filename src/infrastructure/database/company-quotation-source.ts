@@ -43,10 +43,11 @@ export function getServerCompanyQuotationCreationService(): CompanyQuotationCrea
   return Object.freeze({
     create: async (quotation, idempotencyKey) => {
       const record = await repository.create(quotation, idempotencyKey);
-      await writer.writeCompanyQuotationRequested(undefined, {
-        quotation: record,
-      });
-      return record;
+      const { outboxIds } = await writer.writeCompanyQuotationRequested(
+        undefined,
+        { quotation: record }
+      );
+      return { notificationOutboxIds: outboxIds, record };
     },
   });
 }

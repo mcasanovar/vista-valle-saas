@@ -29,15 +29,31 @@ type NotificationInsert = Readonly<{
  * reservation. Payloads intentionally contain only operational identifiers;
  * delivery workers fetch their presentation data from trusted persistence.
  */
+/**
+ * Returns the id of each row addressed by `intents`, in the same order,
+ * whether it was just inserted or already existed under that idempotency
+ * key - so a caller can always learn the real outbox row to process next,
+ * even when this write is a retried duplicate of an earlier one.
+ */
 async function writeIntents(
   tx: ProductionDatabaseTransaction,
   intents: readonly NotificationInsert[]
-) {
-  if (intents.length === 0) return;
+): Promise<readonly string[]> {
+  if (intents.length === 0) return [];
+  const keys = intents.map((intent) => intent.idempotencyKey);
   await tx
     .insert(notificationOutbox)
     .values([...intents])
     .onConflictDoNothing({ target: notificationOutbox.idempotencyKey });
+  const rows = await tx
+    .select({
+      id: notificationOutbox.id,
+      idempotencyKey: notificationOutbox.idempotencyKey,
+    })
+    .from(notificationOutbox)
+    .where(inArray(notificationOutbox.idempotencyKey, keys));
+  const idByKey = new Map(rows.map((row) => [row.idempotencyKey, row.id]));
+  return keys.map((key) => idByKey.get(key)!);
 }
 
 /** Persistent outbox adapter. It must only be used inside a DB transaction. */
@@ -101,7 +117,7 @@ export function createDrizzleNotificationOutboxWriter(
     },
     writeCompanyQuotationRequested: async (tx, input) => {
       const quotation = input.quotation;
-      await writeIntents(tx, [
+      const outboxIds = await writeIntents(tx, [
         {
           idempotencyKey: `company-quotation:${quotation.id}:customer`,
           payload: { quotationId: quotation.id },
@@ -117,6 +133,7 @@ export function createDrizzleNotificationOutboxWriter(
           type: "company_quotation_admin",
         },
       ]);
+      return { outboxIds };
     },
   });
 }

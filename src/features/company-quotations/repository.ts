@@ -23,12 +23,22 @@ export type CompanyQuotationRepository = Readonly<{
 /**
  * Server-side application boundary for accepting a quotation. Production
  * implementations persist the quotation and notification intents as one unit.
+ *
+ * `notificationOutboxIds` lists the intents this call just enqueued, so a
+ * caller can attempt their delivery immediately instead of waiting for a
+ * scheduled processor. It is empty when the quotation already existed
+ * (idempotent replay), since no new intent was enqueued by this call.
  */
 export type CompanyQuotationCreationService = Readonly<{
   create: (
     quotation: CompanyQuotation,
     idempotencyKey: string
-  ) => Promise<CompanyQuotationRecord>;
+  ) => Promise<
+    Readonly<{
+      notificationOutboxIds: readonly string[];
+      record: CompanyQuotationRecord;
+    }>
+  >;
 }>;
 
 export function createMockCompanyQuotationRepository(): CompanyQuotationRepository {

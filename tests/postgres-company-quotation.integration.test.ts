@@ -73,23 +73,28 @@ if (!enabled) {
       const first = await service.create(quotation, "quote-integration-1");
       const repeated = await service.create(quotation, "quote-integration-1");
 
-      expect(repeated.id).toBe(first.id);
+      expect(repeated.record.id).toBe(first.record.id);
+      expect(first.notificationOutboxIds).toHaveLength(2);
+      expect(repeated.notificationOutboxIds).toEqual([]);
       expect(
         await db
           .select()
           .from(companyQuotationLines)
-          .where(eq(companyQuotationLines.quotationId, first.id))
+          .where(eq(companyQuotationLines.quotationId, first.record.id))
       ).toHaveLength(1);
       const intents = await db
         .select()
         .from(notificationOutbox)
-        .where(eq(notificationOutbox.quotationId, first.id));
+        .where(eq(notificationOutbox.quotationId, first.record.id));
       expect(intents).toHaveLength(2);
       expect(
         intents.every(
-          (intent) => quotationIdFromPayload(intent.payload) === first.id
+          (intent) => quotationIdFromPayload(intent.payload) === first.record.id
         )
       ).toBe(true);
+      expect(
+        intents.map((intent) => intent.id).sort()
+      ).toEqual([...first.notificationOutboxIds].sort());
     });
 
     it("lets the worker rebuild the full email template data from Postgres using only the quotation id", async () => {
@@ -97,7 +102,7 @@ if (!enabled) {
         db,
         createDrizzleNotificationOutboxWriter("admin@example.test")
       );
-      const created = await service.create(
+      const { record: created } = await service.create(
         quotation,
         "quote-integration-worker-read"
       );
