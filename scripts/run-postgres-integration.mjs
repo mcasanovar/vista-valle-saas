@@ -65,6 +65,7 @@ try {
       "tests/postgres-operational-alerts.integration.test.ts",
       "tests/postgres-admin-pending-payments.integration.test.ts",
       "tests/postgres-reservation-summary.integration.test.ts",
+      "tests/postgres-booking-confirmation.integration.test.ts",
       "tests/postgres-alerts-end-to-end.integration.test.ts",
       "tests/postgres-assistant-interaction-audit.integration.test.ts",
       "tests/postgres-edit-reservation-dates.integration.test.ts",
