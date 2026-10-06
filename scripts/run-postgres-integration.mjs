@@ -60,6 +60,7 @@ try {
       "tests/postgres-reservation.integration.test.ts",
       "tests/postgres-reservation-hold.integration.test.ts",
       "tests/postgres-company-quotation.integration.test.ts",
+      "tests/postgres-admin-company-quotation.integration.test.ts",
       "tests/postgres-notification-outbox.integration.test.ts",
       "tests/postgres-room-block.integration.test.ts",
       "tests/postgres-operational-alerts.integration.test.ts",
