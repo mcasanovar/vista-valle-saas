@@ -10,7 +10,7 @@ import { resolveDisplayRoomNightlyPrice } from "@/features/rooms/occupancy-prici
 // eslint-disable-next-line architecture/feature-public-api -- the public reservations barrel reaches server-only data access.
 import { serializeRoomSelectionParam } from "@/features/reservations/room-selection-codec";
 // eslint-disable-next-line architecture/feature-public-api -- the public reservations barrel reaches server-only data access.
-import { isExternalChannelOrigin } from "@/features/reservations/reservation-rate-eligibility";
+import { allowsManualNightlyRate } from "@/features/reservations/reservation-rate-eligibility";
 import { useToast } from "@/presentation/organisms";
 import type {
   ManualReservationActionField,
@@ -143,9 +143,9 @@ export function ManualReservationForm({
   >(initialData.availability.status);
   const [availabilityError, setAvailabilityError] = useState<string>();
   const [origin, setOrigin] = useState<(typeof manualOrigins)[number]>("admin");
-  // Keyed by roomId; only read when the selected origin is an external
-  // channel, so switching away from Airbnb/Booking cannot carry a value into
-  // a submission the server would ignore anyway.
+  // Keyed by roomId; only read when the selected origin admits a hand-set
+  // value, so switching to one that does not cannot carry a value into a
+  // submission the server would ignore anyway.
   const [nightlyRates, setNightlyRates] = useState<Record<string, string>>({});
   const [invoiceRequested, setInvoiceRequested] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -292,7 +292,7 @@ export function ManualReservationForm({
   const setRoomGuestCount = (roomId: string, guestCount: number) => {
     setRoomGuestCounts((current) => ({ ...current, [roomId]: guestCount }));
   };
-  const allowsManualRate = isExternalChannelOrigin(origin);
+  const allowsManualRate = allowsManualNightlyRate(origin);
   const roomsFieldValue = () =>
     serializeRoomSelectionParam(
       selectedRoomIds.map((roomId) => ({
@@ -366,7 +366,7 @@ export function ManualReservationForm({
               </div>
               {allowsManualRate ? (
                 <label className="flex items-center justify-between gap-2 text-xs font-semibold text-foreground">
-                  <span>Valor por noche del canal</span>
+                  <span>Valor por noche acordado</span>
                   <input
                     className="w-32 rounded-md border border-border bg-background px-2 py-1 text-right text-sm font-normal text-foreground"
                     inputMode="numeric"

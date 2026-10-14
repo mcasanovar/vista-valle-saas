@@ -128,7 +128,7 @@ async function renderDetail(overrides: Partial<Record<string, unknown>> = {}) {
 }
 
 describe("nightly value editor in the detail (task 7.3)", () => {
-  it.each(["airbnb", "booking"] as const)(
+  it.each(["airbnb", "booking", "whatsapp"] as const)(
     "renders the editor for a %s reservation",
     async (origin) => {
       await renderDetail({ origin });
@@ -142,7 +142,7 @@ describe("nightly value editor in the detail (task 7.3)", () => {
     }
   );
 
-  it.each(["website", "phone", "whatsapp", "admin"] as const)(
+  it.each(["website", "phone", "admin"] as const)(
     "does not render the editor for a %s reservation",
     async (origin) => {
       await renderDetail({ origin });
@@ -161,6 +161,31 @@ describe("nightly value editor in the detail (task 7.3)", () => {
       ).toBeInTheDocument();
     }
   );
+
+  it.each(["cancelled", "completed", "no_show"] as const)(
+    "renders the editor for a %s WhatsApp reservation",
+    async (status) => {
+      await renderDetail({ origin: "whatsapp", status });
+      expect(
+        screen.getByRole("form", { name: "Editar valor por noche" })
+      ).toBeInTheDocument();
+    }
+  );
+
+  it("offers the editor on a WhatsApp reservation without claiming a platform has to be kept in sync", async () => {
+    await renderDetail({ origin: "whatsapp" });
+    expect(
+      screen.getByRole("form", { name: "Editar valor por noche" })
+    ).toBeInTheDocument();
+    // The sync notice belongs to Airbnb and Booking: there is no WhatsApp
+    // platform left uninformed by an edit here.
+    expect(screen.queryByText(/no se refleja en/i)).not.toBeInTheDocument();
+  });
+
+  it("still warns about the platform on a Booking reservation", async () => {
+    await renderDetail({ origin: "booking" });
+    expect(screen.getByText(/no se refleja en/i)).toBeInTheDocument();
+  });
 
   it("prefills the field with the hand-set value and leaves it empty otherwise", async () => {
     await renderDetail({

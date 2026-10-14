@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  assertExternalChannelReservation,
-  isExternalChannelReservation,
-  ReservationNotExternalChannelError,
+  assertManualNightlyRateAllowed,
+  ManualNightlyRateNotAllowedError,
+  reservationAllowsManualNightlyRate,
   type ReservationOrigin,
 } from "@/features/reservations";
 
@@ -17,38 +17,34 @@ const allOrigins: readonly ReservationOrigin[] = [
   "admin",
 ];
 
-describe("external-channel eligibility (task 2.1)", () => {
-  it("accepts only the two external-channel origins", () => {
+describe("nightly-value eligibility by origin", () => {
+  it("accepts exactly the origins whose price comes from an outside agreement", () => {
     const eligible = allOrigins.filter((origin) =>
-      isExternalChannelReservation({ origin })
+      reservationAllowsManualNightlyRate({ origin })
     );
-    expect(eligible).toEqual(["airbnb", "booking"]);
+    expect(eligible).toEqual(["airbnb", "booking", "whatsapp"]);
   });
 
-  it.each(["airbnb", "booking"] as const)(
+  it.each(["airbnb", "booking", "whatsapp"] as const)(
     "asserts %s as eligible without throwing",
     (origin) => {
-      expect(() =>
-        assertExternalChannelReservation({ origin })
-      ).not.toThrow();
+      expect(() => assertManualNightlyRateAllowed({ origin })).not.toThrow();
     }
   );
 
-  it.each(["website", "phone", "whatsapp", "admin"] as const)(
+  it.each(["website", "phone", "admin"] as const)(
     "rejects %s with its origin on the error",
     (origin) => {
-      expect(() => assertExternalChannelReservation({ origin })).toThrow(
-        ReservationNotExternalChannelError
+      expect(() => assertManualNightlyRateAllowed({ origin })).toThrow(
+        ManualNightlyRateNotAllowedError
       );
       try {
-        assertExternalChannelReservation({ origin });
+        assertManualNightlyRateAllowed({ origin });
       } catch (error) {
-        expect(error).toBeInstanceOf(ReservationNotExternalChannelError);
-        expect((error as ReservationNotExternalChannelError).origin).toBe(
-          origin
-        );
-        expect((error as ReservationNotExternalChannelError).code).toBe(
-          "RESERVATION_NOT_EXTERNAL_CHANNEL"
+        expect(error).toBeInstanceOf(ManualNightlyRateNotAllowedError);
+        expect((error as ManualNightlyRateNotAllowedError).origin).toBe(origin);
+        expect((error as ManualNightlyRateNotAllowedError).code).toBe(
+          "MANUAL_NIGHTLY_RATE_NOT_ALLOWED"
         );
       }
     }

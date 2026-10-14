@@ -340,31 +340,37 @@ describe("nightly value for an external channel (task 7.1)", () => {
     );
   }
 
-  it("shows the field only once the origin is an external channel", async () => {
+  it("shows the field only for an origin that admits a hand-set value", async () => {
     stubAvailability();
     const user = userEvent.setup();
     renderForm({ action: vi.fn() });
     await selectRoom(user);
 
-    // Default origin is Administración: no channel value to record.
+    // Default origin is Administración: nothing agreed outside the rate.
     expect(
-      screen.queryByLabelText(/valor por noche del canal/i)
+      screen.queryByLabelText(/valor por noche acordado/i)
     ).not.toBeInTheDocument();
 
     await user.selectOptions(screen.getByLabelText("Origen"), "booking");
     expect(
-      screen.getByLabelText(/valor por noche del canal/i)
+      screen.getByLabelText(/valor por noche acordado/i)
     ).toHaveAttribute("name", "rate:available-room");
 
     await user.selectOptions(screen.getByLabelText("Origen"), "airbnb");
     expect(
-      screen.getByLabelText(/valor por noche del canal/i)
+      screen.getByLabelText(/valor por noche acordado/i)
     ).toBeInTheDocument();
 
-    // Back to a non-channel origin: the field disappears again.
+    // WhatsApp admits one too: the price was agreed with the guest by message.
+    await user.selectOptions(screen.getByLabelText("Origen"), "whatsapp");
+    expect(
+      screen.getByLabelText(/valor por noche acordado/i)
+    ).toHaveAttribute("name", "rate:available-room");
+
+    // Back to an origin priced from the room's rate: the field disappears.
     await user.selectOptions(screen.getByLabelText("Origen"), "phone");
     expect(
-      screen.queryByLabelText(/valor por noche del canal/i)
+      screen.queryByLabelText(/valor por noche acordado/i)
     ).not.toBeInTheDocument();
   });
 
@@ -384,7 +390,7 @@ describe("nightly value for an external channel (task 7.1)", () => {
     expect(totalLine()).toHaveTextContent("$120.000");
 
     await user.type(
-      screen.getByLabelText(/valor por noche del canal/i),
+      screen.getByLabelText(/valor por noche acordado/i),
       "42000"
     );
 
@@ -406,7 +412,7 @@ describe("nightly value for an external channel (task 7.1)", () => {
       screen.getByText(/sin valor propio.*\$60\.000/i)
     ).toBeInTheDocument();
 
-    await user.type(screen.getByLabelText(/valor por noche del canal/i), "42,5");
+    await user.type(screen.getByLabelText(/valor por noche acordado/i), "42,5");
 
     // A malformed amount never becomes a price in the summary; the server
     // rejects it on submit.
@@ -432,7 +438,7 @@ describe("nightly value for an external channel (task 7.1)", () => {
     await fillValidReservation(user);
     await user.selectOptions(screen.getByLabelText("Origen"), "booking");
     await user.type(
-      screen.getByLabelText(/valor por noche del canal/i),
+      screen.getByLabelText(/valor por noche acordado/i),
       "42000"
     );
     await user.click(screen.getByRole("button", { name: /crear reserva/i }));

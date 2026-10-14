@@ -1,7 +1,7 @@
 import {
   editReservationNightlyRates,
   InvalidNightlyRateError,
-  ReservationNotExternalChannelError,
+  ManualNightlyRateNotAllowedError,
   ReservationNotFoundError,
   ReservationRoomNotInStayError,
   ReservationStayRoomRateMissingError,
@@ -32,8 +32,8 @@ export type EditReservationNightlyRatesActionResult =
     }>;
 
 /**
- * Typed core: sets, changes or drops the hand-set nightly value of an
- * external-channel reservation's rooms from already-parsed values, resolving
+ * Typed core: sets, changes or drops the hand-set nightly value of the rooms
+ * of a reservation whose origin admits one, from already-parsed values, resolving
  * production dependencies itself. Re-validates eligibility by origin and
  * every requested amount regardless of what the caller already checked, and
  * returns a typed result instead of throwing.
@@ -113,11 +113,11 @@ export async function editAdminReservationNightlyRatesWithResult(
         ok: false as const,
       });
     }
-    if (error instanceof ReservationNotExternalChannelError) {
+    if (error instanceof ManualNightlyRateNotAllowedError) {
       return Object.freeze({
         code: "validation" as const,
         message:
-          "Solo las reservas de Airbnb y Booking admiten un valor por noche propio.",
+          "Solo las reservas de Airbnb, Booking y WhatsApp admiten un valor por noche propio.",
         ok: false as const,
       });
     }

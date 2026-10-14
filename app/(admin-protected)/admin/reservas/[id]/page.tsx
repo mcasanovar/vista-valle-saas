@@ -23,6 +23,7 @@ import { editAdminReservationNightlyRatesAction } from "@/features/admin/edit-re
 import { EditReservationNightlyRatesForm } from "@/features/admin/edit-reservation-nightly-rates-form";
 import { editAdminReservationOriginAction } from "@/features/admin/edit-reservation-origin-action";
 import { EditReservationOriginForm } from "@/features/admin/edit-reservation-origin-form";
+import { allowsManualNightlyRate } from "@/features/reservations";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
 export const dynamic = "force-dynamic";
@@ -112,7 +113,12 @@ export default async function ReservationDetail({
     approvedPaymentsClp - reservation.totalClp,
     0
   );
-  const isExternalChannelOrigin =
+  // Two separate questions that used to share one condition. Whether the
+  // reservation admits a hand-set nightly value now includes `whatsapp`;
+  // whether there is an external platform the property has to keep in sync
+  // by hand does not, because WhatsApp is not one.
+  const allowsManualRate = allowsManualNightlyRate(reservation.origin);
+  const isExternalPlatformOrigin =
     reservation.origin === "airbnb" || reservation.origin === "booking";
 
   // Rooms with an active channel connection: moving a stay into a room
@@ -228,7 +234,7 @@ export default async function ReservationDetail({
           <span>Total</span>
           <span>{currency.format(reservation.totalClp)}</span>
         </p>
-        {isExternalChannelOrigin ? (
+        {isExternalPlatformOrigin ? (
           <p className="mt-4 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
             Editar la estadía de esta reserva no se refleja en{" "}
             {originLabels[reservation.origin]}: la plataforma externa no se
@@ -245,14 +251,14 @@ export default async function ReservationDetail({
               guestCount: item.guestCount,
               roomId: item.roomId,
             }))}
-            {...(isExternalChannelOrigin
+            {...(isExternalPlatformOrigin
               ? { externalChannelLabel: originLabels[reservation.origin] }
               : {})}
             reservationId={reservation.id}
           />
         </div>
         <div className="mt-4 space-y-4">
-          {isExternalChannelOrigin ? (
+          {allowsManualRate ? (
             <EditReservationNightlyRatesForm
               action={editAdminReservationNightlyRatesAction}
               reservationId={reservation.id}

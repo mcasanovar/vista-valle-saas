@@ -4,6 +4,8 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/presentation/atoms";
 import { useToast } from "@/presentation/organisms";
+// eslint-disable-next-line architecture/feature-public-api -- the public reservations barrel reaches server-only data access.
+import { manualNightlyRateOrigins } from "@/features/reservations/reservation-rate-eligibility";
 import type { EditReservationOriginActionResult } from "./edit-reservation-origin-action";
 
 const controlClass =
@@ -19,16 +21,16 @@ const originOptions = [
   { label: "Administración", value: "admin" },
 ] as const;
 
-const externalChannels = new Set(["airbnb", "booking"]);
 
 /**
  * Corrects which origin a reservation is attributed to, for an entry mistake.
  * Offered on every reservation and for all six origins.
  *
- * When the chosen origin is not an external channel and the reservation carries
- * a hand-set nightly value, that value is dropped and the stay is repriced from
+ * When the chosen origin does not admit a hand-set nightly value and the
+ * reservation carries one, that value is dropped and the stay is repriced from
  * the rooms' current rates - so the form says so before the administrator
- * confirms, rather than letting the total move unannounced.
+ * confirms, rather than letting the total move unannounced. The eligible set is
+ * read from the shared predicate, never restated here.
  */
 export function EditReservationOriginForm({
   action,
@@ -50,7 +52,8 @@ export function EditReservationOriginForm({
   const { notify } = useToast();
 
   const willDropManualRate =
-    hasManualNightlyRate && !externalChannels.has(origin);
+    hasManualNightlyRate &&
+    !(manualNightlyRateOrigins as readonly string[]).includes(origin);
   const leavesWebsite = currentOrigin === "website" && origin !== "website";
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {

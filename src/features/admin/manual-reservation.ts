@@ -7,7 +7,7 @@ import {
 import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
 import {
   createMultiRoomPayAtPropertyReservation,
-  isExternalChannelOrigin,
+  allowsManualNightlyRate,
   parseGuestInput,
   selectedRooms,
   toResolvedRoom,
@@ -137,15 +137,15 @@ export class InvalidManualNightlyRateError extends RangeError {
 /**
  * Overrides one resolved room's nightly value with the administrator's, when
  * the reservation's origin allows it. Silently ignores the map for any other
- * origin, so a submission carrying rates for a phone or admin reservation
- * cannot change its price; the amount itself is validated here so the DB
+ * origin, so a submission carrying rates for a website, phone or admin
+ * reservation cannot change its price; the amount itself is validated here so the DB
  * check `reservation_items_nightly_price_positive` is never the first line of
  * defence.
  */
 function applyManualNightlyRate<
   TRoom extends Readonly<{ id: string; nightlyPriceClp: number }>,
 >(room: TRoom, input: ManualReservationInput): TRoom {
-  if (!input.nightlyRates || !isExternalChannelOrigin(input.origin))
+  if (!input.nightlyRates || !allowsManualNightlyRate(input.origin))
     return room;
   const manual = input.nightlyRates.get(room.id);
   if (manual === undefined) return room;
