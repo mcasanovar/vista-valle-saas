@@ -97,8 +97,8 @@ export function EditReservationNightlyRatesForm({
       <div>
         <h3 className="font-heading text-base font-bold">Valor por noche</h3>
         <p className="text-sm text-foreground/80">
-          Registra lo que cobró el canal. Deja el campo vacío para volver a la
-          tarifa vigente de la habitación.
+          Registra el valor acordado para esta reserva. Deja el campo vacío para
+          volver a la tarifa vigente de la habitación.
         </p>
       </div>
       <ul className="space-y-3">

@@ -202,10 +202,32 @@ describe("manual reservation", () => {
     expect(result.reservation.totalClp).toBe(120000);
   });
 
-  it("ignores a hand-set value submitted for a non-external origin (task 7.2)", async () => {
-    for (const [index, origin] of (
-      ["admin", "phone", "whatsapp"] as const
-    ).entries()) {
+  it("applies a hand-set value on a WhatsApp reservation", async () => {
+    const result = await createManualReservation(
+      {
+        ...guest,
+        checkIn: "2031-02-10",
+        checkOut: "2031-02-13",
+        origin: "whatsapp",
+        rooms: "demo-room-andes:1",
+        // The price the administrator agreed with the guest over WhatsApp,
+        // below the room's current 60.000 rate.
+        "rate:demo-room-andes": "45000",
+      },
+      "admin-1"
+    );
+
+    const item = result.reservation.items.find(
+      (line) => line.roomId === "demo-room-andes"
+    );
+    expect(item?.nightlyPriceClp).toBe(45000);
+    expect(item?.nightlyPriceManual).toBe(true);
+    // 3 nights * 45.000, derived from the agreed value, not from the rate.
+    expect(result.reservation.totalClp).toBe(135000);
+  });
+
+  it("ignores a hand-set value submitted for an origin that rejects one (task 7.2)", async () => {
+    for (const [index, origin] of (["admin", "phone"] as const).entries()) {
       const result = await createManualReservation(
         {
           ...guest,
@@ -221,7 +243,8 @@ describe("manual reservation", () => {
       const item = result.reservation.items.find(
         (line) => line.roomId === "demo-room-andes"
       );
-      // The submitted amount cannot move the price of a non-channel origin.
+      // The submitted amount cannot move the price of an origin that does
+      // not admit a hand-set value.
       expect(item?.nightlyPriceClp).toBe(60000);
       expect(item?.nightlyPriceManual).toBe(false);
     }

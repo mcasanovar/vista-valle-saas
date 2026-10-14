@@ -9,7 +9,7 @@ import {
   type ReservationStayRoomRate,
 } from "./edit-reservation-stay";
 import type { ReservationCharge } from "./pricing";
-import { assertExternalChannelReservation } from "./reservation-rate-eligibility";
+import { assertManualNightlyRateAllowed } from "./reservation-rate-eligibility";
 import {
   ReservationNotFoundError,
   type ReservationDateEditPaymentAction,
@@ -178,9 +178,9 @@ export type EditReservationNightlyRatesResult = Readonly<{
 
 /**
  * The transactional entry point for setting, changing or dropping the
- * nightly value of an external-channel reservation's rooms.
+ * nightly value of the rooms of a reservation whose origin admits one.
  *
- * Re-reads the reservation, asserts its origin is `airbnb` or `booking`
+ * Re-reads the reservation, asserts its origin admits a hand-set value
  * (status never restricts), validates the requested values, recalculates
  * every line and the total over the reservation's *current* interval and
  * rooms, reconciles payments, and writes lines, payments and audit as one
@@ -208,7 +208,7 @@ export async function editReservationNightlyRates<TContext>(
   );
   if (!current) throw new ReservationNotFoundError(input.reservationId);
 
-  assertExternalChannelReservation(current);
+  assertManualNightlyRateAllowed(current);
   assertValidNightlyRateOverrides(input.overrides, current);
 
   const interval: LodgingInterval = createLodgingInterval(

@@ -10,7 +10,7 @@ import {
   type ReservationNightlyRateFinancialSummary,
 } from "./edit-reservation-nightly-rates";
 import type { ReservationCharge } from "./pricing";
-import { isExternalChannelOrigin } from "./reservation-rate-eligibility";
+import { allowsManualNightlyRate } from "./reservation-rate-eligibility";
 import {
   ReservationNotFoundError,
   type ReservationOrigin,
@@ -60,10 +60,11 @@ export function parseReservationOrigin(candidate: unknown): ReservationOrigin {
 
 /**
  * Whether correcting a reservation to `nextOrigin` has to drop hand-set
- * nightly values. True only when the destination is not an external channel
- * *and* at least one line actually carries a hand-set value - so a correction
- * between two channels, or on a reservation priced from its rates, stays a
- * pure relabelling that touches no money.
+ * nightly values. True only when the destination does not admit a hand-set
+ * value *and* at least one line actually carries one - so a correction between
+ * two origins that both admit it (say Booking to WhatsApp), or on a
+ * reservation priced from its rates, stays a pure relabelling that touches no
+ * money.
  *
  * The UI uses this to warn before confirming; the server re-derives it.
  */
@@ -71,7 +72,7 @@ export function correctionDropsManualRates(
   reservation: Readonly<{ items: readonly Readonly<{ nightlyPriceManual: boolean }>[] }>,
   nextOrigin: ReservationOrigin
 ): boolean {
-  if (isExternalChannelOrigin(nextOrigin)) return false;
+  if (allowsManualNightlyRate(nextOrigin)) return false;
   return reservation.items.some((item) => item.nightlyPriceManual);
 }
 
@@ -105,8 +106,8 @@ export type EditReservationOriginResult = Readonly<{
  *
  * Two shapes, decided by `correctionDropsManualRates`:
  *
- * - **Pure relabelling** (destination is a channel, or no line carries a
- *   hand-set value): a single non-transactional update, like
+ * - **Pure relabelling** (the destination admits a hand-set value, or no line
+ *   carries one): a single non-transactional update, like
  *   `editReservationInvoice`. No lock, no money touched.
  * - **Relabelling that drops hand-set values**: the rooms are repriced from
  *   their current occupancy rates, the total is recomputed and payments are
@@ -150,7 +151,7 @@ export async function editReservationOrigin<TContext>(
   // Dropping hand-set values means repricing, so both dependencies are required.
   if (!getRoomRates || !roomLockGateway) {
     throw new Error(
-      "Correcting away from an external channel needs room rates and a lock gateway to reprice the stay"
+      "Correcting to an origin that rejects hand-set values needs room rates and a lock gateway to reprice the stay"
     );
   }
   if (!reservationRepository.editReservationNightlyRates) {
