@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createLodgingInterval,
@@ -14,7 +14,7 @@ import {
   ReservationRoomNotInStayError,
   type ReservationNightlyRateRoomRate,
 } from "@/features/reservations/edit-reservation-nightly-rates";
-import { ReservationNotExternalChannelError } from "@/features/reservations/reservation-rate-eligibility";
+import { ManualNightlyRateNotAllowedError } from "@/features/reservations/reservation-rate-eligibility";
 import {
   createMockReservationRepository,
   type ReservationOrigin,
@@ -260,6 +260,95 @@ describe("editReservationNightlyRates (task 3.1)", () => {
     });
     expect(reservation.totalClp).toBe(126_000 + 210_000);
   });
+
+  it.each(["airbnb", "booking", "whatsapp"] as const)(
+    "accepts a reservation of origin %s",
+    async (origin) => {
+      const { reservationRepository, roomLockGateway } = setup();
+      const created = await createReservation(
+        roomLockGateway,
+        reservationRepository,
+        { origin, rooms: [{ nightlyPriceClp: 50_000, roomId: "room-1" }] }
+      );
+
+      const { reservation } =
+        await editReservationNightlyRates<MockRoomLockOperationContext>({
+          getRoomRates: ratesOf({ "room-1": { nightlyPriceClp: 50_000 } }),
+          input: {
+            overrides: [{ nightlyPriceClp: 42_000, roomId: "room-1" }],
+            reservationId: created.id,
+          },
+          reservationRepository,
+          roomLockGateway,
+        });
+
+      expect(lineOf(reservation, "room-1")?.nightlyPriceManual).toBe(true);
+      expect(reservation.totalClp).toBe(126_000);
+    }
+  );
+
+  it("sets the agreed value on a WhatsApp reservation and reports the audit figures", async () => {
+    const { reservationRepository, roomLockGateway } = setup();
+    const created = await createReservation(roomLockGateway, reservationRepository, {
+      origin: "whatsapp",
+      rooms: [{ nightlyPriceClp: 60_000, roomId: "room-1" }],
+    });
+    expect(created.totalClp).toBe(180_000);
+
+    // The in-memory repository keeps no audit trail, so the figures the audit
+    // event is written from are asserted on the payload it receives instead.
+    const editInRepository = reservationRepository.editReservationNightlyRates;
+    if (!editInRepository) throw new Error("repository cannot edit rates");
+    const spy = vi.fn(editInRepository);
+    const spiedRepository = Object.freeze({
+      ...reservationRepository,
+      editReservationNightlyRates: spy,
+    });
+
+    const { reservation, financialSummary } =
+      await editReservationNightlyRates<MockRoomLockOperationContext>({
+        getRoomRates: ratesOf({ "room-1": { nightlyPriceClp: 60_000 } }),
+        input: {
+          actorUserId: "admin-1",
+          // The price agreed with the guest over WhatsApp, below the rate.
+          overrides: [{ nightlyPriceClp: 45_000, roomId: "room-1" }],
+          reservationId: created.id,
+        },
+        reservationRepository: spiedRepository,
+        roomLockGateway,
+      });
+
+    // 3 nights * 45.000, derived from the agreed value.
+    expect(lineOf(reservation, "room-1")).toMatchObject({
+      nightlyPriceClp: 45_000,
+      nightlyPriceManual: true,
+      nights: 3,
+      subtotalClp: 135_000,
+    });
+    expect(reservation.totalClp).toBe(135_000);
+    // No approved payment, so the whole new total is what is left to collect.
+    expect(financialSummary.approvedPaymentsClp).toBe(0);
+    expect(financialSummary.overpaymentClp).toBe(0);
+    expect(financialSummary.pendingBalanceClp).toBe(135_000);
+    // The origin is untouched by a value edit.
+    expect(reservation.origin).toBe("whatsapp");
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0]?.[1]).toMatchObject({
+      actorUserId: "admin-1",
+      approvedPaymentsClp: 0,
+      overpaymentClp: 0,
+      previousRates: [
+        {
+          nightlyPriceClp: 60_000,
+          nightlyPriceManual: false,
+          roomId: "room-1",
+        },
+      ],
+      previousTotalClp: 180_000,
+      reservationId: created.id,
+    });
+  });
 });
 
 describe("rejected nightly-value edits (task 3.2)", () => {
@@ -318,7 +407,7 @@ describe("rejected nightly-value edits (task 3.2)", () => {
     }
   );
 
-  it.each(["website", "phone", "whatsapp", "admin"] as const)(
+  it.each(["website", "phone", "admin"] as const)(
     "rejects a reservation of origin %s",
     async (origin) => {
       const { reservationRepository, roomLockGateway } = setup();
@@ -338,7 +427,7 @@ describe("rejected nightly-value edits (task 3.2)", () => {
           reservationRepository,
           roomLockGateway,
         })
-      ).rejects.toThrow(ReservationNotExternalChannelError);
+      ).rejects.toThrow(ManualNightlyRateNotAllowedError);
 
       const after = await reservationRepository.getReservationById(created.id);
       expect(after?.totalClp).toBe(150_000);

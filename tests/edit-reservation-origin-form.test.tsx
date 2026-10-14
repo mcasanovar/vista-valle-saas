@@ -66,6 +66,38 @@ describe("origin correction form", () => {
   });
 
   describe("warning before dropping a hand-set value", () => {
+    it("does not warn when correcting to WhatsApp with a hand-set value", async () => {
+      const user = userEvent.setup();
+      renderForm({ currentOrigin: "booking", hasManualNightlyRate: true });
+
+      await user.selectOptions(
+        screen.getByLabelText("Origen de la reserva"),
+        "whatsapp"
+      );
+      // WhatsApp admits a hand-set value, so nothing is dropped and there is
+      // no recalculation to announce.
+      expect(
+        screen.queryByTestId("drop-manual-rate-warning")
+      ).not.toBeInTheDocument();
+    });
+
+    it("warns when correcting a WhatsApp reservation to phone with a hand-set value", async () => {
+      const user = userEvent.setup();
+      renderForm({ currentOrigin: "whatsapp", hasManualNightlyRate: true });
+
+      expect(
+        screen.queryByTestId("drop-manual-rate-warning")
+      ).not.toBeInTheDocument();
+
+      await user.selectOptions(
+        screen.getByLabelText("Origen de la reserva"),
+        "phone"
+      );
+      expect(screen.getByTestId("drop-manual-rate-warning")).toHaveTextContent(
+        /el valor\s+fijado a mano se descarta/i
+      );
+    });
+
     it("warns when leaving an external channel with a hand-set value", async () => {
       const user = userEvent.setup();
       renderForm({ currentOrigin: "booking", hasManualNightlyRate: true });
@@ -83,14 +115,15 @@ describe("origin correction form", () => {
       );
     });
 
-    it.each(["airbnb", "booking"] as const)(
-      "does not warn when staying on %s",
+    it.each(["airbnb", "booking", "whatsapp"] as const)(
+      "does not warn when correcting to %s",
       async (origin) => {
         const user = userEvent.setup();
         renderForm({
           currentOrigin: origin === "airbnb" ? "booking" : "airbnb",
           hasManualNightlyRate: true,
         });
+
 
         await user.selectOptions(
           screen.getByLabelText("Origen de la reserva"),

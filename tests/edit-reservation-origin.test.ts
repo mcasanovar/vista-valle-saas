@@ -111,14 +111,14 @@ describe("correctionDropsManualRates", () => {
   };
   const withoutManual = { items: [{ nightlyPriceManual: false }] };
 
-  it.each(["admin", "phone", "whatsapp", "website"] as const)(
+  it.each(["admin", "phone", "website"] as const)(
     "is true for %s when a line carries a hand-set value",
     (origin) => {
       expect(correctionDropsManualRates(withManual, origin)).toBe(true);
     }
   );
 
-  it.each(["airbnb", "booking"] as const)(
+  it.each(["airbnb", "booking", "whatsapp"] as const)(
     "is false for %s even with a hand-set value",
     (origin) => {
       expect(correctionDropsManualRates(withManual, origin)).toBe(false);
@@ -245,6 +245,84 @@ describe("editReservationOrigin — dropping a hand-set value", () => {
     });
 
     expect(reservation.origin).toBe("admin");
+    // 3 nights at the room's current rate of 60.000, not the dropped 42.000.
+    expect(reservation.totalClp).toBe(180_000);
+    expect(lineOf(reservation, "room-1")).toMatchObject({
+      nightlyPriceClp: 60_000,
+      nightlyPriceManual: false,
+    });
+    expect(financialSummary?.pendingBalanceClp).toBe(180_000);
+  });
+
+  /** A WhatsApp reservation whose room was given the value agreed with the guest. */
+  async function whatsappWithManualRate() {
+    const { created, gateway, repository } = await createReservation("whatsapp");
+    await editReservationNightlyRates<MockRoomLockOperationContext>({
+      getRoomRates: ratesOf(50_000),
+      input: {
+        overrides: [{ nightlyPriceClp: 42_000, roomId: "room-1" }],
+        reservationId: created.id,
+      },
+      reservationRepository: repository,
+      roomLockGateway: gateway,
+    });
+    return { created, gateway, repository };
+  }
+
+  it("keeps the hand-set value when correcting a channel reservation to WhatsApp", async () => {
+    const { created, gateway, repository } = await withManualRate();
+
+    const { reservation, financialSummary } = await editReservationOrigin({
+      getRoomRates: ratesOf(60_000),
+      input: { origin: "whatsapp", reservationId: created.id },
+      reservationRepository: repository,
+      roomLockGateway: gateway,
+    });
+
+    // WhatsApp admits a hand-set value, so this is a pure relabelling.
+    expect(reservation.origin).toBe("whatsapp");
+    expect(financialSummary).toBeUndefined();
+    expect(reservation.totalClp).toBe(126_000);
+    expect(lineOf(reservation, "room-1")).toMatchObject({
+      nightlyPriceClp: 42_000,
+      nightlyPriceManual: true,
+    });
+  });
+
+  it("keeps the hand-set value when correcting a WhatsApp reservation to a channel", async () => {
+    const { created, gateway, repository } = await whatsappWithManualRate();
+
+    const { reservation, financialSummary } = await editReservationOrigin({
+      getRoomRates: ratesOf(60_000),
+      input: { origin: "airbnb", reservationId: created.id },
+      reservationRepository: repository,
+      roomLockGateway: gateway,
+    });
+
+    expect(reservation.origin).toBe("airbnb");
+    expect(financialSummary).toBeUndefined();
+    expect(reservation.totalClp).toBe(126_000);
+    expect(lineOf(reservation, "room-1")).toMatchObject({
+      nightlyPriceClp: 42_000,
+      nightlyPriceManual: true,
+    });
+  });
+
+  it("drops the hand-set value when correcting a WhatsApp reservation to phone", async () => {
+    const { created, gateway, repository } = await whatsappWithManualRate();
+
+    const { reservation, financialSummary } = await editReservationOrigin({
+      getRoomRates: ratesOf(60_000),
+      input: {
+        actorUserId: "admin-1",
+        origin: "phone",
+        reservationId: created.id,
+      },
+      reservationRepository: repository,
+      roomLockGateway: gateway,
+    });
+
+    expect(reservation.origin).toBe("phone");
     // 3 nights at the room's current rate of 60.000, not the dropped 42.000.
     expect(reservation.totalClp).toBe(180_000);
     expect(lineOf(reservation, "room-1")).toMatchObject({

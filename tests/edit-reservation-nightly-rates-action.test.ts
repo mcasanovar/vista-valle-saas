@@ -49,7 +49,7 @@ import {
 import { editAdminReservationOriginAction } from "@/features/admin/edit-reservation-origin-action";
 import {
   InvalidNightlyRateError,
-  ReservationNotExternalChannelError,
+  ManualNightlyRateNotAllowedError,
 } from "@/features/reservations";
 
 function formData(fields: Record<string, string>) {
@@ -199,14 +199,19 @@ describe("editAdminReservationNightlyRatesAction (task 6.1)", () => {
   it("reports an ineligible origin as a validation result", async () => {
     asAdministrator();
     mocks.editReservationNightlyRates.mockRejectedValue(
-      new ReservationNotExternalChannelError("website")
+      new ManualNightlyRateNotAllowedError("website")
     );
 
     const result = await editAdminReservationNightlyRatesAction(
       formData({ "rate:room-1": "42000", id: "reservation-1" })
     );
 
-    expect(result).toMatchObject({ code: "validation", ok: false });
+    expect(result).toEqual({
+      code: "validation",
+      message:
+        "Solo las reservas de Airbnb, Booking y WhatsApp admiten un valor por noche propio.",
+      ok: false,
+    });
   });
 
   it("rejects a submission with no rate field at all", async () => {
