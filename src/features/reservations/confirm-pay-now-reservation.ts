@@ -50,7 +50,12 @@ export type ConfirmPayNowReservationFromHoldParams<TContext> = Readonly<{
 export async function confirmPayNowReservationFromHold<TContext>(
   params: ConfirmPayNowReservationFromHoldParams<TContext>
 ): Promise<
-  Readonly<{ payment: ApprovedPayNowPayment; reservation: ReservationRecord }>
+  Readonly<{
+    /** See `ConfirmedPayAtPropertyReservation.notificationOutboxIds`. */
+    notificationOutboxIds: readonly string[];
+    payment: ApprovedPayNowPayment;
+    reservation: ReservationRecord;
+  }>
 > {
   const {
     generatePublicId = generateReservationPublicId,
@@ -100,19 +105,21 @@ export async function confirmPayNowReservationFromHold<TContext>(
       );
       await holdRepository.deleteHold(context, hold);
 
-      if (notificationOutboxWriter) {
-        const guest = await guestRepository.getGuestById(hold.guestId);
-        if (!guest) {
-          throw new Error(`Guest not found for hold ${hold.id}`);
-        }
+      if (!notificationOutboxWriter)
+        return { ...created, notificationOutboxIds: [] };
+
+      const guest = await guestRepository.getGuestById(hold.guestId);
+      if (!guest) {
+        throw new Error(`Guest not found for hold ${hold.id}`);
+      }
+      const { outboxIds } =
         await notificationOutboxWriter.writeReservationConfirmed(context, {
           guest,
           payment: created.payment,
           reservation: created.reservation,
         });
-      }
 
-      return created;
+      return { ...created, notificationOutboxIds: outboxIds };
     }
   );
 }

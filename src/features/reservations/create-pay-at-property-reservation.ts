@@ -58,6 +58,12 @@ export type CreateMultiRoomPayAtPropertyReservationParams<TContext> = Omit<
   }>;
 
 export type ConfirmedPayAtPropertyReservation = Readonly<{
+  /**
+   * Outbox rows enqueued for this reservation's confirmation emails, so the
+   * caller can attempt their delivery once the transaction has committed.
+   * Empty when no notification writer was provided.
+   */
+  notificationOutboxIds: readonly string[];
   /** `PendingPayAtPropertyPayment` unless `params.paymentStatus` is `"approved"` (channel-sync only). */
   payment: PayAtPropertyPayment;
   reservation: ReservationRecord;
@@ -178,15 +184,17 @@ export async function createMultiRoomPayAtPropertyReservation<TContext>(
             externalRef,
           }
         );
-      if (!notificationOutboxWriter) return created;
+      if (!notificationOutboxWriter)
+        return { ...created, notificationOutboxIds: [] };
 
       try {
-        await notificationOutboxWriter.writeReservationConfirmed(context, {
-          guest: persistedGuest,
-          payment: created.payment,
-          reservation: created.reservation,
-        });
-        return created;
+        const { outboxIds } =
+          await notificationOutboxWriter.writeReservationConfirmed(context, {
+            guest: persistedGuest,
+            payment: created.payment,
+            reservation: created.reservation,
+          });
+        return { ...created, notificationOutboxIds: outboxIds };
       } catch (error) {
         await reservationRepository.rollbackConfirmedPayAtPropertyReservation?.(
           context,

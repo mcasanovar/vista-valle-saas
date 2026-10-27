@@ -142,7 +142,7 @@ if (!enabled) {
             throw new Error("outbox write failed");
           },
           writePaymentCollected: async () => undefined,
-          writeReservationConfirmed: async () => undefined,
+          writeReservationConfirmed: async () => ({ outboxIds: [] }),
           writeReservationDatesChanged: async () => undefined,
         };
       const service = createDrizzleCompanyQuotationCreationService(

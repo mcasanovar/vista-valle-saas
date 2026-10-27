@@ -276,7 +276,12 @@ describe("administrative stay-change email (task 4.2)", () => {
       removedRooms: [],
     });
 
-    expect(html).toContain("Fechas anteriores: 2027-09-01 — 2027-09-04");
+    // Dates reach the reader spelled out, never as the ISO strings the
+    // reservation stores them in.
+    expect(html).toContain(
+      "Fechas anteriores: 1 de septiembre de 2027 — 4 de septiembre de 2027"
+    );
+    expect(html).not.toContain("2027-09-01");
   });
 
   it("renders without a change section when no snapshot is available", () => {

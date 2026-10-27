@@ -16,6 +16,12 @@ import { getServerPaymentMethodSettingsRepository } from "@/infrastructure/datab
 
 const maxBookingRequestBytes = 16 * 1024;
 
+// Generous margin over the Resend calls plus their internal network retry,
+// so the best-effort delivery attempt scheduled via `after()` has room to
+// finish before the invocation is torn down (same reasoning as
+// `app/api/company-quotations/route.ts`).
+export const maxDuration = 30;
+
 export async function POST(request: Request) {
   try {
     if (!isBookingAcceptanceEnabled()) {
