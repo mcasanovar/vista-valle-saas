@@ -172,7 +172,10 @@ describe("processFintocWebhookEvent", () => {
       roomLockGateway: setup.roomLockGateway,
     });
 
-    expect(result).toEqual({ outcome: "reservation_confirmed" });
+    expect(result).toEqual({
+      notificationOutboxIds: [],
+      outcome: "reservation_confirmed",
+    });
     await expect(setup.holdRepository.getHoldById(hold.id)).resolves.toBeNull();
 
     const reservations = await setup.reservationRepository.listReservations!();

@@ -1,4 +1,5 @@
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
+import { deliverNotificationsAfterResponse } from "@/infrastructure/database/notification-delivery-trigger";
 import {
   captureServerException,
   writeStructuredLog,
@@ -13,6 +14,12 @@ import {
   getMockMercadoPagoOnlinePaymentDependencies,
   getProductionMercadoPagoOnlinePaymentDependencies,
 } from "@/features/payments/mercado-pago-dependencies";
+
+// Generous margin over the Resend calls plus their internal network retry,
+// so the best-effort delivery attempt scheduled via `after()` has room to
+// finish before the invocation is torn down (same reasoning as
+// `app/api/company-quotations/route.ts`).
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -50,17 +57,23 @@ export async function POST(request: Request) {
   }
 
   try {
-    const outcome = isProduction
+    const result = isProduction
       ? await handleEvent(event, getProductionMercadoPagoOnlinePaymentDependencies())
       : await handleEvent(event, getMockMercadoPagoOnlinePaymentDependencies());
-    if (outcome === "already_processed") {
+    if (result.outcome === "already_processed") {
       return Response.json({ received: true }, { status: 200 });
     }
     writeStructuredLog("info", "mercado_pago_webhook.processed", {
       eventId: event.id,
       eventType: event.type,
-      outcome,
+      outcome: result.outcome,
     });
+    // The reservation and its intents are committed by now, so the guest
+    // gets the same prompt confirmation as a pay-at-property booking
+    // instead of waiting for the next sweep of the outbox cron.
+    if (result.outcome === "reservation_confirmed") {
+      deliverNotificationsAfterResponse(result.notificationOutboxIds);
+    }
     return Response.json({ received: true }, { status: 200 });
   } catch (error) {
     await captureServerException(
@@ -110,9 +123,10 @@ async function handleEvent<TContext>(
       provider: "mercado_pago",
       providerEventId: event.id,
     });
-  if (alreadyProcessed) return "already_processed" as const;
+  if (alreadyProcessed)
+    return Object.freeze({ outcome: "already_processed" as const });
 
-  const result = await processOnlinePaymentWebhookEvent<TContext>({
+  return processOnlinePaymentWebhookEvent<TContext>({
     event,
     guestRepository: dependencies.guestRepository,
     notificationOutboxWriter: dependencies.notificationOutboxWriter,
@@ -122,5 +136,4 @@ async function handleEvent<TContext>(
     reservationRepository: dependencies.reservationRepository,
     roomLockGateway: dependencies.roomLockGateway,
   });
-  return result.outcome;
 }

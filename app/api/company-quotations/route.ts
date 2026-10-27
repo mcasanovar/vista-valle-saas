@@ -1,5 +1,3 @@
-import { after } from "next/server";
-
 import {
   assertCompanyQuotationRoomsAvailable,
   calculateCompanyQuotation,
@@ -15,29 +13,13 @@ import {
   getServerCompanyQuotationBreakfastCatalogRepository,
   getServerCompanyQuotationCreationService,
 } from "@/infrastructure/database/company-quotation-source";
-import { getServerScheduledOutboxProcessor } from "@/infrastructure/database/notification-processor-source";
+import { deliverNotificationsAfterResponse } from "@/infrastructure/database/notification-delivery-trigger";
 import { getRoomReadSource } from "@/features/rooms";
 
 // Generous margin over a Resend call plus its internal network retry, so the
 // best-effort delivery attempt scheduled via `after()` below has room to
 // finish before the invocation is torn down.
 export const maxDuration = 30;
-
-/**
- * `after()` throws synchronously when called outside a real Next.js request
- * scope - which is exactly what happens when this route's `POST` is invoked
- * directly, as this project's tests do, bypassing the Next router that
- * normally sets up that scope. In an actual deployment the router always
- * provides it, so this falls back to firing the task without blocking only
- * in that direct-invocation case.
- */
-function runAfterResponse(task: () => Promise<void>) {
-  try {
-    after(task);
-  } catch {
-    void task();
-  }
-}
 
 function publicQuotation(record: CompanyQuotationRecord) {
   return {
@@ -103,13 +85,7 @@ export async function POST(request: Request) {
       quotation,
       idempotencyKey
     );
-    if (notificationOutboxIds.length > 0) {
-      runAfterResponse(async () => {
-        await getServerScheduledOutboxProcessor()?.processByIds(
-          notificationOutboxIds
-        );
-      });
-    }
+    deliverNotificationsAfterResponse(notificationOutboxIds);
     return Response.json(publicQuotation(record), { status: 201 });
   } catch (error) {
     if (error instanceof CompanyQuotationInputError) {
