@@ -12,12 +12,11 @@ import { getServerEnvironment } from "@/config/server";
 import { getRoomReadSource, type RoomReadSource } from "@/features/rooms";
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
 import { createProductionDatabase } from "@/infrastructure/database/client";
-import {
-  createDrizzleRoomLockGateway,
-  type ProductionRoomLockTransaction,
-} from "@/infrastructure/database/room-lock";
+import { createDrizzleRoomLockGateway } from "@/infrastructure/database/room-lock";
 import { createDrizzleGuestRepository } from "@/infrastructure/database/guest-repository";
 import { createDrizzleReservationRepository } from "@/infrastructure/database/reservation-repository";
+import { createDrizzleNotificationOutboxWriter } from "@/infrastructure/database/notification-outbox-repository";
+import { deliverNotificationsAfterResponse } from "@/infrastructure/database/notification-delivery-trigger";
 import { getProductionPublicBookingConfirmation } from "@/infrastructure/database/booking-confirmation-source";
 
 import {
@@ -199,6 +198,13 @@ export type PayAtPropertyBookingDependencies<TContext> = Readonly<{
   roomLockGateway: RoomLockGateway<TContext>;
   /** Optional: a missing writer skips notifications rather than failing the booking (see `createMultiRoomPayAtPropertyReservation`). */
   notificationOutboxWriter?: NotificationOutboxWriter<TContext> | null;
+  /**
+   * Best-effort first delivery attempt for the intents this booking just
+   * enqueued, invoked once the reservation has committed. It must not be
+   * awaited by the booking: the guest's confirmation is already persisted,
+   * and the outbox sweep remains the backstop for whatever this misses.
+   */
+  deliverNotifications?: (outboxIds: readonly string[]) => void;
 }>;
 
 /**
@@ -209,7 +215,7 @@ export type PayAtPropertyBookingDependencies<TContext> = Readonly<{
  * Browser-supplied totals, prices, statuses and payment modes are
  * intentionally absent from this contract.
  */
-async function confirmPayAtPropertyBookingWith<TContext>(
+export async function confirmPayAtPropertyBookingWith<TContext>(
   candidate: Record<string, unknown>,
   roomSource: RoomReadSource,
   dependencies: PayAtPropertyBookingDependencies<TContext>
@@ -274,6 +280,12 @@ async function confirmPayAtPropertyBookingWith<TContext>(
       reservationId: created.reservation.id,
       source: created.reservation.origin,
     });
+    // The reservation is committed at this point, so a failed delivery
+    // attempt can no longer undo it; the outbox keeps the intent and the
+    // sweep retries it.
+    if (created.notificationOutboxIds.length > 0) {
+      dependencies.deliverNotifications?.(created.notificationOutboxIds);
+    }
     return confirmation;
   } catch (error) {
     // Availability conflicts are a distinct, safe user outcome and must be
@@ -338,8 +350,12 @@ export function getPayAtPropertyBookingConfirmationService() {
         guestRepository,
         reservationRepository,
         roomLockGateway,
-        notificationOutboxWriter:
-          getNotificationOutboxWriter<ProductionRoomLockTransaction>(),
+        // `getNotificationOutboxWriter()` only ever returns the mock writer,
+        // so wiring it here silently dropped every website confirmation
+        // email: `createMultiRoomPayAtPropertyReservation` treats a missing
+        // writer as "skip notifications" rather than as a failure.
+        notificationOutboxWriter: createDrizzleNotificationOutboxWriter(),
+        deliverNotifications: deliverNotificationsAfterResponse,
       })
   );
 }

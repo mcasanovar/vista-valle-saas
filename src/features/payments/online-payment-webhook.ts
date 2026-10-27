@@ -29,7 +29,11 @@ export type ProcessOnlinePaymentWebhookEventParams<TContext> = Readonly<{
 export type ProcessOnlinePaymentWebhookEventResult =
   | Readonly<{ outcome: "ignored_duplicate" }>
   | Readonly<{ outcome: "payment_not_found" }>
-  | Readonly<{ outcome: "reservation_confirmed" }>
+  | Readonly<{
+      /** Outbox rows enqueued for this confirmation, for an immediate delivery attempt by the caller. */
+      notificationOutboxIds: readonly string[];
+      outcome: "reservation_confirmed";
+    }>
   | Readonly<{ outcome: "hold_expired" }>
   | Readonly<{ outcome: "payment_failed" }>
   | Readonly<{ outcome: "requires_action" }>
@@ -138,7 +142,10 @@ export async function processOnlinePaymentWebhookEvent<TContext>(
           providerPaymentId: paymentIntentId,
           reservationId: confirmed.reservation.id,
         });
-        return Object.freeze({ outcome: "reservation_confirmed" });
+        return Object.freeze({
+          notificationOutboxIds: confirmed.notificationOutboxIds,
+          outcome: "reservation_confirmed" as const,
+        });
       } catch (error) {
         if (error instanceof HoldExpiredError) {
           return Object.freeze({ outcome: "hold_expired" });

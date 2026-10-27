@@ -69,7 +69,7 @@ export function createDrizzleNotificationOutboxWriter(
       if (invoiceEmail) recipients.add(invoiceEmail);
       const reservationId = input.reservation.id;
 
-      await writeIntents(tx, [
+      const outboxIds = await writeIntents(tx, [
         ...[...recipients].map((recipient) => ({
           idempotencyKey: `reservation:${reservationId}:guest:${recipient}`,
           payload: { reservationId },
@@ -85,6 +85,7 @@ export function createDrizzleNotificationOutboxWriter(
           type: "reservation_confirmed_admin",
         },
       ]);
+      return { outboxIds };
     },
     writeReservationDatesChanged: async (tx, input) => {
       const reservationId = input.reservation.id;

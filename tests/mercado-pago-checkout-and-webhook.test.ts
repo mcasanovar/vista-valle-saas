@@ -179,7 +179,10 @@ describe("mercado-pago webhook processing", () => {
       roomLockGateway: setup.roomLockGateway,
     });
 
-    expect(result).toEqual({ outcome: "reservation_confirmed" });
+    expect(result).toEqual({
+      notificationOutboxIds: [],
+      outcome: "reservation_confirmed",
+    });
     await expect(setup.holdRepository.getHoldById(hold.id)).resolves.toBeNull();
     const reservations = await setup.reservationRepository.listReservations!();
     expect(reservations).toHaveLength(1);
@@ -215,10 +218,15 @@ describe("mercado-pago webhook processing", () => {
       roomLockGateway: setup.roomLockGateway,
     });
 
-    expect(result).toEqual({ outcome: "reservation_confirmed" });
     const intents = outbox.list();
     expect(intents.some((intent) => intent.type === "reservation_confirmed_guest")).toBe(true);
     expect(intents.some((intent) => intent.type === "reservation_confirmed_admin")).toBe(true);
+    // The webhook hands back exactly these rows so its route can attempt
+    // delivery immediately instead of waiting for the outbox sweep.
+    expect(result.outcome).toBe("reservation_confirmed");
+    expect(
+      result.outcome === "reservation_confirmed" && result.notificationOutboxIds
+    ).toEqual(intents.map((intent) => intent.id));
   });
 
   it("marks the payment rejected and releases the hold when Mercado Pago reports it rejected", async () => {
@@ -307,7 +315,10 @@ describe("mercado-pago webhook processing", () => {
       reservationRepository: setup.reservationRepository,
       roomLockGateway: setup.roomLockGateway,
     });
-    expect(confirmed).toEqual({ outcome: "reservation_confirmed" });
+    expect(confirmed).toEqual({
+      notificationOutboxIds: [],
+      outcome: "reservation_confirmed",
+    });
 
     const alertsBefore = (await listPaymentChargebackAlerts()).length;
 

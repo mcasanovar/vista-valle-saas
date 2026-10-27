@@ -88,6 +88,12 @@ export type NotificationOutboxWriter<TContext> = Readonly<{
       reservation: ReservationRecord;
     }>
   ) => Promise<void>;
+  /**
+   * Returns the outbox row of every intent it addressed - the guest's, the
+   * invoice contact's when there is one, and the administrative copy - so
+   * the caller can attempt delivery for exactly those rows right after the
+   * reservation commits instead of waiting for the next outbox sweep.
+   */
   writeReservationConfirmed: (
     context: TContext,
     input: Readonly<{
@@ -95,7 +101,7 @@ export type NotificationOutboxWriter<TContext> = Readonly<{
       payment: PayAtPropertyPayment | ApprovedPayNowPayment;
       reservation: ReservationRecord;
     }>
-  ) => Promise<void>;
+  ) => Promise<Readonly<{ outboxIds: readonly string[] }>>;
   writeCompanyQuotationRequested: (
     context: TContext,
     input: Readonly<{ quotation: CompanyQuotationRecord }>
@@ -201,7 +207,7 @@ export function createMockNotificationOutbox<TContext = unknown>(
         recipients.add(
           input.reservation.invoiceRequest.email.trim().toLowerCase()
         );
-      addBatch([
+      const outboxIds = addBatch([
         ...[...recipients].map((recipient) => ({
           key: `reservation:${input.reservation.id}:guest:${recipient}`,
           intent: createIntent({
@@ -219,6 +225,7 @@ export function createMockNotificationOutbox<TContext = unknown>(
           }),
         },
       ]);
+      return { outboxIds };
     },
     writeReservationDatesChanged: async (_context, input) => {
       addBatch([
