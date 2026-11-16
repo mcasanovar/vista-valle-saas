@@ -101,4 +101,42 @@ describe("notification delivery resilience", () => {
     );
     expect(fetch).not.toHaveBeenCalled();
   });
+
+  it("names the guest who reserved in both delivered copies", async () => {
+    const confirmation = await confirmPayAtPropertyBooking({
+      room: "demo-room-valle",
+      checkIn: "2054-02-01",
+      checkOut: "2054-02-03",
+      firstName: "Rosa",
+      lastName: "Fuentes",
+      email: "named-guest@example.test",
+      phone: "123",
+      guestCount: 1,
+    });
+    const reservation = await getMockReservationPaymentAdminViewByPublicId(
+      confirmation.publicId
+    );
+    const outbox = getMockNotificationOutboxRepository();
+    const source = getMockNotificationTemplateDataSource();
+    if (!reservation || !outbox || !source)
+      throw new Error(
+        "Mock notification dependencies are required for this test"
+      );
+    const adapter = createMockResendEmailAdapter();
+    const worker = createNotificationDeliveryWorker(outbox, adapter, source);
+
+    for (const intent of outbox
+      .list()
+      .filter((item) => item.reservationId === reservation.id)) {
+      await worker.process(intent.id);
+    }
+
+    const delivered = adapter.listDelivered();
+    expect(delivered.map((email) => email.subject)).toEqual([
+      "Tu reserva en Vista Valle está confirmada",
+      "Nueva reserva confirmada",
+    ]);
+    expect(delivered[0]!.html).toContain("Hola Rosa Fuentes");
+    expect(delivered[1]!.html).toContain("Rosa Fuentes");
+  });
 });

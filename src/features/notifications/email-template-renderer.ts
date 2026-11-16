@@ -124,10 +124,14 @@ function document(body: string) {
 export function renderPayAtPropertyConfirmationEmail(
   data: PayAtPropertyConfirmationEmailData
 ) {
+  const greeting = data.guestName
+    ? `Hola ${escapeHtml(data.guestName)}, tu reserva está confirmada.`
+    : "Tu reserva está confirmada.";
+
   return brandShell(
     "Reserva confirmada",
     `${paragraph(
-      "Tu reserva está confirmada. El pago queda pendiente y se realiza al llegar a Vista Valle."
+      `${greeting} El pago queda pendiente y se realiza al llegar a Vista Valle.`
     )}${reservationBody(data)}${highlightNotice(
       "<strong>Modalidad:</strong> pagar al llegar. No necesitas transferir nada por adelantado; al llegar te recibimos con el código de reserva."
     )}${contactFooter("Cualquier duda, escríbenos a", data.contactEmail)}`
@@ -146,10 +150,16 @@ export function renderNewReservationAdminAlertEmail(
         )
       : "";
 
+  // Who reserved goes first: it is what identifies the reservation for
+  // whoever reads the alert, before any operational detail.
+  const guestLine = data.guestName
+    ? `<strong>Huésped:</strong> ${escapeHtml(data.guestName)}<br />`
+    : "";
+
   return brandShell(
     "Nueva reserva confirmada",
     `${paragraph(
-      `<strong>Origen:</strong> ${escapeHtml(origin)}<br /><strong>Modalidad:</strong> pagar al llegar; pago pendiente.`
+      `${guestLine}<strong>Origen:</strong> ${escapeHtml(origin)}<br /><strong>Modalidad:</strong> pagar al llegar; pago pendiente.`
     )}${reservationBody(data)}${channelChecklist}${contactFooter(
       "Contacto operativo",
       data.contactEmail

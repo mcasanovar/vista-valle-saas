@@ -3,12 +3,16 @@ import "server-only";
 import { getServerEnvironment } from "@/config/server";
 import { nights } from "@/features/availability";
 import { getRoomReadSource } from "@/features/rooms";
-import { mockReservationRepository } from "@/features/reservations";
+import {
+  guestFullName,
+  mockGuestRepository,
+  mockReservationRepository,
+} from "@/features/reservations";
 import { getCompanyQuotationRepository } from "@/features/company-quotations";
 
 import type { NotificationTemplateDataSource } from "./delivery-worker";
 
-/** Mock-only template data composition; it never exposes guest contact data. */
+/** Mock-only template data composition; of the guest it exposes only the name the email greets or reports. */
 export function getMockNotificationTemplateDataSource(): NotificationTemplateDataSource | null {
   if (getServerEnvironment().VISTA_VALLE_CONFIG_CONTEXT !== "mock") return null;
 
@@ -19,6 +23,7 @@ export function getMockNotificationTemplateDataSource(): NotificationTemplateDat
       const reservation =
         await mockReservationRepository.getReservationById(reservationId);
       if (!reservation) return null;
+      const guest = await mockGuestRepository.getGuestById(reservation.guestId);
       const activeRooms = (await getRoomReadSource()).listActive();
       const items = reservation.items.map((item) => ({
         guestCount: item.guestCount,
@@ -33,6 +38,7 @@ export function getMockNotificationTemplateDataSource(): NotificationTemplateDat
         checkOut: reservation.checkOut,
         contactEmail: getServerEnvironment().ADMIN_NOTIFICATION_EMAIL,
         guestCount: reservation.guestCount,
+        guestName: guest ? guestFullName(guest) : undefined,
         nights: nights(reservation.checkIn, reservation.checkOut),
         origin: reservation.origin,
         publicId: reservation.publicId,

@@ -83,6 +83,43 @@ describe("reservation confirmation email presentation", () => {
     );
   });
 
+  it("greets the guest by name and names them in the administrative copy", () => {
+    const named = { ...data, guestName: "Camila Soto" } as const;
+
+    expect(renderPayAtPropertyConfirmationEmail(named)).toContain(
+      "Hola Camila Soto, tu reserva está confirmada."
+    );
+    const adminHtml = renderNewReservationAdminAlertEmail({
+      ...named,
+      origin: "website",
+    });
+    expect(adminHtml).toContain("Huésped:");
+    expect(adminHtml).toContain("Camila Soto");
+  });
+
+  it("escapes a name rather than letting it inject markup", () => {
+    const html = renderNewReservationAdminAlertEmail({
+      ...data,
+      guestName: "<b>Camila</b>",
+      origin: "website",
+    });
+
+    expect(html).toContain("&lt;b&gt;Camila&lt;/b&gt;");
+    expect(html).not.toContain("<b>Camila</b>");
+  });
+
+  it("renders both copies without a dangling greeting when no name is known", () => {
+    expect(renderPayAtPropertyConfirmationEmail(data)).toContain(
+      "Tu reserva está confirmada."
+    );
+    const adminHtml = renderNewReservationAdminAlertEmail({
+      ...data,
+      origin: "website",
+    });
+    expect(adminHtml).not.toContain("Huésped:");
+    expect(adminHtml).not.toContain("undefined");
+  });
+
   it("leaves an unparseable date untouched rather than inventing one", () => {
     const html = renderPayAtPropertyConfirmationEmail({
       ...data,

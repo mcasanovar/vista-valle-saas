@@ -8,6 +8,13 @@ export type PayAtPropertyConfirmationEmailData = Readonly<{
   checkOut: string;
   contactEmail: string;
   guestCount: number;
+  /**
+   * Who reserved, for a greeting in the guest's copy and so the
+   * administrative alert names the reservation's holder. Optional: an
+   * intent whose guest row can no longer be read must still render its
+   * email rather than fail delivery, and older fixtures keep type-checking.
+   */
+  guestName?: string;
   nights: number;
   publicId: string;
   roomName: string;
@@ -92,8 +99,9 @@ export function PayAtPropertyConfirmationEmail(
       <body>
         <h1>Reserva confirmada</h1>
         <p>
-          Tu reserva está confirmada. El pago queda pendiente y se realiza al
-          llegar a Vista Valle.
+          {props.guestName ? `Hola ${props.guestName}, tu` : "Tu"} reserva está
+          confirmada. El pago queda pendiente y se realiza al llegar a Vista
+          Valle.
         </p>
         <ReservationDetails {...props} />
         <p>Modalidad: pagar al llegar.</p>
@@ -107,7 +115,7 @@ function formatOrigin(origin: ReservationOrigin) {
   return origin === "website" ? "Sitio web" : origin;
 }
 
-/** Server-only operational alert without payment-provider or guest details. */
+/** Server-only operational alert without payment-provider or payment-method details. */
 export function NewReservationAdminAlertEmail(
   props: NewReservationAdminAlertEmailData
 ) {
@@ -115,6 +123,7 @@ export function NewReservationAdminAlertEmail(
     <html lang="es">
       <body>
         <h1>Nueva reserva confirmada</h1>
+        {props.guestName ? <p>Huésped: {props.guestName}</p> : null}
         <ReservationDetails {...props} />
         <p>Origen: {formatOrigin(props.origin)}</p>
         <p>Modalidad: pagar al llegar; pago pendiente.</p>

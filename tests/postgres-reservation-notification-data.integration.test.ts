@@ -102,6 +102,7 @@ if (!enabled) {
       expect(data).toMatchObject({
         checkIn: "2035-05-01",
         checkOut: "2035-05-03",
+        guestName: "Camila Soto",
         nights: 2,
         origin: "website",
         publicId: "VV-notification-data-two-rooms",
