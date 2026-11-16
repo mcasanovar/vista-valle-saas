@@ -69,6 +69,22 @@ export type ConfirmedPayAtPropertyReservation = Readonly<{
   reservation: ReservationRecord;
 }>;
 
+/**
+ * Whether a confirmed reservation of this origin notifies anyone at all.
+ *
+ * Only a booking the guest made on the website does: every other origin
+ * reaches the system because an administrator typed it in after agreeing
+ * it by phone, WhatsApp, Airbnb or Booking, so a confirmation would
+ * duplicate what the guest already knows - or surprise someone who never
+ * gave Vista Valle their address - and the administrative alert would
+ * notify the very person who just created the reservation.
+ */
+export function reservationOriginNotifiesOnConfirmation(
+  origin: ReservationOrigin
+) {
+  return origin === "website";
+}
+
 /** Cryptographically random, externally visible reservation identifier. */
 export function generateReservationPublicId() {
   return `VV-${crypto.randomUUID()}`;
@@ -184,7 +200,10 @@ export async function createMultiRoomPayAtPropertyReservation<TContext>(
             externalRef,
           }
         );
-      if (!notificationOutboxWriter)
+      if (
+        !notificationOutboxWriter ||
+        !reservationOriginNotifiesOnConfirmation(created.reservation.origin)
+      )
         return { ...created, notificationOutboxIds: [] };
 
       try {

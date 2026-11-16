@@ -5,8 +5,10 @@ import { inArray } from "drizzle-orm";
 import { getServerEnvironment } from "@/config/server";
 import { nights } from "@/features/availability";
 import type { NotificationTemplateDataSource } from "@/features/notifications";
+import { guestFullName } from "@/features/reservations";
 import { rooms } from "@/persistence/schema";
 import { createDrizzleCompanyQuotationRepository } from "./company-quotation-repository";
+import { createDrizzleGuestRepository } from "./guest-repository";
 import { createDrizzleReservationRepository } from "./reservation-repository";
 import type { ProductionDatabase } from "./client";
 
@@ -20,6 +22,7 @@ export function createProductionNotificationTemplateDataSource(
 ): NotificationTemplateDataSource {
   const quotations = createDrizzleCompanyQuotationRepository(db);
   const reservations = createDrizzleReservationRepository(db);
+  const guests = createDrizzleGuestRepository(db);
 
   const roomNamesByIds = async (roomIds: readonly string[]) => {
     if (roomIds.length === 0) return new Map<string, string>();
@@ -38,6 +41,9 @@ export function createProductionNotificationTemplateDataSource(
     getReservationEmailData: async (reservationId) => {
       const reservation = await reservations.getReservationById(reservationId);
       if (!reservation) return null;
+      // A guest row that can no longer be read must not stop the email:
+      // the name is dropped and the rest of the detail still goes out.
+      const guest = await guests.getGuestById(reservation.guestId);
       const names = await roomNamesByIds(
         reservation.items.map((item) => item.roomId)
       );
@@ -55,6 +61,7 @@ export function createProductionNotificationTemplateDataSource(
         checkOut: reservation.checkOut,
         contactEmail: getServerEnvironment().ADMIN_NOTIFICATION_EMAIL,
         guestCount: reservation.guestCount,
+        guestName: guest ? guestFullName(guest) : undefined,
         items,
         nights: nights(reservation.checkIn, reservation.checkOut),
         origin: reservation.origin,

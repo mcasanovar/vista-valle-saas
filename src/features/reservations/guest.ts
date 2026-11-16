@@ -20,6 +20,21 @@ export type GuestContactDetails = Readonly<{
  * `comment` are reservation-level fields (see `reservations.guest_comment`
  * in `src/persistence/schema.ts`); they are not stored on `guests`.
  */
+/**
+ * How a guest is named in anything a person reads - a confirmation email,
+ * an administrative alert. Tolerates a half-filled record (a channel-sync
+ * import carries no surname) by dropping the missing half instead of
+ * leaving a dangling space.
+ */
+export function guestFullName(
+  guest: Readonly<{ firstName?: string; lastName?: string }>
+) {
+  return [guest.firstName, guest.lastName]
+    .map((part) => part?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
+}
+
 export type GuestBookingInput = Readonly<
   GuestContactDetails & {
     comment?: string;

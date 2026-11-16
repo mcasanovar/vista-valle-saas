@@ -1,7 +1,10 @@
 import { nights, type RoomLockGateway } from "@/features/availability";
 import type { NotificationOutboxWriter } from "@/features/notifications";
 
-import { generateReservationPublicId } from "./create-pay-at-property-reservation";
+import {
+  generateReservationPublicId,
+  reservationOriginNotifiesOnConfirmation,
+} from "./create-pay-at-property-reservation";
 import type { GuestRepository } from "./guest-repository";
 import { isHoldExpired, type HoldRepository, type ReservationHoldRecord } from "./hold-repository";
 import type {
@@ -105,7 +108,10 @@ export async function confirmPayNowReservationFromHold<TContext>(
       );
       await holdRepository.deleteHold(context, hold);
 
-      if (!notificationOutboxWriter)
+      if (
+        !notificationOutboxWriter ||
+        !reservationOriginNotifiesOnConfirmation(created.reservation.origin)
+      )
         return { ...created, notificationOutboxIds: [] };
 
       const guest = await guestRepository.getGuestById(hold.guestId);

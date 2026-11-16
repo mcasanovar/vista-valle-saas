@@ -134,7 +134,7 @@ describe("notification outbox", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("integrates manual reservations and payment collection with the shared canonical outbox", async () => {
+  it("keeps a manual reservation silent while payment collection still notifies the administrator", async () => {
     const manual = await createManualReservation(
       {
         ...guest,
@@ -145,10 +145,12 @@ describe("notification outbox", () => {
       },
       "admin-outbox"
     );
+    // The administrator just entered this reservation themselves, so it
+    // notifies no one - neither the guest nor the administrative copy.
     const reservationIntents = getMockNotificationOutboxIntents().filter(
       (intent) => intent.reservationId === manual.reservation.id
     );
-    expect(reservationIntents).toHaveLength(2);
+    expect(reservationIntents).toEqual([]);
 
     const payment = await getMockPendingPaymentByReservationId(
       manual.reservation.id
