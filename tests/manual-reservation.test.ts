@@ -3,6 +3,7 @@ import {
   createManualReservation,
   manualOrigins,
 } from "@/features/admin/manual-reservation";
+import { addLodgingDays, lodgingToday } from "@/features/availability";
 import { confirmPayAtPropertyBooking } from "@/features/reservations/confirm-pay-at-property";
 const guest = {
   room: "demo-room-andes",
@@ -280,6 +281,69 @@ describe("manual reservation", () => {
         "admin-1"
       )
     ).rejects.toThrow("must be a positive whole amount");
+  });
+
+  /**
+   * `admin-manual-reservations` spec, "Registro de estadías ya iniciadas o
+   * pasadas": the administrative flow registers a stay that arrived late, so
+   * the public search's current-date rule does not apply here.
+   */
+  it("creates a reservation for a stay already under way", async () => {
+    const today = lodgingToday();
+    const result = await createManualReservation(
+      {
+        ...guest,
+        room: "demo-room-terra",
+        origin: "whatsapp",
+        checkIn: addLodgingDays(today, -1),
+        checkOut: addLodgingDays(today, 2),
+      },
+      "admin-1"
+    );
+    expect(result.reservation.status).toBe("confirmed");
+    expect(result.reservation.checkIn).toBe(addLodgingDays(today, -1));
+  });
+
+  it("creates a reservation for a stay that already ended", async () => {
+    const result = await createManualReservation(
+      {
+        ...guest,
+        room: "demo-room-terra",
+        origin: "airbnb",
+        checkIn: "2019-05-10",
+        checkOut: "2019-05-14",
+      },
+      "admin-1"
+    );
+    expect(result.reservation.status).toBe("confirmed");
+    expect(result.reservation.checkIn).toBe("2019-05-10");
+    expect(result.reservation.checkOut).toBe("2019-05-14");
+  });
+
+  it("rejects an overlapping manual reservation in past dates too", async () => {
+    const input = {
+      ...guest,
+      room: "demo-room-valle",
+      origin: "booking",
+      checkIn: "2019-07-01",
+      checkOut: "2019-07-04",
+    };
+    await createManualReservation(input, "admin-1");
+    await expect(createManualReservation(input, "admin-1")).rejects.toThrow();
+  });
+
+  it("rejects a check-out that does not follow the check-in", async () => {
+    await expect(
+      createManualReservation(
+        {
+          ...guest,
+          origin: "admin",
+          checkIn: "2029-04-10",
+          checkOut: "2029-04-08",
+        },
+        "admin-1"
+      )
+    ).rejects.toThrow("Check-out must be after check-in");
   });
 
   it("rejects an overlapping manual reservation", async () => {

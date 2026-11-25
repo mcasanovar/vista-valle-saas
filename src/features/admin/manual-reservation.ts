@@ -33,9 +33,7 @@ import {
 import { createDatabaseBoundary } from "@/infrastructure/database/server";
 import {
   manualOrigins,
-  validateManualReservationDateRange,
   type ManualOrigin,
-  type ManualReservationDateFieldError,
 } from "./manual-reservation-contract";
 import { writeStructuredLog } from "@/infrastructure/observability/sentry";
 import { parseNightlyRateAmount } from "./nightly-rate-amount";
@@ -44,17 +42,6 @@ export {
   manualOrigins,
   type ManualOrigin,
 } from "./manual-reservation-contract";
-
-export class ManualReservationDateRangeError extends Error {
-  readonly code = "INVALID_MANUAL_RESERVATION_DATE_RANGE" as const;
-  readonly fieldErrors: readonly ManualReservationDateFieldError[];
-
-  constructor(fieldErrors: readonly ManualReservationDateFieldError[]) {
-    super(fieldErrors[0]?.message ?? "Fechas de reserva inválidas.");
-    this.name = "ManualReservationDateRangeError";
-    this.fieldErrors = fieldErrors;
-  }
-}
 
 export type ManualReservationDependencies<TContext> = Readonly<{
   guestRepository: GuestRepository<TContext>;
@@ -175,12 +162,10 @@ export async function createManualReservationFromInput<TContext>(
   const rooms = selected
     .map(toResolvedRoom)
     .map((room) => applyManualNightlyRate(room, input));
+  // The only date rule this flow has - departure after entry - is the
+  // domain's own interval invariant, enforced here. An entry date in the past
+  // is legitimate: see `./manual-reservation-contract.ts`.
   const interval = createLodgingInterval(input.checkIn, input.checkOut);
-  const dateErrors = validateManualReservationDateRange(
-    interval.checkIn,
-    interval.checkOut
-  );
-  if (dateErrors.length) throw new ManualReservationDateRangeError(dateErrors);
   const result = await createMultiRoomPayAtPropertyReservation({
     actorUserId: actor,
     guestCandidate: input.guest,

@@ -302,26 +302,119 @@ describe("manual reservation form", () => {
     vi.unstubAllGlobals();
   });
 
-  it("rejects a check-in date before today, matching the public search rule", async () => {
+  it("leaves the entry date unbounded and bounds departure by the chosen entry", async () => {
     renderForm({ action: vi.fn() });
-    fireEvent.submit(
-      screen.getByRole("form", { name: "Crear reserva manual" })
+
+    expect(screen.getByLabelText("Entrada")).not.toHaveAttribute("min");
+    expect(screen.getByLabelText("Salida")).not.toHaveAttribute("min");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => availableResponse())
     );
+    fireEvent.change(screen.getByLabelText("Entrada"), {
+      target: { value: "2000-01-01" },
+    });
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Salida")).toHaveAttribute(
+        "min",
+        "2000-01-01"
+      )
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("accepts a check-in before today, for a stay already under way", async () => {
+    const fetchMock = vi.fn(async () => availableResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    const action = vi.fn();
+    const user = userEvent.setup();
+    renderForm({ action });
 
     fireEvent.change(screen.getByLabelText("Entrada"), {
       target: { value: "2000-01-01" },
     });
     fireEvent.change(screen.getByLabelText("Salida"), {
-      target: { value: "2000-01-02" },
+      target: { value: "2000-01-03" },
+    });
+    await user.click(
+      await screen.findByRole("checkbox", { name: /habitación valle/i })
+    );
+    await user.type(screen.getByLabelText("Nombre"), "Ana");
+    await user.type(screen.getByLabelText("Apellido"), "Pérez");
+    await user.type(
+      screen.getByLabelText("Correo electrónico"),
+      "ana@example.test"
+    );
+    await user.type(screen.getByLabelText("Teléfono"), "+56912345678");
+    fireEvent.submit(
+      screen.getByRole("form", { name: "Crear reserva manual" })
+    );
+
+    await waitFor(() => expect(action).toHaveBeenCalledOnce());
+    expect(
+      screen.queryByText("La fecha de entrada no puede ser anterior a hoy.")
+    ).not.toBeInTheDocument();
+    const submitted = action.mock.calls[0]![0] as FormData;
+    expect(submitted.get("checkIn")).toBe("2000-01-01");
+    expect(submitted.get("checkOut")).toBe("2000-01-03");
+    vi.unstubAllGlobals();
+  });
+
+  it("names the date rule for an inverted interval instead of a doomed query", async () => {
+    const fetchMock = vi.fn(async () => availableResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    renderForm({ action: vi.fn() });
+
+    fireEvent.change(screen.getByLabelText("Entrada"), {
+      target: { value: "2033-02-12" },
+    });
+    fireEvent.change(screen.getByLabelText("Salida"), {
+      target: { value: "2033-02-10" },
+    });
+
+    expect(
+      await screen.findByText(
+        "La fecha de salida debe ser posterior a la de entrada."
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "No pudimos consultar las habitaciones. Revisa las fechas e inténtalo nuevamente."
+      )
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Crear reserva" })
+    ).toBeDisabled();
+    expect(fetchMock).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("stops an inverted interval before calling the action", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => availableResponse())
+    );
+    const action = vi.fn();
+    renderForm({ action });
+
+    fireEvent.change(screen.getByLabelText("Entrada"), {
+      target: { value: "2033-02-12" },
+    });
+    fireEvent.change(screen.getByLabelText("Salida"), {
+      target: { value: "2033-02-10" },
     });
     fireEvent.submit(
       screen.getByRole("form", { name: "Crear reserva manual" })
     );
 
     const dateErrors = await screen.findAllByText(
-      "La fecha de entrada no puede ser anterior a hoy."
+      "La fecha de salida debe ser posterior a la de entrada."
     );
     expect(dateErrors.length).toBeGreaterThan(0);
+    expect(action).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 
