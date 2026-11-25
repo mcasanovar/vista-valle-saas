@@ -12,7 +12,6 @@ import {
   type RoomReadSource,
 } from "@/features/rooms";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
-import { validateManualReservationDateRange } from "./manual-reservation-contract";
 
 export type ManualReservationAvailability = Readonly<{
   checkIn: string;
@@ -41,6 +40,10 @@ export async function resolveManualReservationAvailability(
     roomSource: RoomReadSource;
   }>
 ): Promise<ManualReservationAvailability> {
+  // No minimum-date rule is applied: an administrator resolves availability
+  // for a stay that already began, or already ended, exactly as for a future
+  // one (`./manual-reservation-contract.ts`). `createLodgingInterval` still
+  // rejects an inverted interval.
   let interval;
   try {
     interval = createLodgingInterval(
@@ -51,14 +54,6 @@ export async function resolveManualReservationAvailability(
     throw new ManualReservationAvailabilityInputError(
       "Selecciona fechas de entrada y salida válidas."
     );
-  }
-
-  const dateErrors = validateManualReservationDateRange(
-    interval.checkIn,
-    interval.checkOut
-  );
-  if (dateErrors.length) {
-    throw new ManualReservationAvailabilityInputError(dateErrors[0]!.message);
   }
 
   const rooms = await Promise.all(

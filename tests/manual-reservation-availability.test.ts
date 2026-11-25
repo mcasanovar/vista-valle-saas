@@ -104,7 +104,7 @@ describe("manual reservation availability boundary", () => {
     });
   });
 
-  it("rejects dates before the public booking minimums", async () => {
+  it("resolves availability for a stay whose dates already passed", async () => {
     requireAdministrator.mockResolvedValueOnce({ user: { id: "admin-1" } });
     getRoomReadSource.mockResolvedValueOnce(roomSource);
     getAvailabilitySearchRepository.mockReturnValue(
@@ -116,8 +116,30 @@ describe("manual reservation availability boundary", () => {
         checkIn: "2000-01-01",
         checkOut: "2000-01-02",
       })
+    ).resolves.toMatchObject({
+      checkIn: "2000-01-01",
+      checkOut: "2000-01-02",
+      rooms: [
+        expect.objectContaining({ id: "trusted-room-a" }),
+        expect.objectContaining({ id: "trusted-room-b" }),
+      ],
+    });
+  });
+
+  it("still rejects an inverted interval as invalid input", async () => {
+    requireAdministrator.mockResolvedValueOnce({ user: { id: "admin-1" } });
+    getRoomReadSource.mockResolvedValueOnce(roomSource);
+    getAvailabilitySearchRepository.mockReturnValue(
+      createMockAvailabilityRepository({ blocks: [], holds: [], reservations: [] })
+    );
+
+    await expect(
+      getManualReservationAvailability({
+        checkIn: "2000-01-02",
+        checkOut: "2000-01-01",
+      })
     ).rejects.toMatchObject({
-      message: "La fecha de entrada no puede ser anterior a hoy.",
+      message: "Selecciona fechas de entrada y salida válidas.",
     });
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import { LoaderCircle } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // eslint-disable-next-line architecture/feature-public-api -- the public availability barrel reaches server-only data access.
 import { nights as calculateNights } from "@/features/availability/client-date-only";
@@ -19,7 +19,6 @@ import type {
 import type { ManualReservationInitialData } from "./manual-reservation-data";
 import {
   manualOrigins,
-  manualReservationDateMinimums,
   validateManualReservationDateRange,
 } from "./manual-reservation-contract";
 import {
@@ -153,13 +152,15 @@ export function ManualReservationForm({
   const [pending, setPending] = useState(false);
   const errorSummary = useRef<HTMLDivElement>(null);
   const { notify } = useToast();
-  const dateMinimums = useMemo(() => manualReservationDateMinimums(), []);
 
   useEffect(() => {
     if (Object.keys(errors).length) errorSummary.current?.focus();
   }, [errors]);
   useEffect(() => {
     if (!checkIn || !checkOut) return;
+    // An inverted interval has no availability to resolve; `updateDate` has
+    // already reported the rule that was broken.
+    if (validateManualReservationDateRange(checkIn, checkOut).length) return;
     const controller = new AbortController();
     void fetch(
       `/api/admin/manual-reservations/availability?${new URLSearchParams({ checkIn, checkOut })}`,
@@ -199,7 +200,20 @@ export function ManualReservationForm({
     setAvailableRooms([]);
     setSelectedRoomIds([]);
     setRoomGuestCounts({});
-    setAvailabilityError(undefined);
+    // Naming the broken date rule here, instead of letting the effect fire a
+    // query the BFF is bound to reject, is what keeps the administrator from
+    // reading a generic "no pudimos consultar" message when the real problem
+    // is the order of the two dates. The submit button stays disabled either
+    // way, since no room can be selected without availability.
+    const [dateError] = validateManualReservationDateRange(
+      nextCheckIn,
+      nextCheckOut
+    );
+    setAvailabilityError(dateError?.message);
+    if (dateError) {
+      setAvailabilityState("error");
+      return;
+    }
     setAvailabilityState(
       nextCheckIn && nextCheckOut ? "loading" : "dates_required"
     );
@@ -512,7 +526,6 @@ export function ManualReservationForm({
               aria-describedby={errors.checkIn ? "checkIn-error" : undefined}
               className={controlClass}
               defaultValue={checkIn}
-              min={dateMinimums.checkIn}
               name="checkIn"
               ref={checkInRef}
               required
@@ -525,7 +538,7 @@ export function ManualReservationForm({
               aria-describedby={errors.checkOut ? "checkOut-error" : undefined}
               className={controlClass}
               defaultValue={checkOut}
-              min={dateMinimums.checkOut}
+              min={checkIn || undefined}
               name="checkOut"
               ref={checkOutRef}
               required

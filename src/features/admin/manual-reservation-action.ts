@@ -11,10 +11,7 @@ import {
 } from "@/features/reservations";
 import { requireAdministrator } from "@/infrastructure/auth/authorization";
 
-import {
-  createManualReservation,
-  ManualReservationDateRangeError,
-} from "./manual-reservation";
+import { createManualReservation } from "./manual-reservation";
 
 export type ManualReservationActionField =
   | "checkIn"
@@ -70,12 +67,6 @@ function unavailableResult(): ManualReservationActionFailure {
 }
 
 function resultForCreationError(error: unknown): ManualReservationActionFailure {
-  if (error instanceof ManualReservationDateRangeError) {
-    return validationResult(
-      error.fieldErrors.map(({ field, message }) => ({ field, message }))
-    );
-  }
-
   if (error instanceof RoomLockConflictError) {
     return Object.freeze({
       code: "availability_conflict",

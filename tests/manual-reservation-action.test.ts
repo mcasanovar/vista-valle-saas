@@ -15,8 +15,10 @@ vi.mock("@/features/admin/manual-reservation", async (importOriginal) => ({
 }));
 
 import { createManualReservationAction } from "@/features/admin/manual-reservation-action";
-import { ManualReservationDateRangeError } from "@/features/admin/manual-reservation";
-import { RoomLockConflictError } from "@/features/availability";
+import {
+  InvalidLodgingIntervalError,
+  RoomLockConflictError,
+} from "@/features/availability";
 import { InvalidGuestInputError } from "@/features/reservations";
 
 describe("manual reservation action", () => {
@@ -91,15 +93,10 @@ describe("manual reservation action", () => {
     });
   });
 
-  it("reports a date range violation as a checkIn/checkOut validation error", async () => {
+  it("reports an inverted interval as a checkOut validation error", async () => {
     requireAdministrator.mockResolvedValueOnce({ user: { id: "admin-1" } });
     createManualReservation.mockRejectedValueOnce(
-      new ManualReservationDateRangeError([
-        {
-          field: "checkIn",
-          message: "La fecha de entrada no puede ser anterior a hoy.",
-        },
-      ])
+      new InvalidLodgingIntervalError("2026-03-16", "2026-03-14")
     );
 
     await expect(
@@ -108,12 +105,30 @@ describe("manual reservation action", () => {
       code: "validation",
       fieldErrors: [
         {
-          field: "checkIn",
-          message: "La fecha de entrada no puede ser anterior a hoy.",
+          field: "checkOut",
+          message: "Indica una fecha de salida posterior a la entrada.",
         },
       ],
       message: "Revisa los datos de la reserva antes de confirmarla.",
       ok: false,
+    });
+  });
+
+  it("does not reject a check-in before today, for a stay already under way", async () => {
+    requireAdministrator.mockResolvedValueOnce({ user: { id: "admin-1" } });
+    createManualReservation.mockResolvedValueOnce({
+      origin: "whatsapp",
+      reservation: { id: "reservation-past" },
+    });
+
+    const formData = new FormData();
+    formData.set("checkIn", "2020-03-14");
+    formData.set("checkOut", "2020-03-16");
+
+    await expect(createManualReservationAction(formData)).resolves.toEqual({
+      ok: true,
+      origin: "whatsapp",
+      reservationId: "reservation-past",
     });
   });
 
